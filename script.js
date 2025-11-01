@@ -245,10 +245,11 @@ function saveAllCharacterData() {
 let currentEditingSweetheartId = null;
 
 /**
- * 打开密友角色卡弹窗（新建模式）
+ * 打开密友角色卡弹窗（新建模式）- 【已修复】
  */
 function openSweetheartCardModal() {
-    renderSweetheartMasksList(contactData.boundMasks || []);
+    // 🔥 核心修复：在这里传入一个空数组，因为是新建，没有已绑定的面具
+    renderSweetheartMasksList([]);
 
     currentEditingSweetheartId = null;
 
@@ -260,13 +261,18 @@ function openSweetheartCardModal() {
     document.getElementById('sweetheart-catchphrase').value = '';
     document.getElementById('sweetheart-history').value = '';
     document.getElementById('sweetheart-relationship').value = '';
+    // ✅ 新增：同样重置ID显示
+    document.getElementById('sweetheart-instance-id').textContent = '待生成';
 
     // 重置头像
     document.getElementById('sweetheart-avatar-preview').src = 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
 
-    // 重置世界书区域
+    // ✅ 新增：重置世界书和面具区域的展开状态
     document.getElementById('sweetheartWorldbooksList').style.display = 'none';
     document.getElementById('sweetheart-wb-arrow').classList.remove('open');
+    document.getElementById('sweetheartMasksList').style.display = 'none';
+    document.getElementById('sweetheart-mask-arrow').classList.remove('open');
+
 
     // 显示弹窗
     document.getElementById('sweetheartCardModal').classList.add('show');
@@ -8635,16 +8641,24 @@ function deleteLocation() {
     }
 }
 
-// 保存地图数据
+/**
+ * 保存地图数据 (已修复)
+ */
 function saveMapData() {
     if (!currentWorldId) {
-        console.log('没有选择世界，无法保存');
+        // [优化] 如果没有世界ID，给用户一个明确的提示
+        showSuccessModal('保存失败', '未选择当前世界，无法保存地图数据!', 2000);
+        console.error('错误：没有选择世界，无法保存');
         return;
     }
 
     // 保存到localStorage
     localStorage.setItem(`mapPins_${currentWorldId}`, JSON.stringify(mapPins));
-    console.log('地图数据已自动保存');
+    console.log('地图数据已成功保存');
+
+    // ▼▼▼ 核心修复：在这里调用成功弹窗函数 ▼▼▼
+    showSuccessModal('保存成功', '地图数据已更新！');
+    // ▲▲▲ 修复结束 ▲▲▲
 }
 
 // 打开世界书绑定
