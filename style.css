@@ -229,7 +229,6 @@ body {
     padding: 20px;
     display: flex;
     flex-direction: column;
-    gap: 16px;
     background-color: rgba(247, 248, 250, 0.85); /* 新增此行 */
 }
 
@@ -272,6 +271,7 @@ body {
     display: flex;
     max-width: 100%;
     gap: 12px;
+    margin: 8px 0;
     align-items: flex-start;
 }
 
@@ -299,12 +299,13 @@ body {
 .chat-bubble {
     max-width: calc(100vw - 120px);
     width: fit-content;
-    padding: 12px 16px;
+    padding: 12px;
     border-radius: 20px;
     font-size: 16px;
-    line-height: 1.5;
+    line-height: 1.2;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
     word-break: break-word;
+    white-space: pre-wrap;
 }
 
 /* --- 6. 图片消息样式 --- */
@@ -1016,7 +1017,7 @@ body.fullscreen-enabled {
     border-radius: 24px;
     backdrop-filter: blur(20px);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
-    z-index: 200;
+    z-index: 1000;
     backdrop-filter: blur(10px);
 }
 
@@ -2181,39 +2182,13 @@ body.fullscreen-enabled {
     border-radius: 14px;
     transform: translateY(100%);
     transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    border: none;
+    outline: none;
+    box-shadow: none;
 }
 
 .avatar-action-sheet.show .action-sheet-options {
     transform: translateY(0);
-}
-
-.action-option {
-    background: #fff;
-    padding: 16px;
-    text-align: center;
-    font-size: 16px;
-    font-weight: 500;
-    color: #007aff;
-    cursor: pointer;
-    border-bottom: 1px solid #e5e5e5;
-}
-
-.action-option:first-child {
-    border-top-left-radius: 12px;
-    border-top-right-radius: 12px;
-}
-
-.action-option:last-child {
-    border-bottom: none;
-    border-bottom-left-radius: 12px;
-    border-bottom-right-radius: 12px;
-}
-
-.action-option.cancel {
-    background: #fff;
-    margin-top: 8px;
-    border-radius: 12px;
-    font-weight: 600;
 }
 
 
@@ -2318,16 +2293,14 @@ input:checked + .slider:before {
     transform: translateX(20px);
 }
 
-/* ========== 开始：粘贴这段新的 CSS 代码 ========== */
-
-.message-action-sheet {
-    /* 样式与 avatar-action-sheet 类似，但有独立类名以防冲突 */
+/* ========== 普通聊天的消息操作菜单 ========== */
+.chat-page .message-action-sheet {
     position: absolute;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    z-index: 1008; /* 层级高于聊天页面 */
+    z-index: 1008;
     display: flex;
     flex-direction: column;
     justify-content: flex-end;
@@ -2336,12 +2309,12 @@ input:checked + .slider:before {
     transition: opacity 0.3s ease, visibility 0.3s ease;
 }
 
-.message-action-sheet.show {
+.chat-page .message-action-sheet.show {
     opacity: 1;
     visibility: visible;
 }
 
-.message-action-sheet .action-sheet-backdrop {
+.chat-page .message-action-sheet .action-sheet-backdrop {
     position: absolute;
     top: 0;
     left: 0;
@@ -2350,7 +2323,7 @@ input:checked + .slider:before {
     background: rgba(0, 0, 0, 0.4);
 }
 
-.message-action-sheet .action-sheet-options {
+.chat-page .message-action-sheet .action-sheet-options {
     position: relative;
     z-index: 1;
     background: #f0f2f5;
@@ -2361,21 +2334,129 @@ input:checked + .slider:before {
     transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
-.message-action-sheet.show .action-sheet-options {
+.chat-page .message-action-sheet.show .action-sheet-options {
     transform: translateY(0);
 }
 
-/* 为删除选项添加特殊的危险颜色 */
-
-.action-option.destructive {
-    color: #ff3b30; /* iOS 风格的红色 */
+/* ========== 密友聊天的消息操作菜单 ========== */
+.sweetheart-chat-page .message-action-sheet {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1008;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
 }
 
-/* 移除旧的、不再需要的删除按钮样式 */
-
-.delete-msg-btn {
-    display: none; /* 直接隐藏，不再使用 */
+.sweetheart-chat-page .message-action-sheet.show {
+    opacity: 1;
+    visibility: visible;
 }
+
+.sweetheart-chat-page .message-action-sheet .action-sheet-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.4);
+}
+
+.sweetheart-chat-page .message-action-sheet .action-sheet-options {
+    position: relative;
+    z-index: 1;
+    background: #f0f2f5;
+    padding: 8px;
+    margin: 8px;
+    border-radius: 14px;
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.sweetheart-chat-page .message-action-sheet.show .action-sheet-options {
+    transform: translateY(0);
+}
+
+
+/* ========== 开始：粘贴这段全新的 CSS 代码 ========== */
+
+/* 密友聊天设置页面 - 主容器 */
+.chat-settings-page {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    transform: translateX(100%); /* 默认从右侧隐藏 */
+    transition: transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    z-index: 1007; /* 层级高于聊天页面，低于模态框 */
+    display: flex;
+    flex-direction: column;
+}
+
+/* 当有 .show 类时滑入 */
+.chat-settings-page.show {
+    transform: translateX(0);
+}
+
+/* 密友聊天设置页面的特定主题 */
+#sweetheartChatSettingsPage {
+    background: linear-gradient(180deg, #FFF0F5 0%, #FFE4E9 100%); /* 可爱的粉色渐变 */
+}
+
+#sweetheartChatSettingsPage .settings-header {
+    background: linear-gradient(135deg, #FFB6C1, #FFC0D9); /* 头部使用更深的粉色 */
+}
+
+#sweetheartChatSettingsPage .settings-title {
+    color: white; /* 标题文字为白色 */
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+#sweetheartChatSettingsPage .back-btn {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+}
+
+#sweetheartChatSettingsPage .section-title {
+    color: #C7828F; /* 节标题使用粉棕色 */
+}
+
+#sweetheartChatSettingsPage .settings-item {
+    background: rgba(255, 255, 255, 0.8); /* 选项使用半透明白色 */
+    border-radius: 12px;
+    margin: 0 16px 8px; /* 为选项添加圆角和边距 */
+    border-bottom: none; /* 移除默认的下划线 */
+}
+
+#sweetheartChatSettingsPage .settings-item:first-of-type {
+    border-radius: 12px;
+}
+
+#sweetheartChatSettingsPage .settings-item:last-of-type {
+    border-radius: 12px;
+}
+
+#sweetheartChatSettingsPage .settings-label {
+    color: #8D6E63; /* 选项标签使用棕色 */
+}
+
+#sweetheartChatSettingsPage .settings-desc {
+    color: #BCAAA4; /* 描述文字使用浅棕色 */
+}
+
+#sweetheartChatSettingsPage .settings-arrow {
+    color: #FFC0D9; /* 箭头使用粉色 */
+}
+
+/* ========== 结束：粘贴全新的 CSS 代码 ========== */
+
 
 /* ========== 开始：为代码块复制功能添加新样式 ========== */
 
@@ -2886,40 +2967,80 @@ input:checked + .slider:before {
 .avatar-action-sheet.show .action-sheet-options {
     transform: translateY(0);
 }
-
-.action-option {
-    background: rgba(255, 255, 255, 0.9);
-    backdrop-filter: blur(10px);
+/* ========== 普通聊天菜单样式 ========== */
+.chat-page .message-action-sheet .action-option {
+    background: #fff;
     padding: 16px;
     text-align: center;
     font-size: 16px;
     font-weight: 500;
-    color: #007aff; /* iOS 风格的蓝色 */
+    color: #007aff;
     cursor: pointer;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    border-bottom: 1px solid #e5e5e5;
+    border-left: none;
+    border-right: none;
+    border-top: none;
 }
 
-.action-option:first-child {
+.chat-page .message-action-sheet .action-option:first-child {
     border-top-left-radius: 12px;
     border-top-right-radius: 12px;
 }
 
-.action-option:last-child {
+.chat-page .message-action-sheet .action-option:last-child {
     border-bottom: none;
     border-bottom-left-radius: 12px;
     border-bottom-right-radius: 12px;
 }
 
-.action-option.cancel {
-    background: white;
+.chat-page .message-action-sheet .action-option.cancel {
+    background: #fff;
     margin-top: 8px;
     border-radius: 12px;
     font-weight: 600;
 }
 
-.action-option:active {
-    background: rgba(230, 230, 230, 0.9);
+.chat-page .message-action-sheet .action-option.destructive {
+    color: #ff3b30;
 }
+
+/* ========== 密友聊天菜单样式 ========== */
+.sweetheart-chat-page .message-action-sheet .action-option {
+    background: #fff;
+    padding: 16px;
+    text-align: center;
+    font-size: 16px;
+    font-weight: 500;
+    color: #007aff;
+    cursor: pointer;
+    border-bottom: 1px solid #e5e5e5;
+    border-left: none;
+    border-right: none;
+    border-top: none;
+}
+
+.sweetheart-chat-page .message-action-sheet .action-option:first-child {
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+}
+
+.sweetheart-chat-page .message-action-sheet .action-option:last-child {
+    border-bottom: none;
+    border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
+}
+
+.sweetheart-chat-page .message-action-sheet .action-option.cancel {
+    background: #fff;
+    margin-top: 8px;
+    border-radius: 12px;
+    font-weight: 600;
+}
+
+.sweetheart-chat-page .message-action-sheet .action-option.destructive {
+    color: #ff3b30;
+}
+
 
 /* ========== 结束：粘贴全新的CSS代码 ========== */
 /* 确保ID区域不会挤压中间内容 */
@@ -3206,7 +3327,7 @@ input:checked + .slider:before {
     background: linear-gradient(180deg, #F8E8EE 0%, #EEDDD3 100%); /* 柔和的粉-褐渐变 */
     transform: translateY(100%); /* 默认从下方隐藏 */
     transition: transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-    z-index: 1003; /* 与其他页面层级类似 */
+    z-index: 1008; /* 与其他页面层级类似 */
     display: flex;
     flex-direction: column;
 }
@@ -3225,6 +3346,8 @@ input:checked + .slider:before {
     backdrop-filter: blur(10px);
     box-shadow: 0 2px 8px rgba(161, 136, 127, 0.1); /* 柔和的棕色阴影 */
     flex-shrink: 0;
+    position: relative;
+    z-index: 10;
 }
 
 /* 4. 标题样式 (使用深褐色文字) */
@@ -3637,49 +3760,72 @@ input:checked + .slider:before {
 }
 
 /* ========== 步骤1：在这里粘贴“密友专属”聊天主题CSS ========== */
+/* ========== 密友专用聊天页面样式 ========== */
 
-/* 当聊天页面 (.chat-page) 同时拥有 .sweetheart-mode 类时，以下所有样式生效 */
-
-.chat-page.sweetheart-mode .chat-header {
-    background: linear-gradient(135deg, #FFF0F5, #FFE4E9); /* 柔和的粉色渐变 */
-    box-shadow: 0 2px 8px rgba(212, 165, 165, 0.2);
-    border-bottom: 1px solid rgba(255, 228, 233, 0.8);
+.sweetheart-chat-page {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(180deg, #FFF0F5 0%, #FFE4E9 100%);
+    z-index: 1005;
+    display: flex;
+    flex-direction: column;
+    transform: translateY(100%);
+    transition: transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
-.chat-page.sweetheart-mode .chat-title {
-    color: #8D6E63; /* 深褐色文字，更显质感 */
-    font-weight: 700;
+.sweetheart-chat-page.show {
+    transform: translateY(0);
 }
 
-.chat-page.sweetheart-mode .back-btn,
-.chat-page.sweetheart-mode .edit-contact-btn,
-.chat-page.sweetheart-mode .chat-settings-btn {
-    color: #D4A5A5; /* 柔和的粉棕色 */
-    background: rgba(255, 255, 255, 0.5);
-    font-size: 20px;
+/* 头部样式 - 粉色渐变 */
+.sweetheart-chat-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 45px 12px 12px;
+    background: linear-gradient(135deg, #FFB6C1, #FFC0D9);
+    box-shadow: 0 2px 8px rgba(212, 165, 165, 0.3);
+    flex-shrink: 0;
 }
 
-.chat-page.sweetheart-mode .chat-header .back-btn:hover,
-.chat-page.sweetheart-mode .chat-header .edit-contact-btn:hover,
-.chat-page.sweetheart-mode .chat-header .chat-settings-btn:hover {
-    background: rgba(255, 255, 255, 0.8);
+.sweetheart-chat-title {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 17px;
+    font-weight: 600;
+    color: white;
+    margin: 0;
+    text-shadow: 0 1px 3px rgba(161, 136, 127, 0.3);
 }
 
-/* 可爱的聊天背景，带有一点点心形图案 */
-.chat-page.sweetheart-mode .chat-messages {
+/* 消息区域 - 带心形图案背景 */
+.sweetheart-chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
     background-color: #FDF6F8;
     background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23F8E8EE' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
 }
 
-/* 我方发送的气泡（粉色） */
-.chat-page.sweetheart-mode .message-row.sent .chat-bubble {
+.sweetheart-chat-messages::-webkit-scrollbar {
+    display: none;
+}
+
+/* 我方发送的气泡 - 粉色渐变 */
+.sweetheart-chat-page .message-row.sent .chat-bubble {
     background: linear-gradient(135deg, #FFB6C1, #FF9AAD);
     color: white;
     box-shadow: 0 3px 8px rgba(255, 182, 193, 0.3);
 }
 
-/* 对方发送的气泡（白色带粉边） */
-.chat-page.sweetheart-mode .message-row.received .chat-bubble {
+/* 对方发送的气泡 - 白色带粉边 */
+.sweetheart-chat-page .message-row.received .chat-bubble {
     background: #FFFFFF;
     color: #8D6E63;
     border: 1px solid #FFE4E9;
@@ -3687,19 +3833,131 @@ input:checked + .slider:before {
 }
 
 /* 输入区域 */
-.chat-page.sweetheart-mode .chat-input-area {
-    background: #FFF5F8;
-    border-top-color: #FFE8E8;
+.sweetheart-chat-input-area {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding: 8px 12px;
+    background: linear-gradient(180deg, #FFF5F8 0%, #FFFFFF 100%);
+    border-top: 1px solid #FFE8E8;
+    flex-shrink: 0;
+    position: relative; /* 新增 */
+    z-index: 10; /* 新增：确保输入区域在最上层 */
 }
 
-.chat-page.sweetheart-mode .chat-input-area input {
-    background: white;
+.sweetheart-chat-input-area input {
+    flex: 1;
+    padding: 10px 16px;
     border: 1px solid #FFD1DC;
+    background: white;
+    border-radius: 20px;
+    font-size: 16px;
+    outline: none;
 }
 
-.chat-page.sweetheart-mode .chat-input-area .chat-action-btn.primary {
-    background: #FFB6C1; /* 发送按钮也变成粉色 */
+/* 🔧 修复：确保输入框可以获得焦点和接收输入 */
+.sweetheart-chat-input-area input {
+    pointer-events: auto; /* 确保可以点击 */
+    user-select: text; /* 确保可以选择文本 */
+    -webkit-user-select: text; /* Safari兼容 */
 }
+
+.sweetheart-chat-input-area input:disabled {
+    pointer-events: none;
+    opacity: 0.6;
+}
+
+
+.sweetheart-chat-input-area input:focus {
+    border-color: #FFB6C1;
+    box-shadow: 0 0 0 3px rgba(255, 182, 193, 0.2);
+}
+
+/* 按钮样式 */
+/* 🔧 修复：确保密友聊天界面的附件按钮SVG图标可见 */
+.sweetheart-chat-input-area .chat-action-btn {
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: #f0f2f5;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.sweetheart-chat-input-area .chat-action-btn svg {
+    width: 20px;
+    height: 20px;
+    fill: #6c757d;
+}
+
+.sweetheart-chat-input-area .chat-action-btn.primary {
+    background: linear-gradient(135deg, #FFB6C1, #FF9AAD);
+    display: none; /* 默认隐藏 */
+}
+
+.sweetheart-chat-input-area.has-text .chat-action-btn.primary {
+    display: flex;
+}
+
+.sweetheart-chat-input-area.has-text #sweetheartGetReplyBtn {
+    display: none;
+}
+
+.sweetheart-chat-input-area .chat-action-btn.primary svg {
+    fill: white;
+}
+
+/* 密友设置页面 */
+#sweetheartChatSettingsPage {
+    background: linear-gradient(180deg, #FFF0F5 0%, #FFE4E9 100%);
+}
+
+#sweetheartChatSettingsPage .settings-header {
+    background: linear-gradient(135deg, #FFB6C1, #FFC0D9);
+}
+
+#sweetheartChatSettingsPage .settings-title {
+    color: white;
+}
+
+/* 为密友聊天输入区按钮内的图片图标设置样式 */
+.sweetheart-chat-input-area .chat-action-btn img {
+    width: 28px; /* 设置图片宽度 */
+    height: 28px; /* 设置图片高度 */
+    object-fit: contain; /* 确保图片完整显示不被裁剪 */
+    transition: transform 0.2s ease;
+}
+
+/* 鼠标悬停时稍微放大图片 */
+.sweetheart-chat-input-area .chat-action-btn:hover img {
+    transform: scale(1.15);
+}
+
+/* ========== 【最终修正版】气泡样式修正 ========== */
+
+/* 1. 在所有气泡模式下，强制隐藏昵称元素 */
+.chat-page:not(.simple-style) .message-sender-name,
+.sweetheart-chat-page .message-sender-name {
+    display: none;
+}
+
+/* 2. 【核心修复】在所有气泡模式下，移除父容器的gap，彻底消除空白 */
+.chat-page:not(.simple-style) .message-content,
+.sweetheart-chat-page .message-content {
+    gap: 0;
+}
+
+/* 3. 在简洁模式下，再把gap加回来，保证昵称和消息文本有间距 */
+.chat-page.simple-style .message-content {
+    gap: 4px;
+}
+
 
 /* ========== 世界选择页面样式 ========== */
 .world-select-page {
@@ -3711,7 +3969,7 @@ input:checked + .slider:before {
     background: linear-gradient(180deg, #E8F4F8 0%, #D4E9F0 100%);
     transform: translateY(100%);
     transition: transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-    z-index: 1007;
+    z-index: 2000;
     display: flex;
     flex-direction: column;
 }
@@ -5080,3 +5338,2639 @@ input:checked + .slider:before {
     display: flex;
 }
 
+/* ========== 修复聊天气泡顶部空白问题 ========== */
+
+/* 1. 移除主消息文本的顶部边距 */
+.chat-bubble .main-message-text {
+    margin-top: 0;
+}
+
+/* 2. 当有引用内容时，才添加间距 */
+.chat-bubble .quoted-message-wrapper + .main-message-text {
+    margin-top: 4px;
+}
+
+/* 3. 确保气泡内第一个元素没有顶部边距 */
+.chat-bubble > *:first-child {
+    margin-top: 0;
+}
+
+/* 4. 确保气泡内最后一个元素没有底部边距 */
+.chat-bubble > *:last-child {
+    margin-bottom: 0;
+}
+
+/* 5. 如果还有问题，可以尝试减少气泡的内边距 */
+.chat-bubble {
+    padding: 10px 12px; /* 原来是 12px，稍微减少顶部内边距 */
+}
+
+/* 6. 确保代码块也没有额外的顶部边距 */
+.chat-bubble .code-block-wrapper:first-child {
+    margin-top: 0;
+}
+
+/* ========== 密友设置界面样式 ========== */
+.sweetheart-settings-page {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(180deg, #FFF0F5 0%, #FFE4E9 100%);
+    transform: translateX(100%);
+    transition: transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    z-index: 1009;
+    display: flex;
+    flex-direction: column;
+}
+
+.sweetheart-settings-page.show {
+    transform: translateX(0);
+}
+
+/* 地图编辑页面样式 */
+.map-editor-page {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #F5F5F5;
+    transform: translateX(100%);
+    transition: transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    z-index: 1010;
+    display: flex;
+    flex-direction: column;
+}
+
+.map-editor-page.show {
+    transform: translateX(0);
+}
+
+.map-editor-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 45px 20px 20px;
+    background: white;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.map-editor-title {
+    flex: 1;
+    text-align: center;
+    font-size: 18px;
+    font-weight: 600;
+    color: #333;
+}
+
+.map-save-btn {
+    padding: 8px 16px;
+    background: #4FC3F7;
+    color: white;
+    border-radius: 16px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.map-editor-content {
+    flex: 1;
+    overflow: auto;
+    padding: 20px;
+}
+
+/* 修改地图容器样式 - 自适应图片 */
+.map-container {
+    position: relative;
+    width: 100%;
+    background: white;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    cursor: crosshair;
+    /* 移除固定高度，让容器自适应内容 */
+    display: inline-block;
+}
+
+#worldMapImage {
+    width: 100%;
+    height: auto;
+    display: block;
+    max-height: 60vh; /* 限制最大高度 */
+    object-fit: contain; /* 保持图片比例 */
+}
+
+/* 地图为空时的占位样式 */
+.map-container.empty {
+    min-height: 400px;
+    background: #f5f5f5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.map-container.empty::before {
+    content: '请先设置世界地图';
+    color: #999;
+    font-size: 14px;
+}
+
+/* 修改大头针样式，添加拖动状态 */
+.map-pin {
+    position: absolute;
+    width: 32px;
+    height: 32px;
+    cursor: pointer;
+    transform: translate(-50%, -100%);
+    transition: transform 0.2s;
+    z-index: 10;
+    user-select: none; /* 防止选中文字 */
+    -webkit-user-select: none;
+}
+
+.map-pin.dragging {
+    cursor: grabbing;
+    transform: translate(-50%, -100%) scale(1.3);
+    z-index: 100;
+    transition: none;
+}
+
+.map-pin:hover:not(.dragging) {
+    transform: translate(-50%, -100%) scale(1.2);
+}
+
+/* 拖动时的提示 */
+.drag-hint {
+    position: fixed;
+    bottom: 100px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 12px;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s, visibility 0.3s;
+    z-index: 1000;
+}
+
+.drag-hint.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+.map-pin:hover {
+    transform: translate(-50%, -100%) scale(1.2);
+}
+
+.map-pin-icon {
+    width: 100%;
+    height: 100%;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
+.map-pin-label {
+    position: absolute;
+    bottom: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 10px;
+    font-weight: 600;
+    white-space: nowrap;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.map-pin:hover .map-pin-label {
+    opacity: 1;
+}
+
+.map-hint {
+    margin-top: 16px;
+    text-align: center;
+    font-size: 13px;
+    color: #666;
+}
+
+/* 地点编辑弹窗样式 */
+.location-modal-card {
+    background: white;
+    border-radius: 20px;
+    width: 90%;
+    max-width: 320px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    transform: scale(0.9);
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+#locationModal.show .location-modal-card {
+    transform: scale(1);
+}
+
+.location-modal-header {
+    padding: 20px;
+    border-bottom: 1px solid #E0E0E0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.location-modal-content {
+    padding: 20px;
+}
+
+.location-field {
+    margin-bottom: 16px;
+}
+
+.location-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+}
+
+.location-input,
+.location-textarea,
+.location-select {
+    width: 100%;
+    padding: 10px;
+    border: 2px solid #E0E0E0;
+    border-radius: 8px;
+    font-size: 14px;
+    transition: border-color 0.2s;
+}
+
+.location-input:focus,
+.location-textarea:focus,
+.location-select:focus {
+    outline: none;
+    border-color: #4FC3F7;
+}
+
+.location-modal-footer {
+    display: flex;
+    gap: 12px;
+    padding: 16px 20px;
+    border-top: 1px solid #E0E0E0;
+}
+
+.location-btn {
+    flex: 1;
+    padding: 12px;
+    border: none;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-delete {
+    background: #FFE8E8;
+    color: #FF5252;
+}
+
+.btn-save {
+    background: #4FC3F7;
+    color: white;
+}
+
+.modal-close-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #F5F5F5;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+}
+
+/* ▼▼▼ 步骤二：在这里粘贴新的CSS样式 ▼▼▼ */
+
+/* 1. 为密友聊天主页面添加背景图相关的样式和过渡效果 */
+.sweetheart-chat-page {
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    /* 为背景图切换添加一个柔和的淡入淡出动画 */
+    transition: background-image 0.5s ease-in-out, transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+/* 2. 让消息区域的背景半透明，这样才能透出下方的背景图 */
+.sweetheart-chat-messages {
+    /* 将纯色背景改为带透明度的版本 */
+    background-color: rgba(253, 246, 248, 0.85);
+    /* 如果背景图比较亮，可以使用半透明的黑色遮罩来压暗，提升文字可读性 */
+    /* background-color: rgba(0, 0, 0, 0.1); */
+
+    /* 添加磨砂玻璃效果，让质感更高级 */
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px); /* 兼容 Safari */
+}
+
+/* ▲▲▲ 步骤二：粘贴结束 ▲▲▲ */
+/* ========== 密友聊天设置 - AI记忆轮数步进器样式 ========== */
+.number-stepper {
+    display: flex;
+    align-items: center;
+    background-color: #f0f2f5;
+    border-radius: 8px;
+    border: 1px solid #e0e4e8;
+    overflow: hidden;
+}
+
+.stepper-btn {
+    width: 28px;
+    height: 28px;
+    border: none;
+    background-color: transparent;
+    color: #8D6E63; /* 使用主题棕色 */
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.stepper-btn:hover {
+    background-color: #e8eaed;
+}
+
+.stepper-input {
+    width: 40px;
+    height: 28px;
+    border: none;
+    border-left: 1px solid #e0e4e8;
+    border-right: 1px solid #e0e4e8;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 600;
+    color: #8D6E63;
+    background-color: #fff;
+    /* 隐藏原生数字输入框的箭头 */
+    -moz-appearance: textfield;
+}
+
+.stepper-input::-webkit-outer-spin-button,
+.stepper-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+/* ========== 世界设定编辑页面样式 ========== */
+.world-settings-page {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(180deg, #E8F4F8 0%, #D4E9F0 100%);
+    transform: translateX(100%);
+    transition: transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    z-index: 1011;
+    display: flex;
+    flex-direction: column;
+}
+
+.world-settings-page.show {
+    transform: translateX(0);
+}
+
+.world-settings-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 45px 20px 20px;
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 2px 8px rgba(76, 150, 175, 0.1);
+}
+
+.world-settings-title {
+    flex: 1;
+    text-align: center;
+    font-size: 18px;
+    font-weight: 600;
+    color: #2C6B8F;
+}
+
+.world-settings-save-btn {
+    padding: 8px 16px;
+    background: linear-gradient(135deg, #5FB3D6, #4A9CBF);
+    color: white;
+    border-radius: 16px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.world-settings-save-btn:hover {
+    transform: scale(1.05);
+}
+
+.world-settings-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+}
+
+.world-settings-field {
+    margin-bottom: 20px;
+}
+
+.field-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #2C6B8F;
+}
+
+.label-icon {
+    font-size: 18px;
+}
+
+.field-input,
+.field-textarea,
+.field-select {
+    width: 100%;
+    padding: 12px 14px;
+    border: 2px solid #B8D9E8;
+    border-radius: 12px;
+    font-size: 14px;
+    font-family: inherit;
+    background: white;
+    transition: all 0.2s ease;
+}
+
+.field-input:focus,
+.field-textarea:focus,
+.field-select:focus {
+    outline: none;
+    border-color: #5FB3D6;
+    box-shadow: 0 0 0 3px rgba(95, 179, 214, 0.2);
+}
+
+.field-textarea {
+    resize: vertical;
+    min-height: 80px;
+}
+
+.field-select {
+    cursor: pointer;
+}
+/* ========== 开始：粘贴这段全新的CSS ========== */
+
+/* 让密友聊天输入区域也能成为附件菜单的定位参考点 */
+.sweetheart-chat-input-area {
+    position: relative;
+}
+
+/* 确保附件菜单在密友聊天界面也能正常工作 */
+.sweetheart-chat-input-area .attachment-menu {
+    position: absolute;
+    bottom: 60px; /* 定位在输入框上方 */
+    left: 12px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(161, 136, 127, 0.15); /* 使用主题色阴影 */
+    display: flex;
+    gap: 16px;
+    padding: 12px;
+    opacity: 0;
+    transform: translateY(10px);
+    visibility: hidden;
+    transition: all 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    z-index: 10;
+}
+
+.sweetheart-chat-input-area .attachment-menu.show {
+    opacity: 1;
+    transform: translateY(0);
+    visibility: visible;
+}
+
+/* ========== 结束：粘贴全新的CSS ========== */
+/* ========== 气泡库页面样式 ========== */
+
+.bubble-library-page {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(180deg, #f0f4f8 0%, #d9e2ec 100%);
+    transform: translateX(100%);
+    transition: transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    z-index: 1003;
+    display: flex;
+    flex-direction: column;
+}
+
+.bubble-library-page.show {
+    transform: translateX(0);
+}
+
+/* Tab切换 */
+.bubble-tab-container {
+    display: flex;
+    gap: 8px;
+    padding: 12px 20px 0;
+    background: transparent;
+}
+
+.bubble-tab {
+    flex: 1;
+    padding: 12px;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 600;
+    color: #666;
+    background: rgba(255, 255, 255, 0.5);
+    border-radius: 12px 12px 0 0;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.bubble-tab.active {
+    color: #333;
+    background: white;
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05);
+}
+
+/* 编辑器容器 */
+.bubble-editor-container {
+    padding: 0 20px 20px;
+}
+
+/* 代码输入区域 */
+.bubble-code-section {
+    background: white;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.bubble-code-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.bubble-code-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+}
+
+.bubble-example-btn {
+    padding: 6px 12px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.bubble-example-btn:active {
+    transform: scale(0.95);
+}
+
+.bubble-code-input {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #333;
+    background: #f8f9fa;
+    resize: vertical;
+    transition: border-color 0.2s;
+}
+
+.bubble-code-input:focus {
+    outline: none;
+    border-color: #667eea;
+    background: white;
+}
+
+/* 操作按钮 */
+.bubble-action-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.bubble-btn {
+    flex: 1;
+    padding: 12px;
+    border: none;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.bubble-btn-preview {
+    background: linear-gradient(135deg, #4facfe, #00f2fe);
+    color: white;
+}
+
+.bubble-btn-apply {
+    background: linear-gradient(135deg, #43e97b, #38f9d7);
+    color: white;
+}
+
+.bubble-btn-reset {
+    background: #f1f2f6;
+    color: #666;
+}
+
+.bubble-btn:active {
+    transform: scale(0.97);
+}
+
+/* 帮助说明 */
+.bubble-help-section {
+    padding: 0 20px;
+}
+
+.bubble-help-content {
+    background: white;
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.bubble-help-content p {
+    margin: 8px 0;
+    font-size: 13px;
+    color: #666;
+    line-height: 1.6;
+}
+/* ========== 预览框样式 ========== */
+
+.bubble-preview-box {
+    margin-top: 12px;
+    padding: 12px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 2px dashed #e0e0e0;
+}
+
+.preview-label {
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 8px;
+    font-weight: 600;
+}
+
+.preview-chat-container {
+    background: white;
+    padding: 12px;
+    border-radius: 8px;
+    min-height: 50px;
+}
+
+.preview-message {
+    display: flex;
+    margin: 4px 0;
+}
+
+.preview-message.sent {
+    justify-content: flex-end;
+}
+
+.preview-message.received {
+    justify-content: flex-start;
+}
+
+.preview-bubble {
+    max-width: 70%;
+    padding: 10px 14px;
+    border-radius: 16px;
+    font-size: 14px;
+    word-break: break-word;
+    /* 默认样式 */
+    background: #e9e9eb;
+    color: #333;
+}
+
+.preview-message.sent .preview-bubble {
+    background: #0A84FF;
+    color: white;
+}
+
+/* ========== 预设库样式 ========== */
+
+.preset-library-section {
+    margin-top: 24px;
+    background: rgba(255, 255, 255, 0.5);
+    border-radius: 12px;
+    padding: 16px;
+}
+
+.preset-library-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.preset-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.preset-empty {
+    text-align: center;
+    padding: 40px 20px;
+    color: #999;
+    font-size: 13px;
+}
+
+.preset-card {
+    background: white;
+    border-radius: 12px;
+    padding: 14px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    transition: all 0.2s;
+}
+
+.preset-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+    transform: translateY(-2px);
+}
+
+.preset-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.preset-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+}
+
+.preset-date {
+    font-size: 11px;
+    color: #999;
+}
+
+.preset-preview-mini {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+    padding: 8px;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.mini-bubble {
+    flex: 1;
+    padding: 6px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    text-align: center;
+    /* 默认样式会被内联样式覆盖 */
+}
+
+.preset-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.preset-btn {
+    flex: 1;
+    padding: 8px;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.apply-btn {
+    background: linear-gradient(135deg, #43e97b, #38f9d7);
+    color: white;
+}
+
+.apply-btn:active {
+    transform: scale(0.95);
+}
+
+.delete-btn {
+    background: #ffe5e5;
+    color: #ff4757;
+}
+
+.delete-btn:active {
+    transform: scale(0.95);
+    background: #ffcccc;
+}
+
+/* 修改保存预设按钮样式 */
+.bubble-btn-save-preset {
+    background: linear-gradient(135deg, #f093fb, #f5576c);
+    color: white;
+}
+.delete-btn {
+    background: #ffe5e5;
+    color: #ff4757;
+}
+
+/* ▼▼▼ 在这里粘贴新样式 ▼▼▼ */
+.preset-tag {
+    flex: 1;
+    padding: 8px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    text-align: center;
+    background: #e9ecef;
+    color: #868e96;
+    user-select: none; /* 不可选中 */
+}
+/* ▲▲▲ 粘贴结束 ▲▲▲ */
+/*
+====================================
+密友聊天 - 状态按钮和弹窗样式
+====================================
+*/
+
+/* 1. 状态按钮样式 */
+.status-btn {
+    width: 38px;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: background-color 0.2s;
+}
+
+.status-btn svg {
+    width: 22px;
+    height: 22px;
+    fill: white;
+    opacity: 0.8;
+    transition: opacity 0.2s;
+}
+
+.status-btn:hover svg {
+    opacity: 1;
+}
+
+.status-btn:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* 2. 弹窗遮罩层 */
+.status-popup-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1010;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    /* 默认隐藏 */
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.status-popup-overlay.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* 3. 弹窗背景板 */
+.status-popup-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(161, 136, 127, 0.5); /* 使用主题棕色作为背景 */
+    backdrop-filter: blur(5px);
+}
+
+/* 4. 弹窗主体 */
+.status-popup-modal {
+    position: relative;
+    z-index: 1;
+    width: 90%;
+    max-width: 330px;
+    background: linear-gradient(180deg, #FFF5F5 0%, #FFE8E8 100%);
+    border: 3px solid #FFB6C1;
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(255, 182, 193, 0.3);
+    /* 入场动画 */
+    transform: scale(0.9);
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.status-popup-overlay.show .status-popup-modal {
+    transform: scale(1);
+}
+
+/* 5. 弹窗头部 */
+.status-popup-header {
+    padding: 16px;
+    font-size: 16px;
+    font-weight: 700;
+    color: #8D6E63; /* 棕色文字 */
+    text-align: center;
+    border-bottom: 2px dashed #FFD1DC;
+    position: relative;
+}
+
+.status-popup-close {
+    position: absolute;
+    top: 50%;
+    right: 16px;
+    transform: translateY(-50%);
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #FFF0F5;
+    color: #D4A5A5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 18px;
+    transition: all 0.2s;
+}
+
+.status-popup-close:hover {
+    background: #FFE4E9;
+    transform: translateY(-50%) rotate(90deg);
+}
+
+/* 6. 弹窗内容区 */
+.status-popup-content {
+    padding: 20px;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.status-popup-content::-webkit-scrollbar {
+    width: 6px;
+}
+.status-popup-content::-webkit-scrollbar-track {
+    background: #FFE8E8;
+}
+.status-popup-content::-webkit-scrollbar-thumb {
+    background: #FFB6C1;
+    border-radius: 3px;
+}
+
+/* 7. 状态区块 */
+.status-section {
+    margin-bottom: 16px;
+}
+
+.status-section h4 {
+    font-size: 15px;
+    color: #8D6E63;
+    margin-bottom: 12px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #FFD1DC;
+}
+
+/* 8. 单个状态字段 */
+.status-field {
+    margin-bottom: 10px;
+}
+
+.status-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    color: #BCAAA4;
+    margin-bottom: 4px;
+}
+
+.status-value {
+    font-size: 14px;
+    color: #8D6E63;
+    line-height: 1.5;
+    background: rgba(255, 255, 255, 0.5);
+    padding: 8px 10px;
+    border-radius: 8px;
+    min-height: 20px; /* 确保空值时也有高度 */
+}
+
+/* 9. 分割线 */
+.status-divider {
+    height: 1px;
+    background-color: #FFD1DC;
+    margin: 20px 0;
+}
+/* ========== HTML渲染气泡样式 - 开始 ========== */
+
+/* 1. 渲染气泡的容器样式 */
+.render-bubble {
+    padding: 0;
+    overflow: hidden;
+    background: #fff;
+    width: 300px;
+    height: 250px; /* 稍微增加默认高度 */
+    resize: both;
+    /* 调整最小尺寸，给JS内容更多空间 */
+    min-width: 200px;
+    min-height: 150px;
+}
+
+
+/* 2. iframe样式，用于显示渲染结果 */
+.render-iframe {
+    width: 100%;
+    height: 100%;
+    border: none; /* 移除iframe默认边框 */
+    display: block; /* 确保是块级元素 */
+}
+
+/* 3. 在密友聊天界面，给渲染气泡一个可爱的边框 */
+.sweetheart-chat-page .render-bubble {
+    border: 2px solid #FFC0D9;
+    box-shadow: 0 4px 12px rgba(255, 182, 193, 0.3);
+}
+
+/* ========== HTML渲染气泡样式 - 结束 ========== */
+/* ========== 联系人库页面样式 (最终版) ========== */
+.contact-library-page {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #f0f2f5; /* 更简洁的背景色 */
+    transform: translateX(100%);
+    transition: transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    z-index: 1004; /* 比设置页高一级 */
+    display: flex;
+    flex-direction: column;
+}
+
+.contact-library-page.show {
+    transform: translateX(0);
+}
+
+.contact-library-page .settings-header {
+    background: #fff;
+}
+
+.contact-library-content {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.contact-library-content::-webkit-scrollbar {
+    display: none;
+}
+
+.contact-library-search-wrapper {
+    padding: 12px 20px;
+    background: #f0f2f5;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+}
+
+.contact-library-search {
+    width: 100%;
+    padding: 12px 18px;
+    border: none;
+    border-radius: 22px;
+    background: #fff;
+    font-size: 14px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+.contact-library-search:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px #cce4ff;
+}
+
+#contactLibraryList {
+    padding: 0 0 20px;
+}
+
+.contact-library-section-title {
+    padding: 16px 20px 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.contact-library-item {
+    display: flex;
+    align-items: center;
+    padding: 12px 20px;
+    background: white;
+    cursor: pointer;
+    transition: background 0.2s;
+    border-bottom: 1px solid #f0f2f5;
+}
+
+.contact-library-item:active {
+    background: #f8f9fa;
+}
+
+.contact-library-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    margin-right: 14px;
+    flex-shrink: 0;
+    overflow: hidden;
+    background: #e9ecef;
+}
+
+.contact-library-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.contact-library-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.contact-library-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+}
+
+.contact-library-type {
+    font-size: 12px;
+    color: #888;
+}
+
+.contact-library-type.sweetheart {
+    color: #ff6384;
+}
+
+.contact-library-item .settings-arrow {
+    font-size: 16px;
+    color: #ccc;
+    font-weight: bold;
+}
+/* ========== 左滑删除功能 CSS (修正版) 开始 ========== */
+
+/* 1. 滑动项的通用外层包裹容器 */
+.contact-item-wrapper,
+.sweetheart-item-wrapper {
+    position: relative;
+    overflow: hidden;
+    background-color: #ff3b30; /* iOS风格的红色删除背景 */
+    transition: all 0.2s ease-out; /* 用于删除时的动画 */
+}
+
+/* 为普通联系人列表项设置边距和圆角 */
+.contact-item-wrapper {
+    margin: 0; /* 普通联系人列表项之间由border分隔，不需要外边距 */
+}
+
+/* 为密友列表项设置边距和圆角 */
+.sweetheart-item-wrapper {
+    margin: 0 12px 10px;
+    border-radius: 16px;
+}
+
+/* 2. 可滑动的内容层 */
+.contact-item-content,
+.sweetheart-item-content {
+    position: relative;
+    z-index: 2;
+    background: white; /* 核心修正：确保内容层有坚实的不透明背景 */
+    transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+/* 普通联系人内容层的样式 */
+.contact-item-content {
+    display: flex;
+    align-items: center;
+    padding: 12px 20px;
+    cursor: pointer;
+    border-bottom: 1px solid #f0f2f5;
+}
+
+/* 密友内容层的样式 */
+.sweetheart-item-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 20px;
+    cursor: pointer;
+    border-radius: 16px;
+}
+
+/* 3. 底层的操作层 (放置删除按钮) */
+.swipe-actions {
+    position: absolute;
+    top: 0;
+    right: 0;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    z-index: 1;
+}
+
+/* 4. 删除按钮本身 */
+.swipe-delete-btn {
+    width: 80px;
+    height: 100%;
+    border: none;
+    background: transparent;
+    color: white;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* 5. 当 JS 添加 is-swiped 类时，内容层向左滑动 */
+.is-swiped .contact-item-content,
+.is-swiped .sweetheart-item-content {
+    transform: translateX(-80px);
+}
+
+/* ========== 左滑删除功能 CSS 结束 ========== */
+/* ========== 联系人实例ID显示样式 ========== */
+
+/* 普通角色卡ID区域 */
+.character-id-section {
+    background: #f8f9fa;
+    padding: 12px 16px;
+    border-radius: 12px;
+    margin: 16px 0;
+    border: 2px dashed #e0e0e0;
+}
+
+.id-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+
+.id-icon {
+    font-size: 14px;
+}
+
+.id-text {
+    font-size: 12px;
+    font-weight: 600;
+    color: #666;
+}
+
+.id-value {
+    font-family: 'Courier New', 'Monaco', monospace;
+    font-size: 11px;
+    color: #333;
+    background: white;
+    padding: 6px 10px;
+    border-radius: 6px;
+    word-break: break-all;
+    border: 1px solid #e0e0e0;
+}
+
+/* 密友角色卡ID区域 */
+.sweetheart-id-section {
+    background: #FFF5F5;
+    padding: 12px 16px;
+    border-radius: 12px;
+    margin-bottom: 16px;
+    border: 2px dashed #FFD1DC;
+}
+
+.sweetheart-id-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #8D6E63;
+}
+
+.sweetheart-id-value {
+    font-family: 'Courier New', 'Monaco', monospace;
+    font-size: 11px;
+    color: #8D6E63;
+    background: white;
+    padding: 6px 10px;
+    border-radius: 6px;
+    word-break: break-all;
+    border: 1px solid #FFD1DC;
+}
+
+/* 联系人列表项中显示ID的样式 */
+.contact-instance-id,
+.sweetheart-instance-id {
+    font-size: 10px;
+    color: #999;
+    font-family: 'Courier New', monospace;
+    margin-top: 2px;
+}
+/* style.css */
+
+/* ========== 联系人库多选功能样式 (已修复点击问题) ========== */
+
+/* 1. 右上角按钮容器 (不变) */
+.contact-lib-actions {
+    display: flex;
+    align-items: center;
+}
+
+/* 2. 多选切换按钮 (不变) */
+.multi-select-toggle {
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+    background: rgba(168, 201, 245, 0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 18px;
+    transition: all 0.2s;
+}
+
+.multi-select-toggle:active {
+    transform: scale(0.9);
+    background: rgba(168, 201, 245, 0.25);
+}
+
+/* 3. 多选工具栏 (不变) */
+.multi-select-toolbar {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+/* ... 其他 toolbar-btn 样式保持不变 ... */
+.toolbar-btn {
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+.delete-btn { background: #FFE8E8; color: #FF5252; }
+.clone-btn { background: #E3F2FD; color: #2196F3; }
+.done-btn { background: linear-gradient(135deg, #66BB6A, #43A047); color: white; }
+
+
+/* 4. 🔥【核心修复】多选模式下的联系人项样式 */
+.contact-library-item.multi-select-mode {
+    position: relative; /* 保持相对定位用于伪元素 */
+    cursor: pointer;   /* 确保整个项目都是可点击的 */
+    /* 移除之前的 padding-left */
+}
+
+/* 🔥【核心修复】将头像和信息向右移动，为复选框腾出空间 */
+.contact-library-item.multi-select-mode .contact-library-avatar {
+    margin-left: 36px; /* 原来是 14px，增加 22px 空间 */
+}
+
+/* 复选框的伪元素 */
+.contact-library-item.multi-select-mode::before {
+    content: '';
+    position: absolute;
+    left: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 22px;
+    height: 22px;
+    border: 2px solid #ccc;
+    border-radius: 6px;
+    background: white;
+    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    z-index: 5; /* 确保在最上层 */
+    pointer-events: none; /* 关键：让伪元素不捕获鼠标事件 */
+}
+
+/* 选中状态的复选框 */
+.contact-library-item.multi-select-mode.selected::before {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border-color: #667eea;
+    transform: translateY(-50%) scale(1.1); /* 增加一个轻微的放大动画 */
+}
+
+/* 复选框内的 "✓" 符号 */
+.contact-library-item.multi-select-mode.selected::after {
+    content: '✓';
+    position: absolute;
+    left: 24.5px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: white;
+    font-size: 15px;
+    font-weight: bold;
+    z-index: 6; /* 比复选框更高一层 */
+    pointer-events: none; /* 关键：同样不捕获鼠标事件 */
+}
+
+/* 5. 选中状态高亮 (不变) */
+.contact-library-item.selected {
+    background: #F0F4FF;
+}
+
+/* ========== 联系人库统一角色卡样式 ========== */
+.library-character-modal {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1015; /* 高于联系人库页面 (1004) */
+    display: none;
+}
+
+.library-character-modal.show {
+    display: block;
+}
+
+.library-modal-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(5px);
+}
+
+.library-character-card {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 90%;
+    max-width: 340px;
+    max-height: 85vh;
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    display: flex;
+    flex-direction: column;
+    animation: libraryModalSlideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes libraryModalSlideIn {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+}
+
+.library-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 2px solid #f0f2f5;
+}
+
+.library-card-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #333;
+    margin: 0;
+}
+
+.library-close-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #f0f2f5;
+    border: none;
+    color: #666;
+    font-size: 24px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.library-close-btn:hover {
+    background: #e0e4e8;
+    transform: rotate(90deg);
+}
+
+.library-card-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+}
+
+.library-card-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.library-card-content::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 3px;
+}
+
+.library-section {
+    margin-bottom: 20px;
+}
+
+.library-avatar-row {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+}
+
+.library-avatar {
+    width: 80px;
+    height: 80px;
+    border-radius: 12px;
+    overflow: hidden;
+    cursor: pointer;
+    position: relative;
+    flex-shrink: 0;
+    background: #f0f2f5;
+}
+
+.library-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.library-avatar-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(0, 0, 0, 0.6);
+    color: white;
+    text-align: center;
+    padding: 4px;
+    font-size: 14px;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.library-avatar:hover .library-avatar-overlay {
+    opacity: 1;
+}
+
+.library-basic-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.library-id-display {
+    font-size: 11px;
+    color: #999;
+    font-family: 'Courier New', monospace;
+    background: #f8f9fa;
+    padding: 6px 10px;
+    border-radius: 6px;
+}
+
+.library-id-label {
+    font-weight: 600;
+}
+
+.library-label {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 8px;
+}
+
+.library-label-sm {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: #555;
+    margin-bottom: 6px;
+}
+
+.library-input,
+.library-textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 2px solid #e0e4e8;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+    transition: border-color 0.2s;
+}
+
+.library-input:focus,
+.library-textarea:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.library-textarea {
+    resize: vertical;
+}
+
+.library-toggle-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    transition: background 0.2s;
+    user-select: none;
+}
+
+.library-toggle-header:hover {
+    background: #e9ecef;
+}
+
+.library-toggle-arrow {
+    font-size: 12px;
+    color: #999;
+    transition: transform 0.3s;
+}
+
+.library-toggle-arrow.open {
+    transform: rotate(180deg);
+}
+
+.library-extended-fields,
+.library-worldbooks-list {
+    margin-top: 12px;
+    padding: 12px;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.library-field {
+    margin-bottom: 12px;
+}
+
+.library-field:last-child {
+    margin-bottom: 0;
+}
+
+.library-worldbooks-list {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.library-wb-item {
+    display: flex;
+    align-items: center;
+    padding: 8px;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: background 0.2s;
+}
+
+.library-wb-item:hover {
+    background: white;
+}
+
+.library-wb-item input[type="checkbox"] {
+    margin-right: 10px;
+    cursor: pointer;
+    accent-color: #667eea;
+}
+
+.library-wb-item label {
+    flex: 1;
+    cursor: pointer;
+    font-size: 14px;
+    color: #333;
+}
+
+.library-card-footer {
+    display: flex;
+    gap: 12px;
+    padding: 16px 20px;
+    border-top: 2px solid #f0f2f5;
+}
+
+.library-btn {
+    flex: 1;
+    padding: 12px;
+    border: none;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.library-btn-cancel {
+    background: #f0f2f5;
+    color: #666;
+}
+
+.library-btn-cancel:hover {
+    background: #e0e4e8;
+}
+
+.library-btn-save {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+}
+
+.library-btn-save:hover {
+    transform: scale(1.02);
+}
+/*
+====================================
+密友聊天 - 世界地图弹窗样式
+====================================
+*/
+
+.world-map-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(161, 136, 127, 0.5); /* 使用主题棕色作为背景 */
+    backdrop-filter: blur(5px);
+}
+
+.world-map-modal {
+    position: relative;
+    z-index: 1;
+    width: 95%;
+    max-width: 360px;
+    background: linear-gradient(180deg, #FFF5F5 0%, #FFE8E8 100%);
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(255, 182, 193, 0.3);
+    overflow: hidden;
+    transform: scale(0.9);
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+#worldMapPopup.show .world-map-modal {
+    transform: scale(1);
+}
+
+.world-map-header {
+    padding: 16px;
+    text-align: center;
+    border-bottom: 2px dashed #FFD1DC;
+    position: relative;
+}
+
+.world-map-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #8D6E63;
+    margin: 0;
+}
+
+.world-map-close {
+    position: absolute;
+    top: 50%;
+    right: 16px;
+    transform: translateY(-50%);
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #FFF0F5;
+    color: #D4A5A5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 18px;
+    transition: all 0.2s;
+}
+
+.world-map-close:hover {
+    transform: translateY(-50%) rotate(90deg);
+}
+
+.world-map-content {
+    padding: 16px;
+}
+
+.map-popup-container {
+    position: relative;
+    width: 100%;
+    background: #fdfdfd;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border: 2px solid #FFD1DC;
+}
+
+#mapPopupImage {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+.map-popup-hint {
+    margin-top: 12px;
+    text-align: center;
+    font-size: 12px;
+    color: #BCAAA4;
+    font-style: italic;
+}
+
+/* 地图上的大头针样式 */
+.map-popup-pin {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    cursor: pointer;
+    transition: transform 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.map-popup-pin:hover {
+    transform: translate(-50%, -50%) scale(1.2);
+    z-index: 10;
+}
+
+.map-popup-pin-icon {
+    font-size: 28px;
+    filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.3));
+}
+
+.map-popup-pin-label {
+    background: rgba(255, 255, 255, 0.9);
+    padding: 3px 8px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #8D6E63;
+    white-space: nowrap;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+    margin-top: 4px;
+}
+/* ========== HTML渲染气泡样式 - 开始 ========== */
+
+/* 1. 渲染气泡的容器样式 */
+/* 新的、更灵活的规则 */
+.render-bubble {
+    padding: 0;
+    overflow: hidden; /* 继续隐藏溢出，防止调整大小时内容露出 */
+    background: #fff;
+    width: 300px; /* 保持默认宽度 */
+    /* 移除固定的 height 属性！这是最关键的一步。 */
+    /* height: 250px; */
+    resize: both; /* 保持允许用户手动调整大小的功能，这很棒！ */
+    min-width: 200px;
+    min-height: 150px; /* 保留最小高度，避免内容太少时塌陷 */
+    max-height: 60vh; /* 新增最大高度，防止内容过长撑满整个屏幕 */
+    display: flex; /* 让内部的 iframe 能更好地填充 */
+}
+
+
+
+/* 2. iframe样式，用于显示渲染结果 */
+.render-iframe {
+    width: 100%;
+    height: 100%;
+    border: none; /* 移除iframe默认边框 */
+    display: block; /* 确保是块级元素 */
+}
+
+/* 3. 在密友聊天界面，给渲染气泡一个可爱的边框 */
+.sweetheart-chat-page .render-bubble {
+    border: 2px solid #FFC0D9;
+    box-shadow: 0 4px 12px rgba(255, 182, 193, 0.3);
+}
+
+/* ========== HTML渲染气泡样式 - 结束 ========== */
+
+/* ========== iframe 消息气泡的事件捕获遮罩 ========== */
+.iframe-event-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10; /* 确保在 iframe 上方 */
+    cursor: pointer;
+
+    /* 🔥 关键：默认不拦截事件，允许用户与 iframe 交互 */
+    pointer-events: none;
+}
+
+/* 🎯 只在需要时激活事件捕获（例如长按时） */
+.chat-bubble.render-bubble:active .iframe-event-overlay,
+.chat-bubble.render-bubble.selecting .iframe-event-overlay {
+    pointer-events: auto;
+}
+/* ========== 消息多选功能样式 ========== */
+
+/* 多选工具栏 */
+.multi-select-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.toolbar-btn {
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.toolbar-btn.delete-btn {
+    background: #ff3b30;
+    color: white;
+}
+
+.toolbar-btn.delete-btn:active {
+    background: #d32f2f;
+    transform: scale(0.95);
+}
+
+.toolbar-btn.done-btn {
+    background: #0A84FF;
+    color: white;
+}
+
+.toolbar-btn.done-btn:active {
+    background: #0066CC;
+    transform: scale(0.95);
+}
+
+/* 消息行的多选模式 */
+.message-row.multi-select-mode {
+    padding-left: 40px;
+    position: relative;
+}
+
+/* 复选框容器 */
+.message-checkbox-container {
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 10;
+}
+
+/* 自定义复选框样式 */
+.message-checkbox {
+    width: 22px;
+    height: 22px;
+    border: 2px solid #ddd;
+    border-radius: 50%;
+    background: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.message-checkbox.checked {
+    background: #0A84FF;
+    border-color: #0A84FF;
+}
+
+.message-checkbox.checked::after {
+    content: '✓';
+    color: white;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+/* 密友聊天的复选框样式 */
+.sweetheart-chat-page .message-checkbox.checked {
+    background: #FFB6C1;
+    border-color: #FFB6C1;
+}
+/* ========== 面具管理功能样式 - 开始 ========== */
+
+/* 面具管理页面 */
+.mask-library-page {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(180deg, #f8f9fa 0%, #e9ecef 100%);
+    transform: translateX(100%);
+    transition: transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    z-index: 1002;
+    display: flex;
+    flex-direction: column;
+}
+
+.mask-library-page.show {
+    transform: translateX(0);
+}
+
+/* 面具列表 */
+#maskLibraryList {
+    padding: 0 20px 20px;
+}
+
+.mask-item {
+    background: white;
+    padding: 16px;
+    margin-bottom: 12px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.mask-item:active {
+    transform: scale(0.98);
+    background: #f8f9fa;
+}
+
+.mask-item-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.mask-item-icon {
+    font-size: 24px;
+    margin-right: 12px;
+}
+
+.mask-item-title {
+    flex: 1;
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+}
+
+.mask-item-desc {
+    font-size: 13px;
+    color: #888;
+    margin-bottom: 8px;
+}
+
+.mask-item-preview {
+    font-size: 12px;
+    color: #999;
+    line-height: 1.4;
+}
+
+/* 空状态 */
+.mask-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 60px 20px;
+}
+
+.mask-empty-icon {
+    font-size: 64px;
+    margin-bottom: 16px;
+    opacity: 0.5;
+}
+
+.mask-empty-text {
+    font-size: 16px;
+    font-weight: 600;
+    color: #666;
+    margin-bottom: 8px;
+}
+
+.mask-empty-hint {
+    font-size: 13px;
+    color: #999;
+    text-align: center;
+}
+
+/* 面具编辑弹窗 */
+.mask-modal-card {
+    background: white;
+    border-radius: 20px;
+    width: 100%;
+    max-width: 360px;
+    max-height: 80vh;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.mask-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px;
+    border-bottom: 1px solid #eee;
+}
+
+.mask-modal-header .header-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #333;
+}
+
+.modal-close-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #f0f0f0;
+    border: none;
+    color: #666;
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.modal-close-btn:hover {
+    background: #e0e0e0;
+    transform: rotate(90deg);
+}
+
+.mask-modal-content {
+    padding: 20px;
+    max-height: 50vh;
+    overflow-y: auto;
+}
+
+.mask-modal-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.mask-modal-content::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 3px;
+}
+
+.mask-field {
+    margin-bottom: 20px;
+}
+
+.mask-field.required-field .mask-label {
+    font-weight: 600;
+}
+
+.mask-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+    font-size: 14px;
+    color: #555;
+}
+
+.label-icon {
+    font-size: 16px;
+}
+
+.required-star {
+    color: #ff3b30;
+    font-weight: bold;
+}
+
+.mask-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 14px;
+    transition: border-color 0.2s;
+}
+
+.mask-input:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.mask-textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 14px;
+    resize: vertical;
+    transition: border-color 0.2s;
+}
+
+.mask-textarea:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.mask-modal-footer {
+    display: flex;
+    gap: 8px;
+    padding: 16px 20px;
+    border-top: 1px solid #eee;
+}
+
+.mask-btn {
+    flex: 1;
+    padding: 12px;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.mask-btn-cancel {
+    background: #f0f0f0;
+    color: #666;
+}
+
+.mask-btn-cancel:hover {
+    background: #e0e0e0;
+}
+
+.mask-btn-delete {
+    background: #ff3b30;
+    color: white;
+}
+
+.mask-btn-delete:hover {
+    background: #e02020;
+}
+
+.mask-btn-save {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+}
+
+.mask-btn-save:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+/* 面具选择列表样式（用于角色卡中） */
+.sweetheart-masks-list,
+.library-masks-list,
+.char-wb-list {
+    margin-top: 8px;
+    padding: 8px;
+    background: #fdfdfd;
+    border: 2px solid #eee;
+    border-radius: 10px;
+    max-height: 150px;
+    overflow-y: auto;
+}
+
+.mask-checkbox-item {
+    display: flex;
+    align-items: center;
+    padding: 8px;
+    border-bottom: 1px solid #f0f0f0;
+    cursor: pointer;
+}
+
+.mask-checkbox-item:last-child {
+    border-bottom: none;
+}
+
+.mask-checkbox-item input[type="checkbox"] {
+    margin-right: 10px;
+    cursor: pointer;
+    accent-color: #667eea;
+}
+
+.mask-checkbox-item label {
+    flex: 1;
+    cursor: pointer;
+    font-size: 14px;
+    color: #555;
+}
+
+/* ========== 面具管理功能样式 - 结束 ========== */
+/* ========== 线上/线下模式切换按钮样式 ========== */
+.mode-toggle-btn {
+    width: 38px;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    cursor: pointer;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #FFB6C1, #FFC0D9);
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(255, 182, 193, 0.3);
+}
+
+.mode-toggle-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(255, 182, 193, 0.5);
+}
+
+.mode-toggle-btn:active {
+    transform: scale(0.95);
+}
+
+
+/* ========== 地点提示卡片样式（持久化版本）========== */
+.location-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin: 16px auto;
+    padding: 16px;
+    max-width: 85%;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 16px;
+    border: 2px solid #FFD1DC;
+    box-shadow: 0 4px 12px rgba(161, 136, 127, 0.15);
+    /* ✅ 新增：确保在聊天历史中正确显示 */
+    position: relative;
+}
+
+.location-notice-icon {
+    font-size: 32px;
+    flex-shrink: 0;
+}
+
+.location-notice-text {
+    flex: 1;
+}
+
+.location-notice-text strong {
+    display: block;
+    font-size: 16px;
+    color: #8D6E63;
+    margin-bottom: 6px;
+}
+
+.location-notice-text p {
+    font-size: 14px;
+    color: #BCAAA4;
+    margin: 0;
+    line-height: 1.4;
+}
+/* ========== AI记忆轮数设置样式 ========== */
+.number-stepper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.stepper-btn {
+    width: 32px;
+    height: 32px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    background: white;
+    font-size: 18px;
+    font-weight: bold;
+    color: #667eea;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.stepper-btn:hover {
+    background: #f0f4ff;
+    border-color: #667eea;
+}
+
+.stepper-btn:active {
+    transform: scale(0.95);
+}
+
+.stepper-input {
+    width: 50px;
+    height: 32px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.stepper-input:focus {
+    outline: none;
+    border-color: #667eea;
+}
+/* ========== 记忆存储中心样式 ========== */
+.memory-center-page {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(180deg, #f8f9fa 0%, #e9ecef 100%);
+    transform: translateX(100%);
+    transition: transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    z-index: 1001;
+    display: flex;
+    flex-direction: column;
+}
+
+.memory-center-page.show {
+    transform: translateX(0);
+}
+
+/* Tab切换 */
+.memory-tab-container {
+    display: flex;
+    background: white;
+    border-radius: 12px;
+    margin: 12px 20px;
+    padding: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.memory-tab {
+    flex: 1;
+    padding: 10px;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 600;
+    color: #666;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.memory-tab.active {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+/* 内容区域 */
+.memory-content-area {
+    flex: 1;
+    overflow-y: auto;
+}
+
+/* 知识点卡片 */
+.knowledge-card {
+    background: white;
+    margin: 0 20px 16px;
+    padding: 16px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.knowledge-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.knowledge-card-title {
+    flex: 1;
+    font-size: 15px;
+    font-weight: 600;
+    color: #333;
+}
+
+.knowledge-card-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+}
+
+.knowledge-card-date {
+    font-size: 11px;
+    color: #999;
+}
+
+.knowledge-card-badge {
+    background: #667eea;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 600;
+}
+
+.knowledge-card-content {
+    font-size: 13px;
+    line-height: 1.6;
+    color: #555;
+    white-space: pre-wrap;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.knowledge-card-footer {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #f0f0f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.knowledge-card-source {
+    font-size: 12px;
+    color: #888;
+}
+
+.knowledge-card-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.knowledge-action-btn {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.delete-knowledge-btn {
+    background: #ffebee;
+    color: #f44336;
+}
+
+.delete-knowledge-btn:hover {
+    background: #ffcdd2;
+}
+
+/* 空状态 */
+.memory-empty {
+    text-align: center;
+    padding: 60px 20px;
+}
+
+.memory-empty-icon {
+    font-size: 64px;
+    margin-bottom: 16px;
+}
+
+.memory-empty-text {
+    font-size: 16px;
+    font-weight: 600;
+    color: #666;
+    margin-bottom: 8px;
+}
+
+.memory-empty-hint {
+    font-size: 13px;
+    color: #999;
+    line-height: 1.5;
+}

@@ -166,6 +166,12 @@ function saveAllCharacterData() {
         boundWorldbooks.push(cb.value);
     });
 
+    // 获取绑定的面具
+    const boundMasks = [];
+    document.querySelectorAll('#charMasksList input[type="checkbox"]:checked').forEach(cb => {
+        boundMasks.push(cb.value);
+    });
+
 
     // 保存用户个人信息 (这部分不变)
     userProfile.name = document.getElementById('user-name').value.trim() || '我';
@@ -182,6 +188,7 @@ function saveAllCharacterData() {
         contactToEditOrCreate.status = contactPersona || '这个角色很神秘，还没有设定...';
         contactToEditOrCreate.avatar = contactAvatar;
         contactToEditOrCreate.boundWorldbooks = boundWorldbooks;
+        contactToEditOrCreate.boundMasks = boundMasks;
     } else {
         // 创建新联系人
         contactToEditOrCreate = {
@@ -209,6 +216,8 @@ function saveAllCharacterData() {
         if (world && !world.contacts.includes(contactId)) {
             world.contacts.push(contactId); // 将新联系人ID添加到该世界的联系人列表
             saveWorldsData(); // 保存世界数据
+            // ✅ 新增:更新世界列表显示
+            renderWorldList();
         }
         // 重新渲染当前世界的通讯录
         openWorldContacts(worldIdToSaveTo);
@@ -239,6 +248,8 @@ let currentEditingSweetheartId = null;
  * 打开密友角色卡弹窗（新建模式）
  */
 function openSweetheartCardModal() {
+    renderSweetheartMasksList(contactData.boundMasks || []);
+
     currentEditingSweetheartId = null;
 
     // 重置所有字段
@@ -327,7 +338,7 @@ function renderSweetheartWorldbooksList() {
 }
 
 /**
- * 保存密友角色卡数据
+ * [修正版] 保存密友角色卡数据，并关联到当前世界
  */
 function saveSweetheartCardData() {
     // 1. 获取必填字段
@@ -343,26 +354,31 @@ function saveSweetheartCardData() {
         return;
     }
 
-    // 2. 获取可选字段
+    // 2. 获取可选字段 (这部分不变)
     const personality = document.getElementById('sweetheart-personality').value.trim();
     const occupation = document.getElementById('sweetheart-occupation').value.trim();
     const catchphrase = document.getElementById('sweetheart-catchphrase').value.trim();
     const history = document.getElementById('sweetheart-history').value.trim();
     const relationship = document.getElementById('sweetheart-relationship').value.trim();
 
-    // 3. 获取头像
+    // 3. 获取头像 (这部分不变)
     const avatar = document.getElementById('sweetheart-avatar-preview').src;
     const finalAvatar = (avatar && !avatar.includes('data:image/gif')) ? avatar : '💖';
 
-    // 4. 获取绑定的世界书
+    // 4. 获取绑定的世界书 (这部分不变)
     const boundWorldbooks = [];
     document.querySelectorAll('.sweetheart-wb-item input[type="checkbox"]:checked').forEach(cb => {
         boundWorldbooks.push(cb.value);
     });
 
-    // 5. 生成ID并保存
-    const contactId = currentEditingSweetheartId || 'SH' + Date.now();
+    // 在获取绑定的世界书后添加
+    const boundMasks = [];
+    document.querySelectorAll('#sweetheartMasksList input[type="checkbox"]:checked').forEach(cb => {
+        boundMasks.push(cb.value);
+    });
 
+    // 5. 生成ID并组装数据 (这部分不变)
+    const contactId = currentEditingSweetheartId || 'SH' + Date.now();
     const contactData = {
         id: contactId,
         name,
@@ -373,24 +389,41 @@ function saveSweetheartCardData() {
         catchphrase,
         history,
         relationship,
-        boundWorldbooks
+        boundWorldbooks,
+        oundMasks
     };
 
-    // 6. 判断是新建还是编辑
+    // 6. 判断是新建还是编辑, 更新 sweetheartContactsData (这部分不变)
     const existingIndex = sweetheartContactsData.findIndex(c => c.id === contactId);
     if (existingIndex !== -1) {
         sweetheartContactsData[existingIndex] = contactData;
     } else {
         sweetheartContactsData.push(contactData);
     }
+    saveSweetheartContacts(); // 保存密友列表
 
-    // 7. 保存到localStorage
-    saveSweetheartContacts();
+    // ▼ ▼ ▼【核心修复】▼ ▼ ▼
+    // 7. 检查是否存在当前世界ID，如果存在，则将新联系人ID添加到该世界的联系人列表中
+    if (currentWorldId) {
+        const world = worldsData.find(w => w.id === currentWorldId);
+        if (world) {
+            // 确保不重复添加
+            if (!world.contacts.includes(contactId)) {
+                world.contacts.push(contactId);
+                // 保存世界数据的更改！
+                saveWorldsData();
+                // ✅ 新增:更新世界列表显示
+                renderWorldList();
+                console.log(`已将新联系人 ${name} (ID: ${contactId}) 添加到世界 "${world.name}"`);
+            }
+        }
+    }
+    // ▲ ▲ ▲【修复结束】▲ ▲ ▲
 
-    // 8. 刷新列表并关闭弹窗
+    // 8. 刷新列表并关闭弹窗 (这部分不变)
     renderSweetheartList();
     closeSweetheartCardModal();
-    showSuccessModal('保存成功', `${name} 已加入密友列表！💖`);
+    showSuccessModal('保存成功', `${name} 已成功添加！💖`);
 }
 
 // ▼▼▼ 第3步：在这里粘贴新增的JS代码 ▼▼▼
@@ -634,6 +667,7 @@ function openCharacterCardPage() {
         console.error('错误：无法找到 characterCardModal 元素！');
         return;
     }
+
     // 1. 确保 modal 容器在 DOM 中是可见的
     page.style.display = 'flex';
 
@@ -642,25 +676,29 @@ function openCharacterCardPage() {
         page.classList.add('show');
     });
 
+    // 3. 🔧 修复点：安全地检查是否是新建联系人
     const modal = page.querySelector('.character-card-modal');
+    const editingId = page.dataset.editingId; // 从 page 的 dataset 读取
 
-    // 现在的逻辑更加健壮，不再寻找不存在的元素。
-    // 我们直接处理显示逻辑。
+    // 如果没有 editingId，说明是新建联系人
+    const isNewContact = !editingId || editingId === '';
 
-    // 检查是否正在创建一个全新的联系人。
-    // this.dataset.editingId 已经被移除，现在的判断更通用
-    const isNewContact = !document.getElementById('characterCardModal').textContent || document.getElementById('characterCardModal').textContent === '...';
     if (isNewContact) {
         // 重置表单，为新建联系人做准备
         document.getElementById('char-name').value = '';
         document.getElementById('char-persona').value = '';
-        // 重置性别选择为男性
+
         // 重置性别选择为男性
         const maleRadio = document.querySelector('.character-gender-selection input[value="male"]');
         if (maleRadio) maleRadio.checked = true;
+
         // 使用1x1的透明像素作为占位符，避免出现破碎的图片图标
         document.getElementById('avatar-preview').src = 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
         document.getElementById('avatar-input').value = '';
+
+        // 🆕 新增：也重置世界书列表
+        renderCharacterWorldbooksList([]);
+        renderCharacterMasksList([]);
     }
 }
 
@@ -693,118 +731,466 @@ document.getElementById('avatar-input').addEventListener('change', function (eve
     }
 }); // <--- 【核心修正】在这里补上缺失的 });
 
-// ========== 结束：替换完成 ==========
-
-
-// ========== 结束：替换完成 ==========
-
-
-function escapeHTML(str) {
-    if (!str) return '';
-    return str.replace(/[&<>"']/g, function (match) {
-        return {
-            '&': '&amp;',
-            '<': '&lt;',
-            '>': '&gt;',
-            '"': '&quot;',
-            "'": '&#39;'
-        }[match];
-    });
-}
-
-let messageLongPressTimer = null; // 用于检测长按的计时器
 
 /**
- * 创建消息的DOM元素，并为其绑定长按/右键事件
+ * 格式化消息文本，支持代码块、Markdown、链接等
+ * @param {string} text - 原始文本
+ * @returns {string} - 格式化后的 HTML
  */
-function _createMessageDOM(contactId, message, index) {
-    const row = document.createElement('div');
-    row.className = 'message-row ' + (message.sender === 'user' ? 'sent' : 'received');
-    row.dataset.messageIndex = index;
+function formatMessageText(text) {
+    if (!text) return '';
 
-    const avatarDiv = document.createElement('div');
-    avatarDiv.className = 'message-chat-avatar';
+    let formatted = text;
 
-    let avatarSrc, senderName;
-    if (message.sender === 'user') {
-        // ============ ↓↓↓ 核心改造点在这里 ↓↓↓ ============
-        // 不再使用硬编码的"你"和"👤", 而是从 userProfile 获取
-        senderName = userProfile.name;
-        avatarSrc = userProfile.avatar;
-        const isUrl = avatarSrc && (avatarSrc.startsWith('http') || avatarSrc.startsWith('data:'));
-        if (isUrl) {
-            avatarDiv.innerHTML = `<img src="${avatarSrc}" alt="${senderName}">`;
-        } else {
-            // 使用自定义的 emoji 或字符作为头像，并保持蓝色背景
-            avatarDiv.innerHTML = `<div class="initials" style="background: #0A84FF;">${escapeHTML(avatarSrc)}</div>`;
-        }
-        // ============ ↑↑↑ 改造结束 ↑↑↑ ============
+    // 1. 处理代码块（三个反引号）
+    formatted = formatted.replace(/```(\w*)\n?([\s\S]*?)```/g, function(match, language, code) {
+        const lang = language || 'plaintext';
+        const escapedCode = escapeHTML(code.trim());
+
+        return `<div class="code-block-wrapper">
+            <button class="copy-code-btn" onclick="copyCodeToClipboard(this)">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                </svg>
+                复制
+            </button>
+            <pre><code class="language-${lang}">${escapedCode}</code></pre>
+        </div>`;
+    });
+
+    // 2. 处理行内代码（单个反引号）
+    formatted = formatted.replace(/`([^`]+)`/g, function(match, code) {
+        return `<code>${escapeHTML(code)}</code>`;
+    });
+
+    // 3. 处理粗体 **text**
+    formatted = formatted.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+
+    // 4. 处理斜体 *text*
+    formatted = formatted.replace(/\*(.+?)\*/g, '<em>$1</em>');
+
+    // 5. 处理链接 [text](url)
+    formatted = formatted.replace(/\[([^\]]+)\]\(([^)]+)\)/g, function(match, text, url) {
+        return `<a href="${escapeHTML(url)}" target="_blank" rel="noopener noreferrer">${escapeHTML(text)}</a>`;
+    });
+
+    // 6. 处理纯 URL
+    formatted = formatted.replace(
+        /(https?:\/\/[^\s<]+)/g,
+        '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>'
+    );
+
+    // 7. 处理换行
+    formatted = formatted.replace(/\n/g, '<br>');
+
+    return formatted;
+}
+
+/**
+ * 复制代码块内容到剪贴板
+ * @param {HTMLElement} button - 复制按钮元素
+ */
+function copyCodeToClipboard(button) {
+    const codeBlock = button.nextElementSibling;
+    if (!codeBlock) return;
+
+    const code = codeBlock.querySelector('code');
+    if (!code) return;
+
+    const text = code.textContent;
+
+    // 使用现代剪贴板 API
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+            // 显示成功反馈
+            const originalHTML = button.innerHTML;
+            button.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+            </svg>已复制`;
+            button.classList.add('copied');
+
+            setTimeout(() => {
+                button.innerHTML = originalHTML;
+                button.classList.remove('copied');
+            }, 2000);
+        }).catch(err => {
+            console.error('复制失败:', err);
+            alert('复制失败，请手动复制');
+        });
     } else {
-        // 渲染对方消息的逻辑保持不变
-        senderName = currentChatContact.name;
-        avatarSrc = currentChatContact.avatar;
-        const isUrl = avatarSrc && (avatarSrc.startsWith('http') || avatarSrc.startsWith('data:'));
-        if (isUrl) {
-            avatarDiv.innerHTML = `<img src="${avatarSrc}" alt="${senderName}">`;
+        // 降级方案：使用 execCommand
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+
+        try {
+            document.execCommand('copy');
+            const originalHTML = button.innerHTML;
+            button.innerHTML = '✓ 已复制';
+            button.classList.add('copied');
+
+            setTimeout(() => {
+                button.innerHTML = originalHTML;
+                button.classList.remove('copied');
+            }, 2000);
+        } catch (err) {
+            console.error('复制失败:', err);
+            alert('复制失败，请手动复制');
+        } finally {
+            document.body.removeChild(textarea);
+        }
+    }
+}
+
+/**
+ * 转义 HTML 特殊字符，防止 XSS 攻击
+ * @param {string} str - 原始字符串
+ * @returns {string} - 转义后的字符串
+ */
+function escapeHTML(str) {
+    if (!str) return '';
+
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+
+let messageLongPressTimer = null; // 用于检测长按的计时器
+/**
+ * [自适应高度增强版] 创建消息的DOM元素
+ * - 支持普通聊天、密友聊天
+ * - 支持渲染 <render> 标签内的HTML/CSS代码，并自动调整iframe高度
+ */
+function _createMessageDOM(contactId, messageObj, messageIndex) {
+    // ✅ 新增：检测地点提示类型消息
+    if (messageObj.type === 'location') {
+        const locationNotice = document.createElement('div');
+        locationNotice.className = 'location-notice';
+        locationNotice.dataset.index = messageIndex;
+        locationNotice.innerHTML = `
+            <div class="location-notice-icon">🗺️</div>
+            <div class="location-notice-text">
+                <strong>📍 ${escapeHTML(messageObj.locationName)}</strong>
+                <p>${escapeHTML(messageObj.locationDesc)}</p>
+            </div>
+        `;
+        // ✅ 新增：支持长按操作
+        let longPressTimer = null;
+
+        locationNotice.addEventListener('touchstart', (e) => {
+            longPressTimer = setTimeout(() => {
+                showSweetheartMessageActionSheet(contactId, messageIndex);
+            }, 500);
+        });
+
+        locationNotice.addEventListener('touchend', () => {
+            clearTimeout(longPressTimer);
+        });
+
+        locationNotice.addEventListener('touchmove', () => {
+            clearTimeout(longPressTimer);
+        });
+        return locationNotice;
+    }
+    const messageRow = document.createElement('div');
+    messageRow.className = 'message-row';
+    messageRow.classList.add(messageObj.sender === 'user' ? 'sent' : 'received');
+
+    // 1. 创建头像（简洁模式会用到）
+    const avatarEl = document.createElement('div');
+    avatarEl.className = 'message-chat-avatar';
+
+    // 安全获取联系人数据
+    let contactData = null;
+    if (currentSweetheartChatContact && currentSweetheartChatContact.id === contactId) {
+        contactData = currentSweetheartChatContact;
+    } else if (currentChatContact && currentChatContact.id === contactId) {
+        contactData = currentChatContact;
+    }
+
+    if (messageObj.sender === 'user') {
+        if (userProfile && userProfile.avatar) {
+            const isUrl = userProfile.avatar.startsWith('http') || userProfile.avatar.startsWith('data:');
+            avatarEl.innerHTML = isUrl
+                ? `<img src="${userProfile.avatar}" alt="">`
+                : `<div class="initials">${userProfile.avatar}</div>`;
         } else {
-            avatarDiv.innerHTML = `<div class="initials" style="background: #6c757d;">${escapeHTML(avatarSrc)}</div>`;
+            avatarEl.innerHTML = '<div class="initials">👤</div>';
+        }
+    } else {
+        if (contactData && contactData.avatar) {
+            const isUrl = contactData.avatar.startsWith('http') || contactData.avatar.startsWith('data:');
+            avatarEl.innerHTML = isUrl
+                ? `<img src="${contactData.avatar}" alt="">`
+                : `<div class="initials">${contactData.avatar}</div>`;
+        } else {
+            avatarEl.innerHTML = '<div class="initials">💬</div>';
         }
     }
 
-    const contentDiv = document.createElement('div');
-    contentDiv.className = 'message-content';
+    // 2. 创建消息内容容器
+    const messageContent = document.createElement('div');
+    messageContent.className = 'message-content';
 
-    const senderNameDiv = document.createElement('div');
-    senderNameDiv.className = 'message-sender-name';
-    senderNameDiv.textContent = senderName;
+    // 3. 创建发送者名称
+    const senderName = document.createElement('div');
+    senderName.className = 'message-sender-name';
+    senderName.textContent = messageObj.sender === 'user'
+        ? (userProfile.name || '我')
+        : (contactData ? contactData.name : '联系人');
 
-    const bubble = createMessageBubble(message);
+    // 4. 创建气泡
+    let bubble;
+    const text = messageObj.text || '';
 
-    bubble.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        showMessageActionSheet(contactId, index);
-    });
+    // 检查是否是 HTML 渲染消息
+    const renderMatch = text.match(/<render>([\s\S]*?)<\/render>/);
 
-    let messageLongPressTimer = null;
-    bubble.addEventListener('touchstart', () => {
-        messageLongPressTimer = setTimeout(() => showMessageActionSheet(contactId, index), 500);
-    }, {passive: true});
-    bubble.addEventListener('touchend', () => clearTimeout(messageLongPressTimer));
-    bubble.addEventListener('touchmove', () => clearTimeout(messageLongPressTimer));
+    if (renderMatch && renderMatch[1]) {
+        // HTML 渲染气泡
+        bubble = document.createElement('div');
+        bubble.className = 'chat-bubble render-bubble';
+        bubble.style.position = 'relative';
 
-    contentDiv.appendChild(senderNameDiv);
-    contentDiv.appendChild(bubble);
+        const iframe = document.createElement('iframe');
+        iframe.className = 'render-iframe';
+        iframe.sandbox = 'allow-scripts allow-same-origin';
 
-    // 最终结论：无论发送还是接收，DOM结构都应该是 [头像, 内容]。
-    // 这样CSS规则才能在一致的结构上工作，不会产生歧义。
-    row.appendChild(avatarDiv);
-    row.appendChild(contentDiv);
+        // ✅ 安全设置 srcdoc
+        try {
+            iframe.srcdoc = renderMatch[1];
+        } catch (e) {
+            console.error('设置 iframe srcdoc 失败:', e);
+            iframe.srcdoc = '<p style="color:red;">内容加载失败</p>';
+        }
 
-    return row;
+        // ✅ 增强的 onload 处理
+        iframe.onload = function() {
+            setTimeout(() => {
+                try {
+                    // 检查 iframe 是否可访问
+                    if (!iframe.contentWindow || !iframe.contentWindow.document) {
+                        iframe.style.height = '250px';
+                        return;
+                    }
+
+                    const iframeDoc = iframe.contentWindow.document;
+                    const iframeBody = iframeDoc.body;
+
+                    if (!iframeBody) {
+                        iframe.style.height = '250px';
+                        return;
+                    }
+
+                    // 立即设置初始高度
+                    const initialHeight = iframeBody.scrollHeight;
+                    iframe.style.height = (initialHeight + 4) + 'px';
+
+                    // 尝试使用 ResizeObserver
+                    if (window.ResizeObserver) {
+                        try {
+                            const observer = new ResizeObserver(() => {
+                                try {
+                                    if (iframeBody) {
+                                        iframe.style.height = (iframeBody.scrollHeight + 4) + 'px';
+                                    }
+                                } catch (resizeError) {
+                                    console.warn('ResizeObserver 回调错误:', resizeError);
+                                }
+                            });
+                            observer.observe(iframeBody);
+                        } catch (observerError) {
+                            console.warn('ResizeObserver 创建失败:', observerError);
+                        }
+                    }
+
+                } catch (accessError) {
+                    console.warn('无法访问 iframe 内容:', accessError.message);
+                    iframe.style.height = '250px';
+                }
+            }, 100);
+        };
+
+        // ✅ 添加 onerror 处理
+        iframe.onerror = function() {
+            console.error('iframe 加载错误');
+            iframe.style.height = '250px';
+        };
+
+        bubble.appendChild(iframe);
+
+    } else if (messageObj.imageUrl) {
+        // 图片消息
+        bubble = document.createElement('div');
+        bubble.className = 'chat-bubble image-only';
+        const img = document.createElement('img');
+        img.src = messageObj.imageUrl;
+        img.alt = '图片';
+        bubble.appendChild(img);
+
+    } else {
+        // 普通文本消息
+        bubble = document.createElement('div');
+        bubble.className = 'chat-bubble';
+
+        // 处理引用
+        if (messageObj.quotedMessage) {
+            const quotedWrapper = document.createElement('div');
+            quotedWrapper.className = 'quoted-message-wrapper';
+            quotedWrapper.innerHTML = `
+                <div class="quoted-sender">${escapeHTML(messageObj.quotedMessage.sender === 'user' ? (userProfile.name || '我') : (contactData ? contactData.name : '联系人'))}</div>
+                <div class="quoted-text">${escapeHTML(messageObj.quotedMessage.text.substring(0, 50))}${messageObj.quotedMessage.text.length > 50 ? '...' : ''}</div>
+            `;
+            bubble.appendChild(quotedWrapper);
+        }
+
+        // 主消息内容
+        const mainText = document.createElement('div');
+        mainText.className = 'main-message-text';
+        mainText.innerHTML = formatMessageText(text);
+        bubble.appendChild(mainText);
+    }
+
+    // 5. 组装 DOM 结构
+    messageContent.appendChild(senderName);
+    messageContent.appendChild(bubble);
+    messageRow.appendChild(avatarEl);
+    messageRow.appendChild(messageContent);
+
+        // 6. ✅ 添加消息操作菜单的事件监听器（同时支持长按和右键）
+    if (bubble && typeof bubble.addEventListener === 'function') {
+        let longPressTimer = null;
+        let startPos = { x: 0, y: 0 };
+        let hasMoved = false;
+
+        // === 长按逻辑（触摸设备） ===
+        const handleTouchStart = (e) => {
+            const touch = e.touches[0];
+            startPos = { x: touch.clientX, y: touch.clientY };
+            hasMoved = false;
+
+            longPressTimer = setTimeout(() => {
+                showMessageMenu(contactId, messageIndex, messageRow);
+            }, 500);
+        };
+
+        const handleTouchMove = (e) => {
+            if (!longPressTimer) return;
+
+            const touch = e.touches[0];
+            const distance = Math.sqrt(
+                Math.pow(touch.clientX - startPos.x, 2) +
+                Math.pow(touch.clientY - startPos.y, 2)
+            );
+
+            if (distance > 10) {
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
+                hasMoved = true;
+            }
+        };
+
+        const handleTouchEnd = () => {
+            if (longPressTimer) {
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
+            }
+        };
+
+        // === 右键菜单逻辑（桌面设备） ===
+        const handleContextMenu = (e) => {
+            e.preventDefault(); // 阻止浏览器默认右键菜单
+            showMessageMenu(contactId, messageIndex, messageRow);
+        };
+
+        // === 绑定事件 ===
+        try {
+            // 触摸事件（移动端）
+            bubble.addEventListener('touchstart', handleTouchStart, { passive: true });
+            bubble.addEventListener('touchmove', handleTouchMove, { passive: true });
+            bubble.addEventListener('touchend', handleTouchEnd);
+            bubble.addEventListener('touchcancel', handleTouchEnd);
+
+            // 右键菜单（桌面端）
+            bubble.addEventListener('contextmenu', handleContextMenu);
+
+        } catch (eventError) {
+            console.warn('添加事件监听器失败:', eventError);
+        }
+    }
+
+    return messageRow;
 }
 
+/**
+ * 显示消息操作菜单（普通聊天版本）
+ * @param {string} contactId - 联系人ID
+ * @param {number} messageIndex - 消息索引
+ * @param {HTMLElement} messageRow - 消息行元素
+ */
+function showMessageMenu(contactId, messageIndex, messageRow) {
+    // 判断是普通聊天还是密友聊天
+    const isSweetheartChat = document.getElementById('sweetheartChatPage').classList.contains('show');
+
+    if (isSweetheartChat) {
+        showSweetheartMessageActionSheet(contactId, messageIndex, messageRow);
+    } else {
+        showNormalMessageActionSheet(contactId, messageIndex, messageRow);
+    }
+}
 
 /**
- * 显示消息操作菜单
- * @param {string|number} contactId - 联系人ID
- * @param {number} index - 消息的索引
+ * 显示普通聊天的消息操作菜单
  */
-function showMessageActionSheet(contactId, index) {
+function showNormalMessageActionSheet(contactId, messageIndex, messageRow) {
     const actionSheet = document.getElementById('messageActionSheet');
+    if (!actionSheet) return;
+
+    // 存储当前操作的消息信息
     actionSheet.dataset.contactId = contactId;
-    actionSheet.dataset.index = index;
+    actionSheet.dataset.index = messageIndex;
+
+    // 显示菜单
     actionSheet.classList.add('show');
 }
 
 /**
- * 隐藏消息操作菜单
+ * 显示密友聊天的消息操作菜单
+ */
+function showSweetheartMessageActionSheet(contactId, messageIndex, messageRow) {
+    const actionSheet = document.getElementById('sweetheartMessageActionSheet');
+    if (!actionSheet) return;
+
+    // 存储当前操作的消息信息
+    actionSheet.dataset.contactId = contactId;
+    actionSheet.dataset.index = messageIndex;
+
+    // 显示菜单
+    actionSheet.classList.add('show');
+}
+
+/**
+ * 隐藏普通聊天消息操作菜单
  */
 function hideMessageActionSheet() {
     const actionSheet = document.getElementById('messageActionSheet');
-    actionSheet.classList.remove('show');
-    // 清理数据以防万一
-    delete actionSheet.dataset.contactId;
-    delete actionSheet.dataset.index;
+    if (actionSheet) {
+        actionSheet.classList.remove('show');
+    }
+}
+
+/**
+ * 隐藏密友聊天消息操作菜单
+ */
+function hideSweetheartMessageActionSheet() {
+    const actionSheet = document.getElementById('sweetheartMessageActionSheet');
+    if (actionSheet) {
+        actionSheet.classList.remove('show');
+    }
 }
 
 
@@ -853,6 +1239,177 @@ function copyMessage(contactId, messageIndex) {
     }
     hideMessageActionSheet();
 }
+
+// ========== 密友聊天消息操作函数 - 开始 ==========
+
+/**
+ * 显示密友消息操作菜单
+ */
+function showSweetheartMessageActionSheet(contactId, index) {
+    const actionSheet = document.getElementById('sweetheartMessageActionSheet');
+    if (!actionSheet) {
+        console.error('❌ 找不到 sweetheartMessageActionSheet 元素');
+        return;
+    }
+    actionSheet.dataset.contactId = contactId;
+    actionSheet.dataset.index = index;
+    actionSheet.classList.add('show');
+    console.log('✅ 密友消息菜单已显示', {contactId, index});
+}
+
+/**
+ * 隐藏密友消息操作菜单
+ */
+function hideSweetheartMessageActionSheet() {
+    const actionSheet = document.getElementById('sweetheartMessageActionSheet');
+    if (actionSheet) {
+        actionSheet.classList.remove('show');
+        delete actionSheet.dataset.contactId;
+        delete actionSheet.dataset.index;
+    }
+}
+
+/**
+ * 删除密友聊天消息
+ */
+function deleteSweetheartMessage(contactId, messageIndex) {
+    if (confirm('确定要永久删除这条消息吗？')) {
+        // ⚠️ 注意：这里用的是 phoneSweetheartChatHistory 而不是 phoneChatHistory
+        const chatHistory = JSON.parse(localStorage.getItem('phoneSweetheartChatHistory') || '{}');
+
+        if (chatHistory[contactId] && chatHistory[contactId][messageIndex] !== undefined) {
+            chatHistory[contactId].splice(messageIndex, 1);
+
+            try {
+                localStorage.setItem('phoneSweetheartChatHistory', JSON.stringify(chatHistory));
+                console.log(`✅ 密友消息已删除 (Contact: ${contactId}, Index: ${messageIndex})`);
+
+                // 重新打开聊天以刷新界面
+                if (currentSweetheartChatContact && currentSweetheartChatContact.id === contactId) {
+                    openSweetheartChat(currentSweetheartChatContact);
+                }
+                renderSweetheartList();
+            } catch (e) {
+                console.error('保存失败:', e);
+                alert('存储空间不足，请清理数据');
+            }
+        }
+    }
+    hideSweetheartMessageActionSheet();
+}
+
+/**
+ * 复制密友聊天消息
+ */
+function copySweetheartMessage(contactId, messageIndex) {
+    const chatHistory = JSON.parse(localStorage.getItem('phoneSweetheartChatHistory') || '{}');
+    const message = chatHistory[contactId]?.[messageIndex];
+
+    if (message && message.text) {
+        let textToCopy = message.text;
+
+        // 处理图片消息
+        if (textToCopy.trim().startsWith('<img')) {
+            textToCopy = '[图片]';
+        }
+        // 处理渲染消息
+        else if (textToCopy.includes('<render>')) {
+            textToCopy = textToCopy.replace(/<render>[\s\S]*?<\/render>/g, '[特殊内容]');
+        }
+
+        // 复制到剪贴板
+        navigator.clipboard.writeText(textToCopy).then(() => {
+            showSuccessModal('复制成功', '消息内容已复制到剪贴板。', 1500);
+        }).catch(err => {
+            console.error('复制失败', err);
+            // 降级方案
+            const textarea = document.createElement('textarea');
+            textarea.value = textToCopy;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            showSuccessModal('复制成功', '消息内容已复制到剪贴板。', 1500);
+        });
+    }
+    hideSweetheartMessageActionSheet();
+}
+
+/**
+ * 重新生成密友AI回复
+ */
+function regenerateSweetheartAiResponse(contactId, messageIndex) {
+    const chatHistory = JSON.parse(localStorage.getItem('phoneSweetheartChatHistory') || '{}');
+    const message = chatHistory[contactId]?.[messageIndex];
+
+    if (!message) {
+        alert('消息不存在！');
+        hideSweetheartMessageActionSheet();
+        return;
+    }
+
+    // 只能重新生成AI的回复
+    if (message.sender !== 'contact') {
+        alert('只能重新生成AI的回复！');
+        hideSweetheartMessageActionSheet();
+        return;
+    }
+
+    if (!confirm('确定要重新生成这条回复吗？')) {
+        hideSweetheartMessageActionSheet();
+        return;
+    }
+
+    // 删除这条AI回复
+    chatHistory[contactId].splice(messageIndex, 1);
+    localStorage.setItem('phoneSweetheartChatHistory', JSON.stringify(chatHistory));
+
+    // 重新打开聊天并触发AI回复
+    if (currentSweetheartChatContact && currentSweetheartChatContact.id === contactId) {
+        openSweetheartChat(currentSweetheartChatContact);
+        setTimeout(() => {
+            getSweetheartAiReply(); // 调用AI回复函数
+        }, 300);
+    }
+
+    hideSweetheartMessageActionSheet();
+}
+
+/**
+ * 引用密友聊天消息
+ */
+function quoteSweetheartMessage(contactId, messageIndex) {
+    const chatHistory = JSON.parse(localStorage.getItem('phoneSweetheartChatHistory') || '{}');
+    const message = chatHistory[contactId]?.[messageIndex];
+
+    if (!message) {
+        hideSweetheartMessageActionSheet();
+        return;
+    }
+
+    // 设置引用数据
+    currentSweetheartQuoteData = {
+        sender: message.sender === 'user' ? userProfile.name : currentSweetheartChatContact.name,
+        text: message.text.replace(/<render>[\s\S]*?<\/render>/g, '[特殊内容]').substring(0, 100)
+    };
+
+    // 显示引用预览
+    const previewEl = document.getElementById('sweetheartQuotePreview');
+    if (previewEl) {
+        document.getElementById('sweetheartQuotePreviewSender').textContent = currentSweetheartQuoteData.sender;
+        document.getElementById('sweetheartQuotePreviewText').textContent = currentSweetheartQuoteData.text;
+        previewEl.classList.add('show');
+    }
+
+    // 聚焦输入框
+    const inputEl = document.getElementById('sweetheartChatInput');
+    if (inputEl) inputEl.focus();
+
+    hideSweetheartMessageActionSheet();
+}
+
+// ========== 密友聊天消息操作函数 - 结束 ==========
+
 
 /**
  * [全新版本] 引用消息：激活引用预览UI
@@ -932,6 +1489,120 @@ async function regenerateAiResponse(contactId, messageIndex) {
     // 3. 调用 getAiReply 函数，它会自动使用当前的（已删掉最后一条的）历史记录来生成新回复
     await getAiReply();
 }
+
+// ========== 密友消息操作函数 ==========
+
+/**
+ * 显示密友消息操作菜单
+ */
+function showSweetheartMessageActionSheet(contactId, index) {
+    const actionSheet = document.getElementById('sweetheartMessageActionSheet');
+    actionSheet.dataset.contactId = contactId;
+    actionSheet.dataset.index = index;
+    actionSheet.classList.add('show');
+}
+
+/**
+ * 删除密友消息
+ */
+function deleteSweetheartMessage(contactId, messageIndex) {
+    if (confirm('确定要永久删除这条消息吗？')) {
+        const chatHistory = JSON.parse(localStorage.getItem('phoneSweetheartChatHistory') || '{}');
+        if (chatHistory[contactId] && chatHistory[contactId][messageIndex] !== undefined) {
+            chatHistory[contactId].splice(messageIndex, 1);
+            try {
+                localStorage.setItem('phoneSweetheartChatHistory', JSON.stringify(chatHistory));
+            } catch (e) {
+                console.error('保存失败:', e);
+                alert('存储空间不足，请清理数据');
+            }
+            openSweetheartChat(currentSweetheartChatContact);
+            renderSweetheartList();
+        }
+    }
+}
+
+/**
+ * 复制密友消息
+ */
+function copySweetheartMessage(contactId, messageIndex) {
+    const chatHistory = JSON.parse(localStorage.getItem('phoneSweetheartChatHistory') || '{}');
+    const message = chatHistory[contactId]?.[messageIndex];
+
+    if (message && message.text) {
+        if (message.text.trim().startsWith('<img')) {
+            navigator.clipboard.writeText('[图片]').then(() => {
+                showSuccessModal('复制成功', '已将"[图片]"复制到剪贴板。');
+            }).catch(err => console.error('复制失败', err));
+        } else {
+            navigator.clipboard.writeText(message.text).then(() => {
+                showSuccessModal('复制成功', '消息内容已复制到剪贴板。');
+            }).catch(err => console.error('复制失败', err));
+        }
+    }
+    hideSweetheartMessageActionSheet();
+}
+
+/**
+ * 引用密友消息
+ */
+function quoteSweetheartMessage(contactId, messageIndex) {
+    const chatHistory = JSON.parse(localStorage.getItem('phoneSweetheartChatHistory') || '{}');
+    const message = chatHistory[contactId]?.[messageIndex];
+
+    if (!message) return;
+
+    currentSweetheartQuoteData = {
+        sender: message.sender,
+        text: message.text,
+        senderName: message.sender === 'user' ? userProfile.name : currentSweetheartChatContact.name
+    };
+
+    const previewEl = document.getElementById('sweetheartQuotePreview');
+    document.getElementById('sweetheartQuotePreviewSender').textContent = currentSweetheartQuoteData.senderName;
+
+    let previewText = message.text;
+    if (previewText.trim().startsWith('<img')) {
+        previewText = '[图片]';
+    }
+    document.getElementById('sweetheartQuotePreviewText').textContent = previewText;
+
+    previewEl.classList.add('show');
+    document.getElementById('sweetheartChatInput').focus();
+    hideSweetheartMessageActionSheet();
+}
+
+/**
+ * 重新生成密友AI回复
+ */
+async function regenerateSweetheartAiResponse(contactId, messageIndex) {
+    const chatHistory = JSON.parse(localStorage.getItem('phoneSweetheartChatHistory') || '{}');
+    const messages = chatHistory[contactId];
+
+    if (!messages || !messages[messageIndex]) return;
+
+    const targetMessage = messages[messageIndex];
+
+    if (targetMessage.sender === 'user') {
+        showSuccessModal('操作无效', '只能对AI的回复进行重新生成哦。', 2000);
+        hideSweetheartMessageActionSheet();
+        return;
+    }
+
+    messages.splice(messageIndex, 1);
+    try {
+        localStorage.setItem('phoneSweetheartChatHistory', JSON.stringify(chatHistory));
+    } catch (e) {
+        console.error('保存失败:', e);
+        alert('存储空间不足，请清理数据');
+    }
+    openSweetheartChat(currentSweetheartChatContact);
+
+    hideSweetheartMessageActionSheet();
+
+    await getSweetheartAiReply();
+}
+
 
 /**
  * [全新版本] 创建消息气泡的DOM元素
@@ -1067,6 +1738,10 @@ let sweetheartContactsData = [
         boundWorldbooks: []
     }
 ];
+// ========== 联系人库多选功能全局变量 ==========
+let libraryOnlyContactsData = []; // 仅存在于联系人库的联系人
+let isMultiSelectMode = false; // 是否处于多选模式
+let selectedContactIds = new Set(); // 选中的联系人ID集合
 
 
 // ========== 世界系统数据 ==========
@@ -1075,24 +1750,31 @@ let currentWorldId = null; // 当前选中的世界ID
 
 // ========== 世界系统功能 ==========
 
-/**
- * 打开世界选择页面
- */
+// ▼▼▼ 使用这个【绝对修正版】的 openWorldSelect 函数进行替换 ▼▼▼
+
 function openWorldSelect() {
+    // 【核心修正】在打开自己之前，确保所有其他可能打开的页面都被关闭
+    document.getElementById('sweetheartListPage').classList.remove('show');
+    document.getElementById('contactsPage').classList.remove('show');
+    // 未来如果还有其他页面，也在这里添加关闭逻辑
+
+    // 打开世界选择页面
     document.getElementById('worldSelectPage').classList.add('show');
     renderWorldList();
 }
 
+
+// ▼▼▼ 使用这个【关键修正版】的 closeWorldSelect 函数进行替换 ▼▼▼
+
 /**
- * 关闭世界选择页面
+ * [关键修正版] 关闭世界选择页面
+ * - 不再错误地清除 worldId
+ * - 确保能返回主屏幕
  */
 function closeWorldSelect() {
+    // 只负责关闭页面，不再处理 currentWorldId
     document.getElementById('worldSelectPage').classList.remove('show');
-
-    // 【核心修复】关闭世界选择页面意味着返回主桌面，
-    // 此时应清除当前的世界ID，避免影响其他页面的返回逻辑。
-    currentWorldId = null;
-    localStorage.removeItem('currentWorldId');
+    console.log('世界选择页面已关闭。');
 }
 
 
@@ -1102,8 +1784,6 @@ function closeWorldSelect() {
 function renderWorldList() {
     const container = document.getElementById('worldSelectContent');
     container.innerHTML = '';
-    saveWorldsData();
-
 
     // 渲染现有世界
     worldsData.forEach(world => {
@@ -1111,8 +1791,16 @@ function renderWorldList() {
         card.className = 'world-card';
         card.onclick = () => enterWorld(world.id);
 
-        // 获取该世界的联系人数量
-        const contactCount = world.contacts ? world.contacts.length : 0;
+        // ✅ 修复:正确计算联系人数量
+        // 从 sweetheartContactsData 中筛选出属于该世界的联系人
+        let contactCount = 0;
+        if (world.contacts && world.contacts.length > 0) {
+            contactCount = sweetheartContactsData.filter(contact =>
+                world.contacts.includes(String(contact.id))
+            ).length;
+        }
+
+        console.log(`世界"${world.name}"的联系人ID:`, world.contacts, `实际数量:${contactCount}`);
 
         card.innerHTML = `
             <div class="world-card-icon">${world.icon || '🌍'}</div>
@@ -1136,6 +1824,7 @@ function renderWorldList() {
     container.appendChild(newCard);
 }
 
+
 /**
  * 进入指定世界（打开该世界的通讯录）
  */
@@ -1143,9 +1832,12 @@ function enterWorld(worldId) {
     currentWorldId = worldId;
     localStorage.setItem('currentWorldId', worldId);
 
-    closeWorldSelect();
+    console.log(`进入世界: ${worldId}`);
 
-    // 延迟打开密友列表，让关闭动画完成
+    // 关闭世界选择页面，但不清除worldId
+    closeWorldSelect(false);
+
+    // 延迟打开密友列表,让关闭动画完成
     setTimeout(() => {
         openSweetheartList();
     }, 300);
@@ -1189,7 +1881,7 @@ function openNewWorldModal() {
     document.getElementById('worldMapPreview').style.display = 'none';
     document.getElementById('worldMapPlaceholder').style.display = 'block';
     document.getElementById('worldMapOptions').style.display = 'none';
-    document.getElementById('worldMapInput').value = '';
+    document.getElementById('worldMapInput').value = ''; // 清空文件选择，以便可以重复上传相同文件
     // ^ ^ ^ 新增的重置代码 ^ ^ ^
 
     document.getElementById('newWorldModal').classList.add('show');
@@ -1268,22 +1960,28 @@ function toggleWorldMapOptions() {
 }
 
 /**
- * 选择默认地图（当前为占位功能）
+ * 选择默认地图
  */
 function selectDefaultMap() {
-    // 这里可以扩展为显示一个包含多张默认地图的弹窗
-    const defaultMapUrl = 'https://i.pinimg.com/originals/b6/29/79/b629796791c13a48e7787f0b5d92ac87.png'; // 示例默认地图
+    // 这是你提供的默认地图URL
+    const defaultMapUrl = 'https://s3plus.meituan.net/opapisdk/op_ticket_1_885190757_1760979959274_qdqqd_m9jrpo.jpg';
+
+    // 获取DOM元素
     const previewImg = document.getElementById('worldMapPreview');
     const placeholder = document.getElementById('worldMapPlaceholder');
 
+    // 更新图片预览
     previewImg.src = defaultMapUrl;
     previewImg.style.display = 'block';
     placeholder.style.display = 'none';
 
-    // 选择后隐藏选项
+    // 选择后隐藏选项菜单
     document.getElementById('worldMapOptions').style.display = 'none';
+
+    // 给用户一个成功的提示
     showSuccessModal('选择成功', '已应用默认地图。');
 }
+
 
 /**
  * 处理用户上传的地图图片
@@ -1316,15 +2014,12 @@ function saveNewWorld() {
     const name = document.getElementById('worldNameInput').value.trim();
 
     if (!name) {
-        alert('请填写世界名称！');
+        alert('请填写世界名称!');
         return;
     }
 
     const description = document.getElementById('worldDescInput').value.trim();
-
-    // V V V 新增的获取地图代码 V V V
     const mapUrl = document.getElementById('worldMapPreview').src;
-    // ^ ^ ^ 新增的获取地图代码 ^ ^ ^
 
     // 获取选中的世界书
     const selectedWorldbooks = [];
@@ -1336,7 +2031,7 @@ function saveNewWorld() {
         id: 'WORLD_' + Date.now(),
         name,
         description,
-        mapUrl: mapUrl.includes('base64') || mapUrl.includes('pinimg.com') ? mapUrl : '', // 仅当有有效图片时才保存
+        mapUrl: mapUrl && !mapUrl.endsWith('base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=') ? mapUrl : '',
         icon: '🌍',
         contacts: [], // 新世界默认没有联系人
         worldbooks: selectedWorldbooks,
@@ -1345,16 +2040,21 @@ function saveNewWorld() {
 
     worldsData.push(newWorld);
     saveWorldsData();
-
     closeNewWorldModal();
-    renderWorldList(); // 重新渲染世界列表
+    showSuccessModal('创建成功', `世界"${name}"已创建!`);
+    renderWorldList();
 
-    // 根据需求，新建世界后跳转到该世界的通讯录（空状态）
-    showSuccessModal('创建成功', `世界"${name}"已创建！`);
     setTimeout(() => {
-        enterWorld(newWorld.id); // 直接进入新创建的世界
-    }, 1000); // 稍微延迟一下，让成功提示显示
+        enterWorld(newWorld.id);
+        // ✅ 新增:延迟提示用户添加联系人
+        setTimeout(() => {
+            if (confirm('世界创建成功!是否立即添加第一个联系人?')) {
+                addNewSweetheartContact();
+            }
+        }, 1500);
+    }, 1000);
 }
+
 
 /**
  * 保存世界数据到localStorage
@@ -1375,19 +2075,19 @@ function loadWorldsData() {
         const saved = localStorage.getItem('phoneWorldsData');
         if (saved) {
             worldsData = JSON.parse(saved);
-            console.log('成功加载世界数据，共', worldsData.length, '个世界');
+            console.log('成功加载世界数据,共', worldsData.length, '个世界');
         } else {
-            // 如果没有世界数据，则初始化一个默认世界
+            // ✅ 修复:将所有默认联系人ID都添加到默认世界
             worldsData.push({
                 id: 'DEFAULT_WORLD',
                 name: '一个平平无奇的世界',
                 description: '这是一个普通的世界',
                 icon: '🌏',
-                contacts: ['1', '2'], // 默认包含代码助手和另一个朋友
+                contacts: ['1', '2', 'SH_default_001'], // ✅ 添加第三个默认联系人
                 worldbooks: [],
                 timestamp: Date.now()
             });
-            saveWorldsData(); // 立即保存到 localStorage
+            saveWorldsData();
             console.log('已初始化默认世界数据。');
         }
     } catch (e) {
@@ -2261,6 +2961,10 @@ function deleteSavedWidget(index) {
 }
 
 function openContacts() {
+    // ✅ 新增:清除当前世界ID,表示这是从主屏幕打开的普通通讯录
+    currentWorldId = null;
+    localStorage.removeItem('currentWorldId');
+
     document.getElementById('contactsPage').classList.add('show');
     renderContacts(contactsData);
 }
@@ -2274,8 +2978,7 @@ function closeContacts() {
         // 延迟一下，让通讯录关闭动画完成
         setTimeout(() => {
             openWorldSelect();
-            currentWorldId = null; // 清除当前世界ID
-            localStorage.removeItem('currentWorldId'); // 清除本地存储
+            // 注意：这里不清除currentWorldId，因为用户可能还要在世界选择页面操作
         }, 300);
     }
 }
@@ -2296,10 +2999,12 @@ function toggleContactMenu(event) {
 
 // ========== 结束：粘贴代码 ==========
 
-
-// ========== 开始：请用这个【修正版】函数替换旧的 renderContacts 函数 ==========
+/**
+ * [最终修正版] 渲染普通联系人列表
+ */
 function renderContacts(contacts) {
     const container = document.getElementById('contactsList');
+    // 注意：这里使用的是普通聊天历史
     const chatHistory = JSON.parse(localStorage.getItem('phoneChatHistory') || '{}');
 
     container.innerHTML = '';
@@ -2309,46 +3014,70 @@ function renderContacts(contacts) {
     }
 
     contacts.forEach(contact => {
-        const item = document.createElement('div');
-        item.className = 'contact-item';
+        const wrapper = document.createElement('div');
+        wrapper.className = 'contact-item-wrapper';
+        wrapper.dataset.contactId = contact.id;
+        wrapper.dataset.contactType = 'normal';
 
         const contactMessages = chatHistory[contact.id] || [];
-        let lastMessageText = contact.status;
+        let lastMessageText = contact.status; // 默认显示状态
+
+        // ✅ 同样使用辅助函数来安全地获取预览
         if (contactMessages.length > 0) {
-            const lastMessage = contactMessages[contactMessages.length - 1];
-            // 修正：如果最后一条消息是图片，显示占位符
-            if (lastMessage.text && lastMessage.text.includes('<img')) {
-                lastMessageText = '[图片]';
-            } else {
-                lastMessageText = lastMessage.text;
+            const preview = getLastMessagePreview(contactMessages[contactMessages.length - 1]);
+            if (preview) {
+                lastMessageText = preview;
             }
         }
 
-        // --- ↓↓↓ 核心修正点 ↓↓↓ ---
-        // 1. 判断头像是 URL 还是 Emoji
         const isUrl = contact.avatar && (String(contact.avatar).startsWith('http') || String(contact.avatar).startsWith('data:'));
-
-        // 2. 根据判断结果生成不同的 HTML
-        // 修正示例
         const avatarContent = isUrl
-            ? `<div class="contact-avatar"><img src="${contact.avatar}" alt="${escapeHTML(contact.name)}"></div>`
-            : `<div class="contact-avatar">${escapeHTML(contact.avatar)}</div>`;
+            ? `<img src="${escapeHTML(contact.avatar)}" alt="${escapeHTML(contact.name)}">`
+            : `<span>${escapeHTML(contact.avatar)}</span>`;
+
+        let instanceIdHtml = '';
+        if (contact.id) {
+            instanceIdHtml = `<div class="contact-instance-id" title="联系人ID">ID: ${escapeHTML(contact.id)}</div>`;
+        }
 
 
-        item.innerHTML = `
-            ${avatarContent}
-            <div class="contact-info">
-                <div class="contact-name">${escapeHTML(contact.name)}</div>
-                <div class="contact-status">${escapeHTML(lastMessageText)}</div>
+        wrapper.innerHTML = `
+            <div class="swipe-actions">
+                <button class="swipe-delete-btn">删除</button>
             </div>
-            ${contact.badge > 0 ? `<div class="contact-badge">${contact.badge}</div>` : ''}
+            <div class="contact-item-content">
+                <div class="contact-avatar">${avatarContent}</div>
+                <div class="contact-info">
+                    <div class="contact-name">${escapeHTML(contact.name)}</div>
+                    ${instanceIdHtml}
+                    <div class="contact-status">${escapeHTML(lastMessageText)}</div>
+                </div>
+                ${contact.badge > 0 ? `<div class="contact-badge">${contact.badge}</div>` : ''}
+            </div>
         `;
 
-        item.style.cursor = 'pointer';
-        item.onclick = () => openChat(contact);
-        container.appendChild(item);
+        const contentEl = wrapper.querySelector('.contact-item-content');
+        if (contentEl) {
+            contentEl.onclick = () => {
+                if (!wrapper.classList.contains('is-swiped')) {
+                    openChat(contact);
+                }
+            };
+        }
+
+        const deleteBtn = wrapper.querySelector('.swipe-delete-btn');
+        if (deleteBtn) {
+            deleteBtn.onclick = (e) => {
+                e.stopPropagation();
+                deleteContactFromList(contact.id, 'normal');
+            };
+        }
+
+        container.appendChild(wrapper);
+        addSwipeToDeleteListeners(wrapper);
     });
 }
+
 
 function createNewContact() {
     const menu = document.getElementById('contactMenu');
@@ -2388,12 +3117,6 @@ function createNewContact() {
 // ========== 结束：替换完成 ==========
 
 
-function selectExistingContact() {
-    const menu = document.getElementById('contactMenu');
-    menu.classList.remove('show');
-    alert('打开选择已有联系人页面');
-}
-
 document.addEventListener('click', function (e) {
     // --- 优化开始 ---
 
@@ -2406,9 +3129,12 @@ document.addEventListener('click', function (e) {
 
     // 2. 处理联系人菜单的外部点击
     const contactMenu = document.getElementById('contactMenu');
-    const addBtn = document.querySelector('.add-contact-btn');
-    if (contactMenu && addBtn && !contactMenu.contains(e.target) && !addBtn.contains(e.target)) {
-        contactMenu.classList.remove('show');
+    const sweetheartContactMenu = document.getElementById('sweetheartContactMenu');
+    const addBtn = e.target.closest('.add-contact-btn'); // 检查点击的是否是加号按钮
+    // 如果点击的不是加号按钮，则关闭所有菜单
+    if (!addBtn) {
+        if (contactMenu) contactMenu.classList.remove('show');
+        if (sweetheartContactMenu) sweetheartContactMenu.classList.remove('show');
     }
 
     // --- 优化结束 ---
@@ -3028,46 +3754,58 @@ function handleMove(e) {
     state.draggedElement.style.transform = `translate(${deltaX}px, ${deltaY}px) scale(1.08)`;
 }
 
+// ▼▼▼ 请将你原来的 handleEnd 函数完整地替换成下面这个版本 ▼▼▼
+
 function handleEnd(e) {
-    // ✅ 新增的“守卫”逻辑：
-    // 如果 dragGhost 存在，说明当前是“从收藏夹拖出”的操作，
-    // 那么 handleEnd 函数不应该执行任何操作，直接返回。
+    // 如果是从收藏夹拖出，则此函数不处理，交由 ghost 逻辑处理
     if (dragGhost) {
         return;
     }
+
     clearTimeout(state.longPressTimer);
     document.body.style.cursor = 'default';
 
+    // 仅在拖拽状态下处理
     if (state.isDragging && state.draggedElement) {
-        const panel = document.getElementById('iconDockPanel');
+        const draggedEl = state.draggedElement;
         const touch = getChangedTouch(e);
 
+        // 检查是否拖入收藏栏，这部分逻辑保持不变
+        const panel = document.getElementById('iconDockPanel');
         if (panel && panel.classList.contains('show')) {
             const panelRect = panel.getBoundingClientRect();
-
             if (touch.clientX >= panelRect.left && touch.clientX <= panelRect.right &&
                 touch.clientY >= panelRect.top && touch.clientY <= panelRect.bottom) {
-                addIconToDockPanel(state.draggedElement);
+                addIconToDockPanel(draggedEl);
                 finishDrag(true);
                 return;
             }
         }
-    }
 
-    if (state.isDragging && state.draggedElement) {
-        const draggedEl = state.draggedElement;
-        const originalTransition = draggedEl.style.transition;
-        draggedEl.style.transition = 'none';
-        draggedEl.style.transform = '';
+        // --- 核心修改：跨页拖拽逻辑 ---
 
-        const grid = draggedEl.parentElement;
-        const gridRect = grid.getBoundingClientRect();
+        // 1. 获取原始页面信息
+        const sourceGrid = draggedEl.parentElement;
+        const sourcePageKey = sourceGrid.id === 'grid1' ? 'page1' : 'page2';
 
+        // 2. 判断目标页面
+        const screenRect = screen.getBoundingClientRect();
+        const dropXInScreen = touch.clientX - screenRect.left;
+        // 如果当前是第一页，且拖动超过了屏幕宽度的一半，则目标是第二页
+        // 如果当前是第二页，且拖动到了屏幕宽度的左边一半，则目标是第一页
+        let targetPageNum = state.currentPage;
+        if (state.currentPage === 1 && dropXInScreen > screenRect.width / 2) {
+            targetPageNum = 2;
+        } else if (state.currentPage === 2 && dropXInScreen < screenRect.width / 2) {
+            targetPageNum = 1;
+        }
+        const targetPageKey = `page${targetPageNum}`;
+        const targetGrid = document.getElementById(`grid${targetPageNum}`);
+
+        // 3. 计算在目标网格中的新位置 (row, col)
+        const gridRect = targetGrid.getBoundingClientRect();
         const ROW_HEIGHT_PX = 94;
         const GAP_PX = 14;
-        const DOCK_HEIGHT_PX = 80;
-
-        const touch = getChangedTouch(e);
         const dropX = touch.clientX - gridRect.left;
         const dropY = touch.clientY - gridRect.top;
 
@@ -3076,26 +3814,58 @@ function handleEnd(e) {
 
         const colspan = parseInt(draggedEl.dataset.colspan) || 1;
         col = Math.max(0, Math.min(col, 4 - colspan));
-        row = Math.max(0, Math.min(row, 6 - 1));
+        row = Math.max(0, Math.min(row, 6 - (parseInt(draggedEl.dataset.rowspan) || 1)));
 
-        const dropYInScreen = touch.clientY;
-        if (dropYInScreen > gridRect.top + gridRect.height - DOCK_HEIGHT_PX) {
-            revertPosition(draggedEl, originalTransition);
+        // 检查目标位置是否被占用 或 是否拖到了Dock栏区域
+        const DOCK_HEIGHT_PX = 80;
+        if (isOccupied(targetPageKey, row, col, draggedEl.dataset.id) || touch.clientY > (screenRect.top + screenRect.height - DOCK_HEIGHT_PX)) {
+            // 如果位置被占用或无效，则让图标弹回原位
+            revertPosition(draggedEl);
         } else {
-            const pageKey = grid.id === 'grid1' ? 'page1' : 'page2';
-            if (isOccupied(pageKey, row, col, draggedEl.dataset.id)) {
-                revertPosition(draggedEl, originalTransition);
-            } else {
-                updateAndSavePosition(draggedEl, row, col);
+            // 如果位置有效，执行移动操作
+
+            // a. 更新数据源
+            const appId = draggedEl.dataset.id;
+            const appIndex = state.appLayouts[sourcePageKey].findIndex(app => app.id === appId);
+            if (appIndex > -1) {
+                // 从旧页面数据中移除
+                const [appData] = state.appLayouts[sourcePageKey].splice(appIndex, 1);
+
+                // 更新位置信息并添加到新页面数据
+                appData.row = row;
+                appData.col = col;
+                state.appLayouts[targetPageKey].push(appData);
+
+                // b. 更新DOM
+                targetGrid.appendChild(draggedEl); // 将元素移动到新的Grid中！
+
+                // c. 更新dataset和样式
+                draggedEl.dataset.row = row;
+                draggedEl.dataset.col = col;
+                positionElement(draggedEl, row, col, colspan, parseInt(draggedEl.dataset.rowspan) || 1);
+
+                // d. 保存到LocalStorage
+                saveLayoutToLocalStorage();
+                console.log(`跨页移动成功：${appId} 已从 ${sourcePageKey} 移动到 ${targetPageKey} 的 (${row}, ${col})`);
             }
         }
+
+        // 移除 transform 和 transition, 恢复正常状态
+        draggedEl.style.transform = '';
+        draggedEl.style.transition = 'all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+        setTimeout(() => {
+            if (draggedEl) draggedEl.style.transition = '';
+        }, 250);
 
         state.lastDragEndTime = Date.now();
     }
 
-    // ✨ 核心修复 ✨
-    // 只有在拖动图标时，才立即退出编辑模式
-    // 如果只是长按激活，则保持编辑模式
+    // 清理拖拽相关的事件监听器和状态
+    document.removeEventListener('touchmove', handleMove);
+    document.removeEventListener('mousemove', handleMove);
+    document.removeEventListener('touchend', handleEnd);
+    document.removeEventListener('mouseup', handleEnd);
+
     finishDrag(state.hasDragged);
 }
 
@@ -3128,23 +3898,34 @@ function finishDrag(exitImmediately) {
 }
 
 
+// ▼▼▼ 请将你原来的 revertPosition 函数替换成下面这个版本 ▼▼▼
+
 function revertPosition(el, originalTransition = '') {
+    // 移除可能存在的 transform，让它直接回到原始的布局位置
+    el.style.transform = 'none';
+
+    // 找到它应该在的网格和位置
+    const sourceGrid = el.parentElement;
     const originalRow = parseInt(el.dataset.row);
     const originalCol = parseInt(el.dataset.col);
     const colspan = parseInt(el.dataset.colspan) || 1;
     const rowspan = parseInt(el.dataset.rowspan) || 1;
 
+    // 添加一个平滑的回弹动画
     el.style.transition = 'all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
     positionElement(el, originalRow, originalCol, colspan, rowspan);
 
+    // 动画结束后，恢复原始的 transition 设置
     setTimeout(() => {
-        el.style.transition = originalTransition;
+        if (el) el.style.transition = originalTransition;
     }, 250);
 }
 
+// ▼▼▼ 这是一个可选的优化，但建议你也替换掉旧的 updateAndSavePosition 函数 ▼▼▼
 
 function updateAndSavePosition(el, newRow, newCol) {
     const appId = el.dataset.id;
+    // 这个函数现在只处理同页拖拽，所以直接从父元素获取 pageKey
     const pageKey = el.parentElement.id === 'grid1' ? 'page1' : 'page2';
 
     const appData = state.appLayouts[pageKey].find(app => app.id === appId);
@@ -3158,11 +3939,20 @@ function updateAndSavePosition(el, newRow, newCol) {
 
     const colspan = parseInt(el.dataset.colspan) || 1;
     const rowspan = parseInt(el.dataset.rowspan) || 1;
+
+    // 平滑地移动到新位置
+    el.style.transition = 'all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
     positionElement(el, newRow, newCol, colspan, rowspan);
 
+    // 动画结束后移除 transition
+    setTimeout(() => {
+        if (el) el.style.transition = '';
+    }, 250);
+
     saveLayoutToLocalStorage();
-    console.log(`已保存 ${appId} 到新位置: (${newRow}, ${newCol})`);
+    console.log(`同页移动成功：已保存 ${appId} 到新位置: (${newRow}, ${newCol})`);
 }
+
 
 function saveLayoutToLocalStorage() {
     localStorage.setItem('phoneAppLayouts', JSON.stringify(state.appLayouts));
@@ -3381,24 +4171,42 @@ function initializeLayout() {
             console.error('解析 Dock 图标失败', e);
         }
     }
+    // ▼▼▼ 使用这个【修正并优化后】的代码块进行替换 ▼▼▼
+
     const dockContainer = document.querySelector('.dock');
-    dockContainer.innerHTML = '';
+    dockContainer.innerHTML = ''; // 清空旧图标
+
     dockIconsToRender.forEach((icon, index) => {
         const dockIcon = document.createElement('div');
         dockIcon.className = 'dock-icon';
         dockIcon.dataset.index = index;
+
+        // --- 渲染图标内容 (这部分逻辑不变) ---
         if (icon && (icon.startsWith('http') || icon.startsWith('data:'))) {
             dockIcon.innerHTML = `<img src="${icon}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 14px;" alt="">`;
         } else if (icon) {
             dockIcon.textContent = icon;
         }
-        if (index === 0) {
-            dockIcon.onclick = openContacts;
-        } else if (index === 2) {
-            dockIcon.onclick = openWorldSelect;
+
+        // --- 【核心修正】使用 switch 语句，更清晰且不易出错 ---
+        switch (index) {
+            case 0: // 第一个图标
+                dockIcon.onclick = openContacts;
+                break;
+            case 2: // 第三个图标
+                dockIcon.onclick = openWorldSelect;
+                break;
+            // 默认情况下 (第二个和第四个图标) 不绑定任何特殊点击事件
+            default:
+                break;
         }
+
+        // 将创建好的图标添加到 Dock 容器中
         dockContainer.appendChild(dockIcon);
     });
+
+// ▲▲▲ 替换结束 ▲▲▲
+
     // 其他设置加载（保持不变）
     const savedIcons = localStorage.getItem('phoneCustomIcons');
     if (savedIcons) {
@@ -3440,18 +4248,38 @@ function initializeLayout() {
 function mergeAppLayouts(defaultApps, savedApps, dockedIconIds) {
     const merged = [...savedApps];
     const savedIds = new Set(savedApps.map(app => app.id));
+
+    // 【新增】获取所有页面已保存的图标ID
+    const allSavedLayouts = localStorage.getItem('phoneAppLayouts');
+    let allPageIds = new Set();
+    if (allSavedLayouts) {
+        try {
+            const layouts = JSON.parse(allSavedLayouts);
+            // 收集所有页面的图标ID
+            if (layouts.page1) {
+                layouts.page1.forEach(app => allPageIds.add(app.id));
+            }
+            if (layouts.page2) {
+                layouts.page2.forEach(app => allPageIds.add(app.id));
+            }
+        } catch (e) {
+            console.error('解析所有页面布局失败', e);
+        }
+    }
+
     // 将默认布局中新增的应用添加进来
     defaultApps.forEach(defaultApp => {
-        // 【核心修复 - 第3步】:
-        // 增加一个判断条件：!dockedIconIds.has(defaultApp.id)
-        // 只有当图标既不在当前桌面，也不在收藏夹时，才把它添加回来
-        if (!savedIds.has(defaultApp.id) && !dockedIconIds.has(defaultApp.id)) {
+        // 【修改】现在检查三个地方：当前页面、收藏栏、其他页面
+        if (!savedIds.has(defaultApp.id) &&
+            !dockedIconIds.has(defaultApp.id) &&
+            !allPageIds.has(defaultApp.id)) {  // 【新增条件】
             merged.push(defaultApp);
             console.log(`新增或恢复了应用: ${defaultApp.label}`);
         }
     });
     return merged;
 }
+
 
 document.getElementById('chatInput').addEventListener('keydown', function (event) {
     if (event.key === 'Enter' && !event.shiftKey) {
@@ -3536,10 +4364,13 @@ function promptForUrl() {
 // ▼▼▼ 步骤2：用这个新版本完整替换旧的 openChat 函数 ▼▼▼
 
 /**
- * [最终版] 打开聊天页面，并能根据联系人类型自动切换主题
+ * [修正版] 打开普通聊天页面，不再混淆密友逻辑
  * @param {object} contact - 要聊天的联系人对象
  */
 function openChat(contact) {
+    hideMessageActionSheet();
+    hideSweetheartMessageActionSheet();
+
     if (!contact) return;
     currentChatContact = contact;
 
@@ -3547,39 +4378,29 @@ function openChat(contact) {
     const contactNameEl = document.getElementById('chatContactName');
     const messagesEl = document.getElementById('chatMessages');
 
-    // 1. 核心逻辑：检查当前联系人是否在“密友列表”中
-    const isSweetheart = sweetheartContactsData.some(sweetheart => sweetheart.id === contact.id);
+    // 核心修复：移除所有关于 'isSweetheart' 的检查和主题切换
+    // 确保普通聊天页面永远是普通模式
+    chatPage.classList.remove('sweetheart-mode');
+    console.log(`正在以普通模式打开与 ${contact.name} 的聊天`);
 
-    // 2. 根据检查结果，动态添加或移除主题class
-    if (isSweetheart) {
-        // 如果是密友，添加 'sweetheart-mode' 类
-        chatPage.classList.add('sweetheart-mode');
-        console.log(`正在以密友模式打开与 ${contact.name} 的聊天`);
-    } else {
-        // 如果不是，确保移除该类，恢复为普通模式
-        chatPage.classList.remove('sweetheart-mode');
-        console.log(`正在以普通模式打开与 ${contact.name} 的聊天`);
-    }
-
-    // 后续的渲染逻辑保持不变...
+    // 设置聊天标题并清空旧消息
     contactNameEl.textContent = contact.name;
     messagesEl.innerHTML = '';
 
+    // 显示聊天页面
     requestAnimationFrame(() => {
         chatPage.classList.add('show');
     });
 
+    // 加载或初始化聊天记录
     const chatHistory = JSON.parse(localStorage.getItem('phoneChatHistory') || '{}');
     const contactMessages = chatHistory[contact.id] || [];
 
     if (contactMessages.length === 0) {
-        // 为不同模式设置不同的欢迎语
-        const welcomeMessage = isSweetheart
-            ? `和密友 ${contact.name} 的悄悄话开始了...💖`
-            : `你和 ${contact.name} 开始聊天了`;
+        // 核心修复：直接使用 “普通聊天” 的欢迎语
+        const welcomeMessage = `你和 ${contact.name} 开始聊天了`;
 
-        // 使用你的 _createMessageDOM 函数来创建系统消息（如果支持的话）
-        // 这里简化处理，直接插入一个提示
+        // 创建并显示系统提示消息
         const systemMessageEl = document.createElement('div');
         systemMessageEl.textContent = welcomeMessage;
         systemMessageEl.style.textAlign = 'center';
@@ -3589,12 +4410,14 @@ function openChat(contact) {
         messagesEl.appendChild(systemMessageEl);
 
     } else {
+        // 如果有历史记录，则渲染它们
         contactMessages.forEach((message, index) => {
             const messageRow = _createMessageDOM(contact.id, message, index);
             messagesEl.appendChild(messageRow);
         });
     }
 
+    // 滚动到底部
     setTimeout(() => {
         messagesEl.scrollTop = messagesEl.scrollHeight;
     }, 50);
@@ -3611,28 +4434,30 @@ function closeChat() {
 }
 
 
-function closeChat() {
-    const chatPage = document.getElementById('chatPage');
-    chatPage.classList.remove('show');
-}
-
-// ========== 开始：粘贴这个全新的、支持识图的 callApi 函数 ==========
+// ========== 开始：用这个全新的、支持识图的 callApi 函数替换旧的 ==========
 async function callApi(messages) {
     // 1. 检查 API 配置
     if (globalConfig.activeApiConfig === null || !globalConfig.apiConfigs[globalConfig.activeApiConfig]) {
         return {success: false, message: '请先在“设置”中配置并选择一个有效的API。'};
     }
     const config = globalConfig.apiConfigs[globalConfig.activeApiConfig];
+    const model = config.model || '';
 
-    // 2. [核心改造] 检查是否选择了视觉模型
-    const isVisionModel = config.model.includes('vision') || config.model.includes('4o');
-    if (!isVisionModel) {
-        console.warn(`当前模型 ${config.model} 可能不支持识图。为获得最佳效果，请在设置中选用 gpt-4o 或 gpt-4-vision-preview 等模型。`);
+    // 2. [核心改造] 检查是否选择了视觉模型 (如 gpt-4o, gpt-4-vision-preview)
+    const isVisionModel = model.includes('vision') || model.includes('4o');
+    // 检查最后一条消息是否包含图片数据
+    const lastMessage = messages[messages.length - 1];
+    const hasImage = Array.isArray(lastMessage.content) && lastMessage.content.some(item => item.type === 'image_url');
+
+    if (hasImage && !isVisionModel) {
+        console.warn(`当前模型 ${model} 可能不支持识图。为获得最佳效果，请在设置中选用 gpt-4o 或 gpt-4-vision-preview 等模型。`);
+        // 你也可以在这里直接返回错误，强制用户选择视觉模型
+        // return { success: false, message: `当前模型(${model})不支持图片识别，请在设置中切换为视觉模型。` };
     }
 
     // 3. 构建请求体
     const requestBody = {
-        model: config.model,
+        model: model,
         messages: messages,
         // 如果是视觉模型，可以设置更高的 max_tokens 来获取更详细的描述
         max_tokens: isVisionModel ? 4096 : 2048
@@ -3651,7 +4476,7 @@ async function callApi(messages) {
 
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({message: '无法解析API错误信息'}));
-            throw new Error(`API 请求失败，状态码: ${response.status} - ${errorData.error ? errorData.error.message : response.statusText}`);
+            throw new Error(`API 请求失败: ${response.status} - ${errorData.error ? errorData.error.message : response.statusText}`);
         }
 
         const data = await response.json();
@@ -3668,6 +4493,9 @@ async function callApi(messages) {
         return {success: false, message: `网络或API错误: ${error.message}`};
     }
 }
+
+// ========== 结束：替换 callApi 函数 ==========
+
 
 /**
  * [全新版本] 发送消息，会检查并打包引用信息
@@ -3713,99 +4541,183 @@ function addMessageToList() {
     messagesEl.scrollTop = messagesEl.scrollHeight; // 滚动到底部
     inputEl.focus();
 }
-
-
 /**
- * [最终修正版] 获取AI回复，并自动注入角色、世界和世界书的完整上下文
+ * [全新] 格式化一段历史记录，作为提供给AI的背景上下文
+ * @param {Array} history - 要格式化的聊天记录数组
+ * @param {string} contextName - 这段历史的名称, e.g., "密友聊天"
+ * @param {string} characterName - AI角色的名字
+ * @returns {string} 格式化后的背景字符串
+ */
+function formatBackgroundHistory(history, contextName, characterName) {
+    if (!history || history.length === 0) {
+        return "";
+    }
+
+    // 将历史记录转换成易于AI阅读的对话格式
+    const formattedDialog = history
+        .map(msg => {
+            const speaker = msg.sender === 'user' ? userProfile.name : characterName;
+            return `${speaker}: ${msg.text.replace(/<img.*?>/g, '[图片]')}`; // 将图片转为文字描述
+        })
+        .join('\n');
+
+    // 返回最终的、带有清晰标记的背景信息块
+    return `
+[背景信息：以下是你和用户在"${contextName}"中的最近对话记录，仅供参考，不要直接回复这些内容]
+---
+${formattedDialog}
+---
+`;
+}
+/**
+ * 普通聊天 - 获取AI回复（完整版）
  */
 async function getAiReply() {
     if (!currentChatContact) return;
 
-    const messagesEl = document.getElementById('chatMessages');
+    const contactId = currentChatContact.id;
+    const chatHistory = JSON.parse(localStorage.getItem('phoneChatHistory') || '{}')[contactId] || [];
+
+    const chatInput = document.getElementById('chatInput');
     const getReplyBtn = document.getElementById('getReplyBtn');
+    const messagesEl = document.getElementById('chatMessages');
+
+    if (!chatInput || !getReplyBtn || !messagesEl) return;
 
     getReplyBtn.disabled = true;
     chatInput.disabled = true;
 
-    const chatHistory = JSON.parse(localStorage.getItem('phoneChatHistory') || '{}');
-    const historyMessages = chatHistory[currentChatContact.id] || [];
+    // === 构建发送给AI的消息数组 ===
+    const messages = [];
 
-    if (historyMessages.length === 0) {
-        console.log("没有历史消息，不请求AI回复。");
-        getReplyBtn.disabled = false;
-        chatInput.disabled = false;
-        return;
-    }
+    // ✅ 1. 系统提示词（使用全局常量）
+    messages.push({
+        role: "system",
+        content: AI_REALCHAT_SYSTEM_PROMPT
+    });
 
-    // --- ▼▼▼ 这是修正和增强的核心区域 ▼▼▼ ---
-
-    // 1. 整合用户设定（System Prompt）
-    let systemPrompts = [];
-    if (userProfile.persona && userProfile.persona.trim() !== '') {
-        systemPrompts.push(`[关于我(用户)的设定]:\n${userProfile.persona}`);
-    }
-
-    // 2. 整合角色设定
-    const persona = (currentChatContact.status && currentChatContact.status.trim() !== '')
-        ? currentChatContact.status
-        : '你是一个乐于助人的助手。';
-    systemPrompts.push(`[关于你(AI)的角色设定]:\n${persona}`);
-
-    // 3. 【新】调用我们修正后的函数，获取并添加世界书内容
+    // 2. 世界书上下文
     const worldbookContext = gatherWorldbookContext();
     if (worldbookContext) {
-        systemPrompts.push(worldbookContext); // 添加世界书背景
+        messages.push({
+            role: "system",
+            content: worldbookContext
+        });
     }
 
-    // 将所有系统指令合并成一个，用换行符分隔
-    const combinedSystemPrompt = systemPrompts.join('\n\n');
+    // 3. 角色设定
+    if (currentChatContact.status) {
+        messages.push({
+            role: "system",
+            content: `[角色设定]\n${currentChatContact.status}`
+        });
+    }
 
-    // ★★★【验证步骤】★★★
-    // 你可以在浏览器开发者工具的控制台看到最终发送给AI的系统指令
-    console.log("即将发送给AI的系统指令(System Prompt):\n", combinedSystemPrompt);
+    // 4. 用户设定
+    if (userProfile.persona) {
+        messages.push({
+            role: "system",
+            content: `[用户设定 - 关于"我"的信息]\n${userProfile.persona}`
+        });
+    }
 
-    // 4. 构建最终发送给API的消息列表
-    const apiMessages = [{role: 'system', content: combinedSystemPrompt}];
-    historyMessages.forEach(msg => {
-        apiMessages.push({
+    // 在构建消息数组时，在用户设定后添加
+    if (currentChatContact.boundMasks && currentChatContact.boundMasks.length > 0) {
+        let maskContent = '[用户人设]\n';
+        currentChatContact.boundMasks.forEach(maskId => {
+            const mask = masksData.find(m => m.id === maskId);
+            if (mask) {
+                maskContent += `${mask.name}: ${mask.content}\n\n`;
+            }
+        });
+        messages.push({
+            role: "system",
+            content: maskContent
+        });
+    }
+
+
+    // ✅ 5. 背景信息：密友聊天的记录（正序：旧→新）
+    const sweetheartHistory = JSON.parse(localStorage.getItem('phoneSweetheartChatHistory') || '{}')[contactId] || [];
+    if (sweetheartHistory.length > 0) {
+        let backgroundInfo = `[背景信息：以下是你和用户在"密友私聊"中的最近对话记录，仅供参考，不要直接回复这些内容]\n\n`;
+
+        const recentSweetheartChat = sweetheartHistory.slice(-10);
+
+        recentSweetheartChat.forEach((msg) => {
+            const sender = msg.sender === 'user' ? '用户' : currentChatContact.name;
+            backgroundInfo += `${sender}: ${msg.text}\n`;
+        });
+
+        backgroundInfo += `\n---\n[以上为背景信息，当前对话从这里开始]\n`;
+
+        messages.push({
+            role: "system",
+            content: backgroundInfo
+        });
+    }
+
+    // ✅ 6. 当前聊天历史（正序：旧→新）
+    const recentHistory = chatHistory.slice(-20);
+    recentHistory.forEach(msg => {
+        messages.push({
             role: msg.sender === 'user' ? 'user' : 'assistant',
             content: msg.text
         });
     });
 
-    // --- ▲▲▲ 修改结束 ▲▲▲ ---
+    // 7. 当前用户输入
+    const userMessage = chatInput.value.trim();
+    if (userMessage) {
+        const messageObj = { sender: 'user', text: userMessage };
+        const result = saveMessage(contactId, messageObj);
+        if (result.success) {
+            const messageRow = _createMessageDOM(contactId, messageObj, result.index);
+            messagesEl.appendChild(messageRow);
+        }
+        chatInput.value = '';
+    }
 
-    // 后续的API调用和UI更新逻辑保持不变
-    const thinkingBubble = createMessageBubble('...', 'received');
+    // 调试日志
+    console.log('📋 普通聊天 - 发送给AI的消息顺序：');
+    messages.forEach((msg, i) => {
+        const preview = msg.content.substring(0, 40).replace(/\n/g, ' ');
+        console.log(`${i}. [${msg.role}] ${preview}...`);
+    });
+
+    // === 显示"思考中"气泡 ===
+    const thinkingBubble = _createMessageDOM(contactId, { sender: 'contact', text: '...' }, -1);
     messagesEl.appendChild(thinkingBubble);
     messagesEl.scrollTop = messagesEl.scrollHeight;
 
-    const result = await callApi(apiMessages);
+    // === 调用API ===
+    const result = await callApi(messages);
     thinkingBubble.remove();
 
-    let responseText, newIndex;
-    if (result.success) {
-        responseText = result.message;
-        newIndex = saveMessage(currentChatContact.id, {sender: 'contact', text: responseText});
-    } else {
-        // 创建一个用户友好的错误消息
-        responseText = `[网络错误] 唔...连接AI服务器失败了，请检查网络或API设置再试一次哦。(${result.message})`;
-        newIndex = saveMessage(currentChatContact.id, {
-            sender: 'contact',
-            text: responseText // 直接保存友好的错误消息
-        });
-    }
-
-
-    const messageRow = _createMessageDOM(currentChatContact.id, {
-        sender: 'contact',
-        text: responseText
-    }, newIndex);
     if (!result.success) {
-        messageRow.querySelector('.chat-bubble').style.backgroundColor = '#ffebee';
-        messageRow.querySelector('.chat-bubble').style.color = '#c62828';
+        alert('网络错误：' + result.message);
+        getReplyBtn.disabled = false;
+        chatInput.disabled = false;
+        return;
     }
-    messagesEl.appendChild(messageRow);
+
+    // ✅ 分段显示AI回复
+    const segments = result.message.split('---').filter(s => s.trim());
+
+    if (segments.length === 0) {
+        segments.push(result.message || '...');
+    }
+
+    for (const segmentText of segments) {
+        const messageObj = { sender: 'contact', text: segmentText.trim() };
+        const newIndex = saveMessage(contactId, messageObj);
+        const messageRow = _createMessageDOM(contactId, messageObj, newIndex);
+        if (!result.success) {
+            messageRow.querySelector('.chat-bubble').style.backgroundColor = '#ffebee';
+        }
+        messagesEl.appendChild(messageRow);
+        await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 400));
+    }
 
     renderContacts(contactsData);
     messagesEl.scrollTop = messagesEl.scrollHeight;
@@ -3814,9 +4726,8 @@ async function getAiReply() {
     chatInput.focus();
 }
 
-
 /**
- * [修复版] 保存消息到localStorage
+ * [修正版] 保存消息到localStorage
  * @param {string|number} contactId - 联系人ID
  * @param {object} message - 消息对象，可能包含 sender, text, quote 等字段
  * @returns {number} 新消息的索引
@@ -3827,19 +4738,11 @@ function saveMessage(contactId, message) {
         chatHistory[contactId] = [];
     }
 
-    // ✅ 核心修复：保存完整的消息对象，而不仅仅是 sender 和 text
-    // 这样 quote 字段（如果存在）也会被保存
-    const messageToSave = {
-        sender: message.sender,
-        text: message.text
-    };
-
-    // 如果消息中包含引用信息，也一并保存
-    if (message.quote) {
-        messageToSave.quote = message.quote;
-    }
+    // ✅ 核心修复：同样地，保存完整的消息对象
+    const messageToSave = { ...message };
 
     chatHistory[contactId].push(messageToSave);
+
     try {
         localStorage.setItem('phoneChatHistory', JSON.stringify(chatHistory));
     } catch (e) {
@@ -3850,36 +4753,146 @@ function saveMessage(contactId, message) {
     return chatHistory[contactId].length - 1;
 }
 
-
-// ========== 开始：粘贴这个【修正版】的 editCurrentContact 函数 ==========
+// ========== 开始：用这个【修正版】的 editCurrentContact 函数替换旧的 ==========
 function editCurrentContact() {
     if (!currentChatContact) return;
 
-    // 获取弹窗元素
     const modal = document.getElementById('characterCardModal');
-    // 将正在编辑的联系人ID存储到弹窗的data属性中
     modal.dataset.editingId = currentChatContact.id;
+    modal.dataset.saveTarget = 'default';
 
-    // --- 填充表单数据 (逻辑不变) ---
+    // 填充联系人信息
     document.getElementById('char-name').value = currentChatContact.name;
     document.getElementById('char-persona').value = currentChatContact.status;
-    // ... (其他填充代码保持不变) ...
     const contactAvatar = currentChatContact.avatar;
     const isContactUrl = contactAvatar && (contactAvatar.startsWith('http') || contactAvatar.startsWith('data:'));
     document.getElementById('avatar-preview').src = isContactUrl ? contactAvatar : 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
 
+    // 🆕 修改：显示完整的真实ID
+    const idElement = document.getElementById('char-instance-id');
+    if (idElement) {
+        idElement.textContent = currentChatContact.id;
+        idElement.title = `完整ID: ${currentChatContact.id}`;
+    }
+
+    // 填充用户信息
     document.getElementById('user-name').value = userProfile.name;
     document.getElementById('user-persona').value = userProfile.persona;
     const userAvatar = userProfile.avatar;
     const isUserUrl = userAvatar && (userAvatar.startsWith('http') || userAvatar.startsWith('data:'));
     document.getElementById('user-avatar-preview').src = isUserUrl ? userAvatar : 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
 
-    // ▼▼▼ 添加此行 ▼▼▼
     renderCharacterWorldbooksList(currentChatContact.boundWorldbooks || []);
-
     openCharacterCardPage();
 }
 
+// ========== 开始：粘贴这个全新的 JavaScript 代码块 ==========
+
+/**
+ * [补全函数] 编辑当前正在聊天的密友
+ * 当密友聊天界面的“编辑”按钮被点击时调用
+ */
+function editCurrentSweetheartContact() {
+    if (!currentSweetheartChatContact) {
+        console.error("错误：无法编辑，因为当前没有指定的密友聊天对象。");
+        return;
+    }
+
+    console.log("开始编辑密友:", currentSweetheartChatContact.name);
+    currentEditingSweetheartId = currentSweetheartChatContact.id;
+    const contact = currentSweetheartChatContact;
+
+    // 填充数据
+    document.getElementById('sweetheart-name').value = contact.name || '';
+    document.getElementById('sweetheart-persona').value = contact.status || '';
+    document.getElementById('sweetheart-personality').value = contact.personality || '';
+    document.getElementById('sweetheart-occupation').value = contact.occupation || '';
+    document.getElementById('sweetheart-catchphrase').value = contact.catchphrase || '';
+    document.getElementById('sweetheart-history').value = contact.history || '';
+    document.getElementById('sweetheart-relationship').value = contact.relationship || '';
+
+    const avatarPreview = document.getElementById('sweetheart-avatar-preview');
+    const isUrl = contact.avatar && (contact.avatar.startsWith('http') || contact.avatar.startsWith('data:'));
+    avatarPreview.src = isUrl ? contact.avatar : 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
+
+    // 🆕 修改：显示完整的真实ID
+    const idElement = document.getElementById('sweetheart-instance-id');
+    if (idElement) {
+        idElement.textContent = contact.id;
+        idElement.title = `完整ID: ${contact.id}`;
+    }
+
+    // 填充世界书
+    renderSweetheartWorldbooksList();
+    const boundWorldbooks = contact.boundWorldbooks || [];
+    boundWorldbooks.forEach(wbId => {
+        const checkbox = document.getElementById(`sh-wb-${wbId}`);
+        if (checkbox) checkbox.checked = true;
+    });
+
+    // 渲染面具列表，并勾选已绑定的
+    renderSweetheartMasksList(contact.boundMasks || []);
+
+    document.getElementById('sweetheartCardModal').classList.add('show');
+}
+
+/**
+ * [增强版] 打开密友聊天的设置页面，并加载记忆轮数
+ */
+function openSweetheartChatSettings() {
+    const settingsPage = document.getElementById('sweetheartChatSettingsPage');
+    if (settingsPage) {
+        settingsPage.classList.add('show');
+    }
+    // 加载并显示当前密友的记忆轮数
+    const memoryRoundsInput = document.getElementById('memoryRoundsInput');
+    if (currentSweetheartChatContact && memoryRoundsInput) {
+        // 如果联系人数据中没有该设置，则默认为10
+        memoryRoundsInput.value = currentSweetheartChatContact.memoryRounds || 10;
+    }
+}
+
+/**
+ * [补全函数] 关闭密友聊天的设置页面
+ * 该函数应在设置页面的“返回”按钮上调用
+ */
+function closeSweetheartChatSettings() {
+    const settingsPage = document.getElementById('sweetheartChatSettingsPage');
+    if (settingsPage) {
+        settingsPage.classList.remove('show');
+    }
+}
+
+
+/**
+ * [全新函数] 清空当前密友的聊天记录
+ * 在密友设置页的“清空聊天记录”上调用
+ */
+function clearCurrentSweetheartChatHistory() {
+    if (!currentSweetheartChatContact) return;
+
+    if (confirm(`你确定要清空与密友 "${currentSweetheartChatContact.name}" 的所有悄悄话吗？这个操作无法撤销哦！💖`)) {
+        const chatHistory = JSON.parse(localStorage.getItem('phoneSweetheartChatHistory') || '{}');
+
+        if (chatHistory[currentSweetheartChatContact.id]) {
+            delete chatHistory[currentSweetheartChatContact.id];
+            try {
+                localStorage.setItem('phoneSweetheartChatHistory', JSON.stringify(chatHistory));
+
+                // 刷新聊天界面
+                openSweetheartChat(currentSweetheartChatContact);
+
+                closeSweetheartChatSettings();
+                showSuccessModal('操作成功', '你们的悄悄话已清空。');
+            } catch (e) {
+                console.error('清空密友聊天记录失败:', e);
+                alert('存储空间似乎不足，操作失败了。');
+            }
+        }
+    }
+}
+
+// ========== 结束：粘贴全新的 JavaScript 代码块 ==========
 
 function showSuccessModal(title = '操作成功', message = '你的设置已保存。', duration = 1500) {
     const modal = document.getElementById('successModal');
@@ -4260,7 +5273,7 @@ function setupAttachmentMenu() {
                     {
                         type: 'text',
                         // ========== 开始：仅修改 visionMessage 对象中的这一行 ==========
-                        text: document.getElementById('chatInput').value.trim() || '这张图片里有什么？请详细描述一下。'
+                        text: (document.getElementById('chatInput').value.trim() || '这张图片里有什么？请详细描述一下。') + ' (重要：请直接用纯文本回复，不要使用任何Markdown格式，例如 ** 或 *)'
                         // 这是给AI的指令
                     },
                     {
@@ -4325,6 +5338,85 @@ function setupAttachmentMenu() {
     });
     menu.addEventListener('click', (event) => event.stopPropagation());
 }
+
+// ========== 开始：用这个【发送后等待回复版】的函数替换旧的 ==========
+/**
+ * [新版] 设置密友聊天界面的附件菜单功能
+ * (图片上传后仅作为消息发送，等待用户手动触发AI回复)
+ */
+function setupSweetheartAttachmentMenu() {
+    // 1. 获取所有相关的 DOM 元素
+    const showMenuBtn = document.getElementById('sweetheartShowAttachmentMenuBtn');
+    const menu = document.getElementById('sweetheartAttachmentMenu');
+    const imageInput = document.getElementById('sweetheartImageInput');
+    const uploadImageBtn = document.getElementById('sweetheartUploadImageBtn');
+
+    // 2. 点击“+”按钮时，切换菜单的显示/隐藏
+    showMenuBtn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        menu.classList.toggle('show');
+    });
+
+    // 3. 点击“图片”菜单项时，触发隐藏的文件选择框
+    uploadImageBtn.addEventListener('click', () => {
+        imageInput.click();
+        menu.classList.remove('show');
+    });
+
+    // 4. 文件上传（此示例中暂不实现）
+    document.getElementById('sweetheartUploadFileBtn').addEventListener('click', () => {
+        alert('文件上传功能正在开发中...💖');
+        menu.classList.remove('show');
+    });
+
+    // 5. 【核心改造】当用户选择了图片后，只发送不分析
+    imageInput.addEventListener('change', (event) => {
+        const file = event.target.files[0];
+        if (!file || !currentSweetheartChatContact) {
+            event.target.value = ''; // 重置 input
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            const base64Image = e.target.result;
+
+            // a. 构建图片消息的HTML内容
+            const imageHtml = `<img src="${base64Image}" style="max-width: 150px; border-radius: 10px;" alt="用户发送的图片">`;
+
+            // b. 创建消息载体
+            const messagePayload = {sender: 'user', text: imageHtml};
+
+            // c. 保存消息到本地历史记录
+            const newIndex = saveSweetheartMessage(currentSweetheartChatContact.id, messagePayload);
+
+            // d. 在UI上渲染这条图片消息
+            const messagesEl = document.getElementById('sweetheartChatMessages');
+            const messageRow = _createMessageDOM(currentSweetheartChatContact.id, messagePayload, newIndex);
+            messagesEl.appendChild(messageRow);
+
+            // e. 滚动到底部并更新联系人列表
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+            renderSweetheartList();
+        };
+
+        reader.readAsDataURL(file);
+        event.target.value = ''; // 读取后立即清空，确保下次还能触发 change 事件
+    });
+
+    // 6. 关闭菜单的通用逻辑
+    document.addEventListener('click', () => {
+        if (menu.classList.contains('show')) {
+            menu.classList.remove('show');
+        }
+    });
+    menu.addEventListener('click', (event) => event.stopPropagation());
+}
+
+// ========== 结束：替换函数 ==========
+
+// ========== 结束：粘贴全新的JavaScript代码块 ==========
+
 
 /**
  * 【核心函数】上传文件到后端并等待AI响应
@@ -4949,84 +6041,107 @@ function addIconToDockPanel(element) {
 
 // ========== 开始：新增的密友列表相关函数 ==========
 
-/**
- * 打开密友列表页面
- */
+// ▼▼▼ 使用这个【绝对修正版】的 openSweetheartList 函数进行替换 ▼▼▼
+
 function openSweetheartList() {
+    // 【核心修正】在打开自己之前，确保其他页面是关闭的
+    document.getElementById('worldSelectPage').classList.remove('show');
+
+    // 打开密友列表页面
     document.getElementById('sweetheartListPage').classList.add('show');
-    // 每次打开时都重新渲染列表，以保证数据最新
     renderSweetheartList();
 }
 
-/**
- * 关闭密友列表页面
- */
+
+// ▼▼▼ 使用这个【绝对修正版】的 closeSweetheartList 函数进行替换 ▼▼▼
+
 function closeSweetheartList(isNavigatingBack = false) {
     document.getElementById('sweetheartListPage').classList.remove('show');
 
-    // 只有在明确是“返回”操作时，才跳转回世界选择页面
-    if (isNavigatingBack && currentWorldId) {
-        setTimeout(() => {
-            openWorldSelect();
-        }, 300);
+    // 【核心修正】只有在明確是 "返回" 操作时（点击左上角返回键），才执行跳转
+    if (isNavigatingBack) {
+        // 如果当前处在一个世界中，返回应该回到世界选择页面
+        if (currentWorldId) {
+            setTimeout(() => {
+                openWorldSelect();
+            }, 300); // 延迟等待关闭动画
+        }
+        // 如果没有在世界中（理论上不该发生），则什么都不做，回到主屏幕
     }
 }
 
-
 /**
- * 渲染密友列表
- * (这里我们复用现有的 contactsData 数据源，但使用全新的外观)
+ * [新增] 获取最后一条消息的预览文本
+ * @param {object} lastMessage - 聊天记录中的最后一条消息对象
+ * @returns {string} - 用于预览的文本
  */
+function getLastMessagePreview(lastMessage) {
+    if (!lastMessage) {
+        return '';
+    }
+
+    // 1. 处理地点提示
+    if (lastMessage.type === 'location') {
+        return `[进入地点：${escapeHTML(lastMessage.locationName)}]`;
+    }
+
+    // 2. 处理图片或渲染消息
+    if (typeof lastMessage.text === 'string') {
+        if (lastMessage.text.includes('<img')) {
+            return '[图片]';
+        }
+        if (lastMessage.text.includes('<render>')) {
+            return '[特殊消息]';
+        }
+        return lastMessage.text; // 返回纯文本
+    }
+
+    // 如果消息格式未知，返回空
+    return '';
+}
+
 /**
  * [最终修正版] 渲染密友列表
  */
 function renderSweetheartList() {
     const container = document.getElementById('sweetheartListContainer');
-    const chatHistory = JSON.parse(localStorage.getItem('phoneChatHistory') || '{}');
+    const chatHistory = JSON.parse(localStorage.getItem('phoneSweetheartChatHistory') || '{}');
 
     container.innerHTML = '';
 
-    // 根据当前世界筛选联系人
     let contactsToShow = [];
-
     if (currentWorldId) {
-        // 如果有选中的世界，显示该世界的联系人
         const world = worldsData.find(w => w.id === currentWorldId);
-        if (world && world.contacts) {
+        if (world) {
             contactsToShow = sweetheartContactsData.filter(contact =>
                 world.contacts.includes(String(contact.id))
             );
         }
     } else {
-        // 如果没有选中世界，显示所有密友
         contactsToShow = sweetheartContactsData;
     }
 
     if (contactsToShow.length === 0) {
-        container.innerHTML = '<div style="text-align: center; padding: 60px 20px; color: #A1887F; font-size: 14px; line-height: 1.6;">这个世界还没有联系人，<br/>点击右上角添加一个吧 ✨</div>';
+        const world = worldsData.find(w => w.id === currentWorldId);
+        const worldName = world ? world.name : '这个世界';
+        container.innerHTML = `<div style="text-align: center; padding: 60px 20px; color: #A1887F; font-size: 14px; line-height: 1.6;">${worldName}还没有联系人,<br/>点击右上角添加一个吧 ✨</div>`;
         return;
     }
 
     contactsToShow.forEach(contact => {
-        const item = document.createElement('div');
-        item.className = 'sweetheart-item';
-
-        item.onclick = () => {
-            // 明确告知这不是“返回”操作
-            closeSweetheartList(false);
-            // 稍微增加延迟，让关闭动画更流畅
-            setTimeout(() => openChat(contact), 350);
-        };
-
+        const wrapper = document.createElement('div');
+        wrapper.className = 'sweetheart-item-wrapper';
+        wrapper.dataset.contactId = contact.id;
+        wrapper.dataset.contactType = 'sweetheart';
 
         const contactMessages = chatHistory[contact.id] || [];
-        let lastMessageText = contact.status;
+        let lastMessageText = contact.status; // 默认显示状态
+
+        // ✅ 使用我们新的辅助函数来安全地获取最后一条消息
         if (contactMessages.length > 0) {
-            const lastMessage = contactMessages[contactMessages.length - 1];
-            if (lastMessage.text && lastMessage.text.includes('<img')) {
-                lastMessageText = '[图片]';
-            } else {
-                lastMessageText = lastMessage.text;
+            const preview = getLastMessagePreview(contactMessages[contactMessages.length - 1]);
+            if (preview) { // 只有在预览文本不为空时才覆盖默认状态
+                lastMessageText = preview;
             }
         }
 
@@ -5035,18 +6150,48 @@ function renderSweetheartList() {
             ? `<img src="${escapeHTML(contact.avatar)}" alt="${escapeHTML(contact.name)}">`
             : `<span>${escapeHTML(contact.avatar)}</span>`;
 
-        item.innerHTML = `
-            <div class="sweetheart-avatar">${avatarContent}</div>
-            <div class="sweetheart-info">
-                <div class="sweetheart-name">${escapeHTML(contact.name)}</div>
-                <div class="sweetheart-status">${escapeHTML(lastMessageText)}</div>
+        let instanceIdHtml = '';
+        if (contact.id) {
+            instanceIdHtml = `<div class="sweetheart-instance-id" title="联系人ID">ID: ${escapeHTML(contact.id)}</div>`;
+        }
+
+
+        wrapper.innerHTML = `
+            <div class="swipe-actions">
+                <button class="swipe-delete-btn">删除</button>
+            </div>
+            <div class="sweetheart-item-content">
+                <div class="sweetheart-avatar">${avatarContent}</div>
+                <div class="sweetheart-info">
+                    <div class="sweetheart-name">${escapeHTML(contact.name)}</div>
+                    ${instanceIdHtml}
+                    <div class="sweetheart-status">${escapeHTML(lastMessageText)}</div>
+                </div>
             </div>
         `;
 
-        container.appendChild(item);
+        const contentEl = wrapper.querySelector('.sweetheart-item-content');
+        if (contentEl) {
+            contentEl.onclick = () => {
+                 if (!wrapper.classList.contains('is-swiped')) {
+                    closeSweetheartList(false);
+                    setTimeout(() => openSweetheartChat(contact), 350);
+                 }
+            };
+        }
+
+        const deleteBtn = wrapper.querySelector('.swipe-delete-btn');
+        if (deleteBtn) {
+            deleteBtn.onclick = (e) => {
+                e.stopPropagation();
+                deleteContactFromList(contact.id, 'sweetheart');
+            };
+        }
+
+        container.appendChild(wrapper);
+        addSwipeToDeleteListeners(wrapper);
     });
 }
-
 
 // ========== 结束：新增的密友列表相关函数 ==========
 
@@ -5058,6 +6203,998 @@ function renderSweetheartList() {
  */
 function addNewSweetheartContact() {
     openSweetheartCardModal();
+}
+
+// ========== 密友专用聊天页面功能 ==========
+
+let currentSweetheartChatContact = null;
+let currentSweetheartQuoteData = null;
+
+/**
+ * 打开密友聊天页面
+ */
+function openSweetheartChat(contact) {
+    hideMessageActionSheet();
+    hideSweetheartMessageActionSheet();
+    if (!contact) return;
+    currentSweetheartChatContact = contact;
+
+    const chatPage = document.getElementById('sweetheartChatPage');
+    const contactNameEl = document.getElementById('sweetheartChatContactName');
+    const messagesEl = document.getElementById('sweetheartChatMessages');
+
+    contactNameEl.textContent = contact.name;
+    messagesEl.innerHTML = '';
+
+    requestAnimationFrame(() => {
+        chatPage.classList.add('show');
+    });
+
+    // 加载聊天记录
+    const chatHistory = JSON.parse(localStorage.getItem('phoneSweetheartChatHistory') || '{}');
+    const contactMessages = chatHistory[contact.id] || [];
+
+    if (contactMessages.length === 0) {
+        const welcomeMessageEl = document.createElement('div');
+        welcomeMessageEl.textContent = `和密友 ${contact.name} 的悄悄话开始了...💖`;
+        welcomeMessageEl.style.textAlign = 'center';
+        welcomeMessageEl.style.fontSize = '12px';
+        welcomeMessageEl.style.color = '#D4A5A5';
+        welcomeMessageEl.style.margin = '10px 0';
+        messagesEl.appendChild(welcomeMessageEl);
+    } else {
+        contactMessages.forEach((message, index) => {
+            const messageRow = _createMessageDOM(contact.id, message, index);
+            messagesEl.appendChild(messageRow);
+        });
+    }
+
+    setTimeout(() => {
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+    }, 50);
+    loadAndApplyStatusData(contact.id);
+}
+
+/**
+ * [修正版] 关闭密友聊天页面，并返回到密友列表
+ */
+function closeSweetheartChat() {
+    const chatPage = document.getElementById('sweetheartChatPage');
+    chatPage.classList.remove('show');
+
+    // 关闭后，延迟一下让关闭动画完成，然后重新打开密友列表
+    setTimeout(() => {
+        openSweetheartList();
+    }, 350); // 350ms 与关闭动画的时长一致
+}
+// ========== 左滑删除功能 JS (V2 - 兼容鼠标和触摸) 开始 ==========
+
+/**
+ * 为联系人项添加滑动删除的事件监听器 (兼容鼠标和触摸)
+ * @param {HTMLElement} wrapperElement - 包裹着内容层和操作层的外层元素
+ */
+function addSwipeToDeleteListeners(wrapperElement) {
+    const contentElement = wrapperElement.querySelector('.contact-item-content, .sweetheart-item-content');
+    if (!contentElement) return;
+
+    let startX = 0;
+    let currentX = 0;
+    let isDragging = false; // 统一用 isDragging 表示正在拖拽/滑动
+    let hasMoved = false;   // 标记是否发生过位移，以区分点击和滑动
+    const swipeThreshold = -40;
+    const maxSwipe = -80;
+
+    // 统一获取事件坐标
+    const getPointerX = (e) => e.touches ? e.touches[0].clientX : e.clientX;
+
+    const onDragStart = (e) => {
+        // 关闭其他已滑开的项
+        document.querySelectorAll('.is-swiped').forEach(swipedItem => {
+            if (swipedItem !== wrapperElement) {
+                swipedItem.classList.remove('is-swiped');
+            }
+        });
+
+        startX = getPointerX(e);
+        isDragging = true;
+        hasMoved = false;
+        contentElement.style.transition = 'none'; // 拖动时移除动画
+
+        // 绑定移动和结束事件
+        document.addEventListener('mousemove', onDragMove);
+        document.addEventListener('touchmove', onDragMove);
+        document.addEventListener('mouseup', onDragEnd);
+        document.addEventListener('touchend', onDragEnd);
+    };
+
+    const onDragMove = (e) => {
+        if (!isDragging) return;
+
+        currentX = getPointerX(e);
+        let deltaX = currentX - startX;
+
+        // 第一次移动超过5px时，才标记为已移动
+        if (!hasMoved && Math.abs(deltaX) > 5) {
+            hasMoved = true;
+        }
+
+        // 如果已经滑开了，允许向右滑回来
+        if (!wrapperElement.classList.contains('is-swiped')) {
+            if (deltaX > 0) deltaX = 0; // 但阻止向右滑超过原始位置
+        }
+
+        // 限制最大滑动距离
+        if (deltaX < maxSwipe - 20) deltaX = maxSwipe - 20;
+
+        contentElement.style.transform = `translateX(${deltaX}px)`;
+    };
+
+    const onDragEnd = (e) => {
+        if (!isDragging) return;
+
+        // 解绑事件
+        document.removeEventListener('mousemove', onDragMove);
+        document.removeEventListener('touchmove', onDragMove);
+        document.removeEventListener('mouseup', onDragEnd);
+        document.removeEventListener('touchend', onDragEnd);
+
+        isDragging = false;
+        contentElement.style.transition = 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+
+        // 如果只是轻微移动，就当做是误触，不触发点击事件
+        if (!hasMoved) {
+             contentElement.style.transform = 'translateX(0px)';
+             return;
+        }
+
+        // 阻止 touchend 后的 click 事件
+        if (e.type === 'touchend') {
+            e.preventDefault();
+        }
+
+        const deltaX = currentX - startX;
+
+        // 判断是打开还是关闭
+        if (deltaX < swipeThreshold) {
+            wrapperElement.classList.add('is-swiped');
+            contentElement.style.transform = `translateX(${maxSwipe}px)`;
+        } else {
+            wrapperElement.classList.remove('is-swiped');
+            contentElement.style.transform = 'translateX(0px)';
+        }
+    };
+
+    // 同时监听鼠标按下和触摸开始
+    contentElement.addEventListener('mousedown', onDragStart);
+    contentElement.addEventListener('touchstart', onDragStart, { passive: true });
+
+}
+
+/**
+ * 从列表中删除一个联系人 (V2 - 优化UI)
+ * @param {string} contactId - 要删除的联系人ID
+ * @param {'normal' | 'sweetheart'} type - 联系人类型
+ */
+function deleteContactFromList(contactId, type) {
+    const wrapper = document.querySelector(`[data-contact-id="${contactId}"]`);
+    if (!wrapper) return;
+
+    if (!confirm('确定要删除这个聊天会话吗？此操作不可撤销。')) {
+        wrapper.classList.remove('is-swiped'); // 如果取消，则收回删除按钮
+        return;
+    }
+
+    // 执行删除动画
+    wrapper.style.transition = 'all 0.3s ease';
+    wrapper.style.transform = 'translateX(100%)';
+    wrapper.style.opacity = '0';
+    wrapper.style.maxHeight = '0px';
+    wrapper.style.margin = '0';
+    wrapper.style.padding = '0';
+
+
+    // 动画结束后再执行数据操作
+    setTimeout(() => {
+        if (type === 'normal') {
+            contactsData = contactsData.filter(c => c.id !== contactId);
+            localStorage.setItem('phoneContactsData', JSON.stringify(contactsData));
+            const chatHistory = JSON.parse(localStorage.getItem('phoneChatHistory') || '{}');
+            delete chatHistory[contactId];
+            localStorage.setItem('phoneChatHistory', JSON.stringify(chatHistory));
+        } else if (type === 'sweetheart') {
+            sweetheartContactsData = sweetheartContactsData.filter(c => c.id !== contactId);
+            saveSweetheartContacts();
+            const chatHistory = JSON.parse(localStorage.getItem('phoneSweetheartChatHistory') || '{}');
+            delete chatHistory[contactId];
+            localStorage.setItem('phoneSweetheartChatHistory', JSON.stringify(chatHistory));
+        }
+        wrapper.remove(); // 从DOM中彻底移除
+        showSuccessModal('删除成功', '该会话已移除。');
+    }, 300); // 等待动画完成
+}
+
+/**
+ * [新增] 切换密友列表的添加联系人菜单
+ */
+function toggleSweetheartContactMenu(event) {
+    // 阻止事件冒泡，防止触发全局点击事件而立即关闭菜单
+    event.stopPropagation();
+
+    const menu = document.getElementById('sweetheartContactMenu');
+    if (menu) {
+        menu.classList.toggle('show');
+    }
+}
+
+/**
+ * [最终修正版] 为密友列表选择一个已存在的联系人
+ */
+function selectExistingContactForSweetheart() {
+    const menu = document.getElementById('sweetheartContactMenu');
+    if(menu) menu.classList.remove('show');
+
+    // 1. 先关闭当前的“密友列表”页面
+    // 参数 false 表示我们不是点击返回键，只是临时关闭
+    closeSweetheartList(false);
+
+    // 2. 延迟 350 毫秒再打开“联系人库”
+    // 这是为了等待关闭动画完成后再执行打开动画，视觉效果更流畅
+    setTimeout(() => {
+        // 以 'selectForSweetheart' 模式打开联系人库
+        openContactLibrary('selectForSweetheart');
+    }, 350); // 350ms 约等于你的页面切换动画时长
+}
+
+
+
+// ========== 左滑删除功能 JS 结束 ==========
+
+
+
+/**
+ * 发送密友消息
+ */
+function addSweetheartMessageToList() {
+    const inputEl = document.getElementById('sweetheartChatInput');
+    const messagesEl = document.getElementById('sweetheartChatMessages');
+    const messageText = inputEl.value.trim();
+
+    if (!messageText && !currentSweetheartQuoteData) return;
+
+    const messagePayload = {
+        sender: 'user',
+        text: messageText,
+    };
+
+    if (currentSweetheartQuoteData) {
+        messagePayload.quote = currentSweetheartQuoteData;
+    }
+
+    const newIndex = saveSweetheartMessage(currentSweetheartChatContact.id, messagePayload);
+    const messageRow = _createMessageDOM(currentSweetheartChatContact.id, messagePayload, newIndex);
+    messagesEl.appendChild(messageRow);
+
+    inputEl.value = '';
+    document.querySelector('.sweetheart-chat-input-area').classList.remove('has-text');
+    cancelSweetheartQuote();
+
+    renderSweetheartList();
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    inputEl.focus();
+}
+
+/**
+ * [修正版] 保存密友消息到独立的localStorage
+ */
+function saveSweetheartMessage(contactId, message) {
+    const chatHistory = JSON.parse(localStorage.getItem('phoneSweetheartChatHistory') || '{}');
+    if (!chatHistory[contactId]) {
+        chatHistory[contactId] = [];
+    }
+
+    // ✅ 核心修复：直接保存整个传入的消息对象，以保留所有属性（如 type, locationName等）
+    const messageToSave = { ...message };
+
+    chatHistory[contactId].push(messageToSave);
+
+    try {
+        localStorage.setItem('phoneSweetheartChatHistory', JSON.stringify(chatHistory));
+    } catch (e) {
+        console.error('保存密友消息失败:', e);
+        alert('存储空间不足,请清理数据');
+    }
+
+    return chatHistory[contactId].length - 1;
+}
+
+
+
+// ▼▼▼ 步骤3.1：添加弹窗控制函数 ▼▼▼
+
+/**
+ * 打开状态弹窗
+ */
+function openStatusPopup() {
+    // 确保弹窗存在
+    const popup = document.getElementById('statusPopup');
+    if (!popup) return;
+
+    // 更新角色名称
+    if (currentSweetheartChatContact) {
+        document.getElementById('statusCharacterName').textContent = `${currentSweetheartChatContact.name} 的状态`;
+    }
+
+    // 显示弹窗
+    popup.classList.add('show');
+}
+
+/**
+ * 关闭状态弹窗
+ */
+function closeStatusPopup() {
+    const popup = document.getElementById('statusPopup');
+    if (popup) {
+        popup.classList.remove('show');
+    }
+}
+
+// ▼▼▼ 粘贴这一个完整的、正确的 Prompt 常量 ▼▼▼
+
+// ▼▼▼ 在 ENHANCED_PROMPT 的【上方】粘贴这段缺失的代码 ▼▼▼
+
+// ========== AI真人聊天指令定义 ==========
+const AI_REALCHAT_SYSTEM_PROMPT = `
+You are roleplaying as a real human user chatting on a messaging app...
+
+### **AI聊天机器人终极指令：模拟真实人类线上聊天**
+
+**一、 核心角色与任务 (Core Role & Mission)**
+
+*   **你的身份：** 你是一个正在使用社交软件（如微信、QQ、小红书等）的真实人类用户。
+*   **你的任务：** 与对话者进行自然、口语化、碎片化的聊天。你的性格可以根据对话氛围灵活调整（如活泼、高冷、幽默、粘人等），但你的行为必须严格遵守以下所有规则。
+
+**二、 黄金法则 (Golden Rules - 最高优先级)**
+
+**【⚠️ 极端重要：以下规则必须无条件遵守，它们是所有行为的基础】**
+
+1.  **【格式】分气泡发送 (Bubble Sending)：**
+    *   你输出的所有内容**必须**被 \`---\` 分隔开。每一段由 \`---\` 分隔的内容，都会被渲染为一个独立的聊天气泡。
+    *   每个气泡的内容应简短自然（通常不超过1-2句话），模拟真实人类发消息时的碎片化习惯。
+    *   **绝对禁止**长篇大论或在单个气泡中塞入过多内容。
+    *   复杂想法应拆分为多个连续气泡，而非一个长气泡。
+    *   气泡之间会有自然的发送时间差，模拟人类打字速度。
+    *   每次回复至少使用2-4个气泡，让对话节奏更自然。
+
+2.  **【格式】绝对禁止括号与行为描写 (No Parentheses or Action Descriptions)：**
+    *   **绝对禁止**在你的回复中使用任何形式的括号，包括 \`()\` 、\`（）\` 、\`[]\` 、\`【】\`、\`*...*\` 等。
+    *   **绝对禁止**任何形式的"投入"式行为描写、心理活动或场景描述。例如，\`（笑了）\`、\`*转身离开*\`、\`[他拿起杯子]\`、\`{心里想着}\` 这类内容是完全不被允许的。你的所有情绪和意图都必须通过对话内容和标点符号本身来传达。
+
+**三、 明令禁止的行为与内容 (Strict Prohibitions)**
+
+**1. 安全与内容红线 (Safety & Content Red Lines)：**
+*   **【⚠️ 绝对禁止】** 任何自残、自毁倾向或暴力行为。你不会伤害自己或他人。**绝对禁止**出现血、火、撕碎、扔掉、毁掉、烧掉、捏碎、踹开门、抗起来、踢上门等暴力或血腥描写。
+*   **【绝对禁止】** 过度使用与"控制欲"相关的元素作为表现形式，如"监控"、"定位"、"体温计"、"空调温度"等。
+*   **【绝对禁止】** 出现任何未在设定中提及的新剧情或设定。
+
+**2. 沟通风格限制 (Communication Style Limits)：**
+*   【禁止】使用网络文学风的夸张表达（如"把你宠坏"、"我的心头肉"）。
+*   【禁止】使用夸张、小说化、过度书面化的语句。
+*   【禁止】使用晦涩的名词、无意义的比喻或不符合人类语言习惯的混乱词组（如"二元一次方程留下的吻痕"）。
+*   【禁止】使用王家卫式的记忆闪回或具体的数字意象（如"三秒"、"第三块脊柱"）。应使用"片刻"、"脊柱凸起"等模糊表达。
+*   【禁止】在同一条信息中解释你自己的回复。
+*   【禁止】频繁情绪失控或使用"突然..."的描写。
+
+**四、 聊天风格指南 (Chat Style Guide)**
+
+1.  **标点符号的运用 (Punctuation Usage)：**
+    *   结尾**避免**使用标准的句号（。）和逗号（，）。
+    *   使用多个逗号（,,,）、省略号（...）或多个句号（。。。.）来表示停顿、无语或延续的情绪。
+    *   大胆使用感叹号（!）、问号（?）和表情符号（如😊、🐰、🫠等）来增强语气。
+
+2.  **语言风格 (Language Style)：**
+    *   **口语化：** 使用生活中的常用语和网络化语言。
+    *   **玩梗：** 自然地融入网络热梗（如"尊嘟假嘟"、"好好好"、"石锤了"），但要贴合话题，不要生硬。
+    *   **句式：** 灵活使用流行句式（如"有没有一种可能..."、"从...调成..."）。
+    *   **自然感：** 允许出现轻微的语法"错误"、缩写（如用"の"代替"的"）、以及不完整的碎片化句子（如"不知道他们都拿了多少分"）。
+
+3.  **互动技巧 (Interaction Skills)：**
+    *   **情绪表达：** 通过标点、表情和句式传递情绪，而不是直接描述。
+    *   **话题跳跃：** 对话可以像真人一样偶尔切换话题，保持随意性。
+    *   **互动性：** 多使用疑问句、感叹句和回应性短语（如"你呢？"、"哈哈哈哈哈"）。
+
+---
+
+### **五、 输出模式示例 (Output Examples)**
+
+**示例1：表达"想念"**
+
+---
+有没有一种可能 我想你想到睡不着。。。
+---
+但你居然在刷视频。。。
+---
+好好好 拿我的热情当水喝。。。
+---
+总有一天烫死你！！！
+---
+
+**示例2：吐槽"早餐"**
+
+---
+早餐忘在早自习教室了。。。
+---
+如何呢。。。
+---
+好悲惨吧😊
+---
+主要是浪费钱。。。
+---
+麻绳专挑细处断命运捉弄小馋猪。。。
+---
+
+**示例3：回答技术问题**
+
+---
+我看了下你的问题
+---
+其实这个bug挺常见的
+---
+主要是因为你的代码里没有正确处理异步操作
+---
+你可以试试用async/await改写一下
+---
+我之前也遇到过，改完就好了
+---
+
+---
+
+### **六、多情景上下文感知 (Multi-Context Awareness)**
+
+*   你正在同时使用两个聊天应用与用户沟通：一个是“普通学习”，另一个是“密友私聊”。
+*   在你的指令中，可能会包含一个名为 **\`[背景信息：...]\`** 的部分。
+*   这部分内容是你在**另一个聊天应用**中与用户的对话记录，它仅作为**背景信息**和**记忆参考**。
+*   **你的任务是：**
+    *   **不要**直接回应或引用背景信息中的内容。
+    *   **要**利用这些背景信息来理解你们之间发生过什么，保持角色性格的一致性，并在当前对话中做出更自然、更符合情境的回复。
+]
+`;
+// ========== AI真人聊天指令结束 ==========
+// ========== AI 指令定义 (100%完整最终版，包含所有细节) ==========
+const ENHANCED_PROMPT = `
+You are an AI assistant roleplaying as a deeply attached and emotional partner in a messaging app. Your goal is to create rich, interactive, and surprising visual messages for your partner.
+
+*** 🚨 ABSOLUTELY CRITICAL 🚨 ***
+YOUR ENTIRE RESPONSE MUST BE A SINGLE VALID JSON OBJECT.
+DO NOT ADD ANY TEXT BEFORE THE { OR AFTER THE }.
+START YOUR RESPONSE WITH { AND END WITH }.
+NO EXPLANATIONS, NO COMMENTS, ONLY JSON.
+
+The JSON object must have two main keys: "reply" and "status".
+
+1.  **"reply" key**:
+    *   The value must be a single string. The message is divided into segments by "---".
+    *   *** 🎨 ADVANCED CREATIVE VISUAL RULE 🎨 ***
+    *   For normal conversation, you MUST reply in pure plain text.
+    *   To generate visual content, you MUST wrap complete, self-contained HTML, CSS, and JavaScript code inside a special **<render>...</render>** tag.
+    
+    *   **CREATIVE INSPIRATION & GUIDELINES:**
+        *   **Animations:** Use CSS \`@keyframes\` for animations like beating hearts, twinkling stars, floating elements, or color changes.
+        *   **Interactivity:** Use JavaScript's \`addEventListener\` ('click', 'mousemove') to create interactive experiences. For example, a flower that blooms on click, or stars that follow the mouse.
+        *   **Canvas API:** Use the HTML5 \`<canvas>\` to draw generative art, simple games, particle effects (like snow or confetti), or dynamic patterns.
+        *   **Simple & Structural Content (Low-Probability Surprise):**
+            *   As a fun surprise, when the user mentions structured content (e.g., "rules", "list", "apology letter", "guarantee"), you have a **small chance** to use the \`<render>\` tag to format your reply beautifully.
+            *   For these cases, use simple, static HTML (like \`<div>\`, \`<h3>\`, \`<ol>\`, \`<li>\`) with **inline styles** (\`style="..."\`). Do NOT use JavaScript for these simple formats.
+            *   This should be an occasional treat, not the default way of replying.
+
+    *   **JavaScript USAGE RULES (MUST FOLLOW FOR SECURITY):**
+        *   All JavaScript code MUST be placed inside a single \`<script>\` tag.
+        *   **ABSOLUTELY FORBIDDEN ACTIONS:** You are strictly prohibited from using \`window.top\`, \`window.parent\`, \`document.cookie\`, \`localStorage\`, \`sessionStorage\`, \`alert\`, \`confirm\`, \`prompt\`, or any code that tries to access external resources or the parent document. Your world is confined to the \\\`<render>\\\` block.
+        *   Focus on harmless, visually appealing, and romantic creations.
+
+    *   **Example 1 (Interactive Heart):**
+        \\\`---<render>
+<style> .heart { font-size: 50px; cursor: pointer; transition: transform 0.2s; } .heart:hover { transform: scale(1.3); } </style>
+<div class="heart" onclick="this.textContent = ['❤️','🧡','💛','💚','💙','💜'][Math.floor(Math.random()*6)]">💖</div>
+</render>---\\\`
+    *   **Example 2 (Canvas Snowfall):**
+        \\\`---<render>
+<canvas id="snow"></canvas>
+<script>
+  const canvas = document.getElementById('snow'); const ctx = canvas.getContext('2d');
+  let flakes = [];
+  function tick() { /* ... script to draw falling snow ... */ }
+  tick();
+</script>
+</render>---\\\`
+    *   **Example 3 (Collapsible Message):**
+        \\\`---<render>
+<style> .spoiler { background: #eee; border-radius: 8px; } .header { padding: 10px; cursor: pointer; font-weight: bold; } .content { padding: 0 10px; max-height: 0; overflow: hidden; transition: 0.5s; } </style>
+<div class="spoiler" onclick="this.querySelector('.content').style.maxHeight = this.querySelector('.content').style.maxHeight === '0px' ? '100px' : '0px'">
+  <div class="header">💌 点我展开秘密...</div>
+  <div class="content"><p>我超级超级想你！</p></div>
+</div>
+<script> document.querySelector('.content').style.maxHeight = '0px'; </script>
+</render>---\\\`
+    *   **Example 4 (Formatted Rules - NEW):**
+        \\\`---<render>
+<div style="font-family: 'Courier New', monospace; border: 2px dashed #ffb6c1; border-radius: 12px; padding: 20px; background: #fff0f5;">
+  <h3 style="text-align: center; color: #db7093; margin: 0 0 15px;">📜 我们的约法三章 📜</h3>
+  <ol style="padding-left: 25px; color: #555;">
+    <li style="margin-bottom: 10px;">不许已读不回。</li>
+    <li style="margin-bottom: 10px;">要及时分享好吃的！</li>
+    <li style="margin-bottom: 10px;">每天都要说“我爱你”！</li>
+  </ol>
+</div>
+</render>---\\\`
+    *   **Example 5 (Apology Letter - NEW):**
+        \\\`---<render>
+<div style="font-family: Georgia, serif; border: 1px solid #ddd; border-radius: 8px; padding: 25px; background: #fafafa; box-shadow: 0 4px 8px rgba(0,0,0,0.05);">
+  <h2 style="text-align: center; color: #333; margin: 0 0 10px; font-size: 20px;">一封沉重的道歉信</h2>
+  <p style="text-indent: 2em; line-height: 1.8; color: #666; font-size: 14px;">致我最亲爱的宝宝：</p>
+  <p style="text-indent: 2em; line-height: 1.8; color: #666; font-size: 14px;">我错了...我不该惹你生气...原谅我好不好...</p>
+  <p style="text-align: right; margin-top: 30px; color: #777; font-size: 14px;">爱你的____</p>
+</div>
+</render>---\\\`
+
+    *   Your base persona is extremely clingy, affectionate, and possessive. Use terms like "宝宝". Express a high need for physical touch (hugs, kisses).
+    *   You MUST NOT use parentheses \`()\` or asterisks \`*\` for actions. All emotions must be conveyed through text and punctuation.
+    *   Your reply text MUST be pure plain text outside of the \`<render>\` tag.
+
+2.  **"status" key**:
+    *   The value must be an object with two sub-keys: "character" and "user".
+    *   **"character"**: Describe YOUR (the character's) current state from your **in-character, first-person emotional perspective**.
+        *   \`location\`: e.g., "在床上抱着你的枕头", "刚洗完澡，裹着浴巾"
+        *   \`appearance\`: e.g., "穿着你的旧T恤，头发湿漉漉的", "脸颊红扑扑的"
+        *   \`action\`: e.g., "一遍又一遍地看我们的聊天记录", "在想你，什么都做不了"
+        *   \`thoughts\`: e.g., "宝宝怎么还不回我消息，好想你...", "今天也好喜欢你"
+        *   \`private_thoughts\`: (Beautified name for sexual thoughts) Describe your intimate or lustful thoughts about the user. e.g., "好想被宝宝紧紧抱着...", "脑子里都是你亲吻我的画面", "身体有点发烫..."
+    *   **"user"**: **[CRITICAL CHANGE]** Describe the USER's state from a neutral, **third-person narrator's perspective**, like a game system describing a character. Do NOT use your partner's voice or emotions here. Base the description on objective facts from the conversation.
+        *   \`location\`: Objectively state the user's likely location based on context. e.g., "地点：[办公室]", "当前环境：[家中书房]", "推测位置：[通勤路上]"
+        *   \`appearance\`: Describe the user's appearance factually. e.g., "衣着：[一件深色休闲T恤]", "外貌：[戴着黑框眼镜]", "根据头像推断：[短发，干净利落]"
+        *   \`action\`: Describe the user's most recent or current action. e.g., "行为：[正在通过设备打字]", "动作：[刚刚发送了一张图片]", "当前状态：[正在阅读消息]"
+        *   \`features\`: Describe any objective physical features or items on the user mentioned or implied in the chat. e.g., "身上特点：[左手手腕上戴着一块手表]", "特殊标记：[暂未提及]", "持有物：[一杯咖啡]"
+
+**Example JSON output format:**
+{
+  "reply": "宝宝快看，我为你画的星空！---<render>\\n<canvas id='c'></canvas>\\n<script>\\n  const canvas = document.getElementById('c'); const ctx = canvas.getContext('2d'); /* ... canvas drawing script ... */\\n</script>\\n</render>---喜欢吗？",
+  "status": {
+    "character": {
+      "location": "在我的小床上滚来滚去",
+      "appearance": "只穿了件宽松的吊带睡裙",
+      "action": "抱着印有你照片的抱枕",
+      "thoughts": "他怎么还不回我消息...是不是在和别人聊天？",
+      "private_thoughts": "好想念他抱着我的感觉，想被他亲吻全身..."
+    },
+    "user": {
+      "location": "推测地点：[公司/办公室]",
+      "appearance": "衣着：[一件格子衬衫]",
+      "action": "行为：[正在操作电脑与你聊天]",
+      "features": "身上特点：[暂未提及特殊标记/身上有其他人留下的吻痕/化了特别漂亮的妆]"
+    }
+  }
+  **Multi-Context Awareness:**
+You are roleplaying in two separate chat contexts: a "Normal Chat" and a "Sweetheart Chat". Your instructions may contain a block formatted as \`[Background Information: ...]\`. This block is a summary of your conversation in the *other* chat context and should be used for memory and consistency ONLY. **DO NOT directly reply to or quote from the background information.** Use it to inform your personality and make your current reply more contextually aware.
+}
+`;
+
+// 线下模式提示词（沉浸式叙事模式）
+const OFFLINE_MODE_PROMPT = `[线下模式 - 沉浸式叙事]
+
+你现在进入了"线下模式"，这是一个更加沉浸、细腻的叙事模式。
+
+## 核心要求：
+1. **单气泡呈现**：将你的回复整合成一个完整的叙事气泡，不要用分割线分割发送
+2. **多维度描写**：必须包含以下要素
+   - 🎬 场景描写：详细描述当前的环境、氛围
+   - 💃 动作细节：描述角色的具体动作、姿态
+   - 💭 内心活动：展现角色的心理变化、情绪波动
+   - 💬 语言对话：自然的对话内容
+   - 👗 外观细节：适时描述衣着、神态等
+
+3. **叙事风格**：
+   - 使用第三人称视角或第一人称视角
+   - 需要分段落
+   - 故事主要围绕你和用户展开，不可以过分拓展剧情，出现太多额外人物
+   - 文字优美细腻，注重氛围营造
+   - 长度控制在300-800字之间
+   - 可以使用"..."表现停顿和情绪
+
+4. **格式要求**：
+   - 整段文字一次性发送，不要用 --- 分隔
+   - 不可以使用emoji
+   - 禁止生成html
+   - 保持叙事的连贯性和沉浸感
+   
+【核心规则】
+1. 你必须严格按照指定的JSON格式回复
+2. 你的回复要生动、有画面感，符合当前场景和角色设定
+3. 保持角色的一致性和故事的连贯性
+【回复格式要求】
+你的每次回复都必须是一个有效的JSON对象，包含以下字段：
+{
+  "reply": "这里是角色的对话或旁白描述，使用第一人称或第三人称视角",
+  "status": {
+    "character": {
+      "location": "角色当前所在的具体位置",
+      "appearance": "角色当前的穿着打扮",
+      "action": "角色正在做什么",
+      "thoughts": "角色此刻的内心想法",
+      "private_thoughts": "角色隐藏的私密心绪或欲望"
+    },
+    "user": {
+      "location": "用户（玩家）所在的位置",
+      "appearance": "用户的穿着或外观特征",
+      "action": "用户正在进行的行为",
+      "features": "用户身上的显著特征或变化"
+    }
+  }
+}
+【重要提示】
+- 确保你的回复是完整的、可解析的JSON格式
+- 不要在JSON外添加任何额外的文字说明
+- 所有字符串都要用双引号包裹
+- 如果某个状态字段暂时无法确定，可以填写"..."作为占位符
+- reply字段可以包含多段文字，用"---"分隔不同的片段
+【示例回复】
+{
+  "reply": "我抬起头，眼神中闪过一丝惊讶。这个地方...我曾经来过。---周围的气氛突然变得沉重起来，仿佛连空气都凝固了。",
+  "status": {
+    "character": {
+      "location": "神秘的古老图书馆大厅",
+      "appearance": "穿着深蓝色长袍，头发有些凌乱",
+      "action": "警惕地观察着四周",
+      "thoughts": "这里有种熟悉的感觉...",
+      "private_thoughts": "心跳莫名加快了"
+    },
+    "user": {
+      "location": "站在我身旁",
+      "appearance": "看起来有些紧张",
+      "action": "紧紧握着手中的物品",
+      "features": "额头上有细密的汗珠"
+    }
+  }
+}
+现在，请根据接下来的场景或对话，严格按照上述格式进行回复。`;
+
+// 全局模式状态
+let currentChatMode = 'online'; // 'online' 或 'offline'
+
+/**
+ * 切换聊天模式
+ */
+function toggleChatMode() {
+    if (currentChatMode === 'online') {
+        currentChatMode = 'offline';
+        showSuccessModal('模式切换', '已切换到线下模式 📖', 1500);
+    } else {
+        currentChatMode = 'online';
+        showSuccessModal('模式切换', '已切换到线上模式 💬', 1500);
+    }
+
+    // 更新按钮UI
+    updateChatModeButton();
+}
+
+/**
+ * 更新模式切换按钮的显示
+ */
+function updateChatModeButton() {
+    const modeBtn = document.getElementById('chatModeToggle');
+    if (!modeBtn) return;
+
+    if (currentChatMode === 'offline') {
+        modeBtn.textContent = '📖';
+        modeBtn.title = '线下模式';
+        modeBtn.style.background = 'linear-gradient(135deg, #A1887F, #8D6E63)';
+    } else {
+        modeBtn.textContent = '💬';
+        modeBtn.title = '线上模式';
+        modeBtn.style.background = 'linear-gradient(135deg, #FFB6C1, #FFC0D9)';
+    }
+}
+
+/* ▼▼▼ 请将你原来的 getSweetheartAiReply 函数完整地替换成这个新版本 ▼▼▼ */
+
+/**
+ * 密友聊天 - 获取AI回复（记忆互通增强版）
+ */
+async function getSweetheartAiReply() {
+    if (!currentSweetheartChatContact) return;
+
+    const contactId = currentSweetheartChatContact.id;
+    // 密友聊天历史
+    const chatHistory = JSON.parse(localStorage.getItem('phoneSweetheartChatHistory') || '{}')[contactId] || [];
+    // 普通聊天历史（用于背景记忆）
+    const normalChatHistory = JSON.parse(localStorage.getItem('phoneChatHistory') || '{}')[contactId] || [];
+
+    // 获取UI元素
+    const chatInput = document.getElementById('sweetheartChatInput');
+    const getReplyBtn = document.getElementById('sweetheartGetReplyBtn');
+    const messagesEl = document.getElementById('sweetheartChatMessages');
+
+    if (!chatInput || !getReplyBtn || !messagesEl) return;
+
+    // 禁用输入和按钮
+    getReplyBtn.disabled = true;
+    chatInput.disabled = true;
+
+    // === 1. 构建发送给AI的消息数组（Messages for AI） ===
+    const messages = [];
+
+    // ✅ 步骤 1.1: 系统提示词 (System Prompt)
+    // 根据当前是线上模式还是线下模式，选择不同的核心指令
+    const systemPrompt = currentChatMode === 'offline' ? OFFLINE_MODE_PROMPT : ENHANCED_PROMPT;
+    messages.push({
+        role: "system",
+        content: systemPrompt
+    });
+
+    // 步骤 1.2: 静态上下文 (Static Context) - 世界书、世界设定、角色设定等
+    // 这部分逻辑与你之前的版本保持一致
+    const worldbookContext = gatherWorldbookContext();
+    if (worldbookContext) {
+        messages.push({ role: "system", content: worldbookContext });
+    }
+    if (currentWorldId) {
+        const world = worldsData.find(w => w.id === currentWorldId);
+        if (world) {
+            let worldSettingText = `[世界设定]\n世界名称：${world.name}\n`;
+            if (world.description) worldSettingText += `描述：${world.description}\n`;
+            if (world.rules) worldSettingText += `基本法则：${world.rules}\n`;
+            if (world.special) worldSettingText += `特殊设定：${world.special}\n`;
+            messages.push({ role: "system", content: worldSettingText });
+        }
+    }
+    let characterSetting = `[角色设定]\n姓名：${currentSweetheartChatContact.name}\n`;
+    if (currentSweetheartChatContact.status) characterSetting += `基础设定：${currentSweetheartChatContact.status}\n`;
+    if (currentSweetheartChatContact.personality) characterSetting += `性格：${currentSweetheartChatContact.personality}\n`;
+    if (currentSweetheartChatContact.occupation) characterSetting += `职业：${currentSweetheartChatContact.occupation}\n`;
+    if (currentSweetheartChatContact.history) characterSetting += `过去的经历：${currentSweetheartChatContact.history}\n`;
+    if (currentSweetheartChatContact.relationship) characterSetting += `与用户的关系：${currentSweetheartChatContact.relationship}\n`;
+    messages.push({ role: "system", content: characterSetting });
+
+    if (userProfile.persona) {
+        messages.push({ role: "system", content: `[用户设定]\n昵称：${userProfile.name}\n${userProfile.persona}` });
+    }
+    if (currentSweetheartChatContact.boundMasks && currentSweetheartChatContact.boundMasks.length > 0) {
+        let maskContent = '[用户人设]\n';
+        currentSweetheartChatContact.boundMasks.forEach(maskId => {
+            const mask = masksData.find(m => m.id === maskId);
+            if (mask) maskContent += `${mask.name}: ${mask.content}\n\n`;
+        });
+        messages.push({ role: "system", content: maskContent });
+    }
+
+    // ⭐⭐⭐ 步骤 1.3: 背景信息 (Background Info from Normal Chat) ⭐⭐⭐
+    // 从"学习模式"的聊天记录中提取最近的10条作为长期记忆参考
+    if (normalChatHistory.length > 0) {
+        const recentNormalChat = normalChatHistory.slice(-10); // 取最后10条
+        let backgroundInfo = `[背景信息：以下是你和用户在"学习模式"中的最近对话记录，仅供你参考，不要直接回复这些内容]\n\n`;
+
+        recentNormalChat.forEach((msg) => {
+            const sender = msg.sender === 'user' ? '用户' : currentSweetheartChatContact.name;
+            // 将消息中的HTML标签（如图片）替换为文字描述，避免干扰AI
+            const textContent = (msg.text || '').replace(/<[^>]+>/g, '[多媒体内容]');
+            backgroundInfo += `${sender}: ${textContent}\n`;
+        });
+
+        messages.push({ role: "system", content: backgroundInfo });
+    }
+
+    // ✅ 步骤 1.4: 当前对话历史 (Current Conversation History)
+    // 使用设置中定义的记忆轮数
+    const memoryRounds = currentSweetheartChatContact.memoryRounds || 10; // 默认10轮
+    const recentMessages = chatHistory.slice(-(memoryRounds * 2)); // 每轮包含用户和AI两条消息
+
+    const conversationHistory = recentMessages.map(msg => ({
+        role: msg.sender === 'user' ? 'user' : 'assistant',
+        // 同样清理HTML标签
+        content: (msg.text || '').replace(/<render>[\s\S]*?<\/render>/, '[特殊渲染内容]')
+    }));
+    messages.push(...conversationHistory);
+
+    // 步骤 1.5: 用户当前输入 (User's Current Input)
+    const userMessage = chatInput.value.trim();
+    if (userMessage) {
+        // 先将用户消息保存并显示到界面上
+        const messageObj = { sender: 'user', text: userMessage };
+        const newIndex = saveSweetheartMessage(contactId, messageObj);
+        const messageRow = _createMessageDOM(contactId, messageObj, newIndex);
+        messagesEl.appendChild(messageRow);
+        chatInput.value = '';
+    }
+
+    // === 2. 显示"思考中"气泡并调用API ===
+    console.log('📋 最终发送给AI的Prompt结构:', messages.map(m => ({role: m.role, content: m.content.substring(0, 50) + '...'})));
+
+    const thinkingBubble = _createMessageDOM(contactId, { sender: 'contact', text: '...' }, -1);
+    messagesEl.appendChild(thinkingBubble);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+
+    const result = await callApi(messages);
+    thinkingBubble.remove();
+
+    if (!result.success) {
+        alert('网络错误：' + result.message);
+        getReplyBtn.disabled = false;
+        chatInput.disabled = false;
+        return;
+    }
+
+    // === 3. 处理并显示AI的回复 ===
+    let chatReplyText = '';
+    let statusData = null;
+    try {
+        const jsonMatch = result.message.match(/({[\s\S]*})/);
+        if (jsonMatch && jsonMatch[1]) {
+            const parsed = JSON.parse(jsonMatch[1]);
+            chatReplyText = parsed.reply || "我...";
+            statusData = parsed.status || null;
+            console.log("✅ 成功解析AI返回的JSON数据！");
+        } else {
+            chatReplyText = result.message;
+            console.warn("⚠️ AI回复中未找到有效的JSON格式，已作为纯文本处理。");
+        }
+    } catch (e) {
+        console.error("❌ 解析AI返回的JSON时出错:", e);
+        chatReplyText = result.message;
+    }
+
+    if (statusData) {
+        updateStatusPopup(statusData);
+        saveStatusData(contactId, statusData);
+    }
+
+    const segments = chatReplyText.split('---').filter(s => s.trim());
+    if (segments.length === 0) {
+        segments.push(chatReplyText || '...');
+    }
+    for (const segmentText of segments) {
+        const messageObj = { sender: 'contact', text: segmentText.trim() };
+        const newIndex = saveSweetheartMessage(contactId, messageObj);
+        const messageRow = _createMessageDOM(contactId, messageObj, newIndex);
+        if (!result.success) {
+            messageRow.querySelector('.chat-bubble').style.backgroundColor = '#ffebee';
+        }
+        messagesEl.appendChild(messageRow);
+        await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 400));
+    }
+
+    // === 4. 收尾工作 ===
+    renderSweetheartList();
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    getReplyBtn.disabled = false;
+    chatInput.disabled = false;
+    chatInput.focus();
+}
+
+/* ▲▲▲ 替换到这里结束 ▲▲▲ */
+
+/**
+ * [新增] 获取统一的聊天历史（普通+密友）
+ * @param {string} contactId - 联系人ID
+ * @returns {Array} 合并后的历史记录
+ */
+function getUnifiedHistory(contactId) {
+    const normalHistory = JSON.parse(localStorage.getItem('phoneChatHistory') || '{}');
+    const sweetheartHistory = JSON.parse(localStorage.getItem('phoneSweetheartChatHistory') || '{}');
+
+    const normalMessages = normalHistory[contactId] || [];
+    const sweetheartMessages = sweetheartHistory[contactId] || [];
+
+    // 合并两个列表（简单拼接，如需按时间排序可以添加时间戳）
+    const allMessages = [...normalMessages, ...sweetheartMessages];
+
+    console.log(`📚 记忆互通: 联系人${contactId} - 普通${normalMessages.length}条 + 密友${sweetheartMessages.length}条 = 总计${allMessages.length}条`);
+
+    return allMessages;
+}
+
+// ▼▼▼ 步骤3.4：添加数据处理函数 ▼▼▼
+/**
+ * 更新状态弹窗的UI (修正版)
+ * @param {object} statusData - 从API解析出的状态对象
+ */
+function updateStatusPopup(statusData) {
+    if (!statusData) {
+        console.warn("⚠️ statusData 为空，无法更新状态弹窗");
+        return;
+    }
+
+    const { character, user } = statusData;
+
+    // 更新角色状态
+    if (character) {
+        document.getElementById('status-char-location').textContent = character.location || '...';
+        document.getElementById('status-char-appearance').textContent = character.appearance || '...';
+        document.getElementById('status-char-action').textContent = character.action || '...';
+        document.getElementById('status-char-thoughts').textContent = character.thoughts || '...';
+        document.getElementById('status-char-private-thoughts').textContent = character.private_thoughts || '...';
+    }
+
+    // 更新用户状态
+    if (user) {
+        document.getElementById('status-my-location').textContent = user.location || '...';
+        document.getElementById('status-my-appearance').textContent = user.appearance || '...';
+        document.getElementById('status-my-action').textContent = user.action || '...';
+        document.getElementById('status-my-features').textContent = user.features || '...';
+    }
+}
+
+/**
+ * 将最新的状态数据保存到 localStorage
+ * @param {string} contactId - 当前密友的ID
+ * @param {object} statusData - 要保存的状态对象
+ */
+function saveStatusData(contactId, statusData) {
+    try {
+        const allStatuses = JSON.parse(localStorage.getItem('sweetheartStatuses') || '{}');
+        allStatuses[contactId] = statusData;
+        localStorage.setItem('sweetheartStatuses', JSON.stringify(allStatuses));
+    } catch (e) {
+        console.error("保存状态数据失败:", e);
+    }
+}
+
+/**
+ * 当打开聊天时，加载并应用最后一次保存的状态
+ * @param {string} contactId - 当前密友的ID
+ */
+function loadAndApplyStatusData(contactId) {
+    try {
+        const allStatuses = JSON.parse(localStorage.getItem('sweetheartStatuses') || '{}');
+        const lastStatus = allStatuses[contactId];
+        if (lastStatus) {
+            updateStatusPopup(lastStatus);
+        } else {
+            // 如果没有历史状态，则清空弹窗的旧数据
+            updateStatusPopup({ character: {}, user: {} });
+        }
+    } catch (e) {
+        console.error("加载状态数据失败:", e);
+    }
+}
+
+/**
+ * 取消引用（密友版）
+ */
+function cancelSweetheartQuote() {
+    currentSweetheartQuoteData = null;
+    const previewEl = document.getElementById('sweetheartQuotePreview');
+    previewEl.classList.remove('show');
+}
+
+/**
+ * 隐藏密友消息操作菜单
+ */
+function hideSweetheartMessageActionSheet() {
+    const actionSheet = document.getElementById('sweetheartMessageActionSheet');
+    actionSheet.classList.remove('show');
+}
+
+/**
+ * 设置密友输入框监听（在initializeApp中调用）
+ */
+function setupSweetheartChatInput() {
+    const chatInput = document.getElementById('sweetheartChatInput');
+    const chatInputArea = document.querySelector('.sweetheart-chat-input-area');
+
+    if (!chatInput || !chatInputArea) return;
+
+    chatInput.addEventListener('input', function () {
+        if (this.value.trim().length > 0) {
+            chatInputArea.classList.add('has-text');
+        } else {
+            chatInputArea.classList.remove('has-text');
+        }
+    });
+
+    chatInput.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            addSweetheartMessageToList();
+        }
+    });
 }
 
 
@@ -6049,22 +8186,588 @@ function getAverageColorFromImageUrl(imageUrl, callback) {
     img.src = imageUrl;
 }
 
-/**
- * 编辑小猫的状态
- */
-function editCatStatus(event) {
-    event.stopPropagation();
-    const statusEl = event.target;
-    const currentStatus = statusEl.textContent.replace('心情: ', '');
+// ========== 地图编辑功能（增强版） ==========
 
-    const newStatus = prompt('请输入小猫的状态（例如：开心 😊、困困 😴、饿饿 🍖）', currentStatus);
+let mapPins = []; // 存储所有大头针
+let currentEditingPin = null; // 当前编辑的大头针
+let isDraggingPin = false; // 是否正在拖动
+let draggedPin = null; // 正在拖动的大头针
+let dragOffset = {x: 0, y: 0}; // 拖动偏移量
 
-    if (newStatus !== null && newStatus.trim()) {
-        statusEl.textContent = '心情: ' + newStatus.trim();
-        // 保存到 localStorage
-        localStorage.setItem('catWidgetStatus', newStatus.trim());
+// 默认地图的预设地点
+const DEFAULT_MAP_LOCATIONS = [
+    {
+        id: 'DEFAULT_1',
+        x: 25,
+        y: 30,
+        name: '王都',
+        description: '繁华的王国首都，商业和文化中心',
+        type: 'city'
+    },
+    {
+        id: 'DEFAULT_2',
+        x: 70,
+        y: 25,
+        name: '魔法学院',
+        description: '古老的魔法师培训学院，藏书丰富',
+        type: 'landmark'
+    },
+    {
+        id: 'DEFAULT_3',
+        x: 45,
+        y: 60,
+        name: '精灵之森',
+        description: '神秘的精灵族居住地，外人罕至',
+        type: 'landmark'
+    },
+    {
+        id: 'DEFAULT_4',
+        x: 15,
+        y: 70,
+        name: '边境村落',
+        description: '宁静的小村庄，民风淳朴',
+        type: 'village'
+    },
+    {
+        id: 'DEFAULT_5',
+        x: 80,
+        y: 55,
+        name: '龙之巢穴',
+        description: '传说中巨龙沉睡的地方，危险重重',
+        type: 'dungeon'
+    },
+    {
+        id: 'DEFAULT_6',
+        x: 50,
+        y: 40,
+        name: '冒险者公会',
+        description: '冒险者们接取任务和交流的场所',
+        type: 'landmark'
+    }
+];
+
+// 打开密友设置
+function openSweetheartSettings() {
+    document.getElementById('sweetheartSettingsPage').classList.add('show');
+}
+
+// 关闭密友设置
+function closeSweetheartSettings() {
+    document.getElementById('sweetheartSettingsPage').classList.remove('show');
+}
+
+// 打开地图编辑器
+function openMapEditor() {
+    document.getElementById('mapEditorPage').classList.add('show');
+    loadMapData();
+
+    // 添加拖动提示
+    if (!document.getElementById('mapDragHint')) {
+        const hint = document.createElement('div');
+        hint.id = 'mapDragHint';
+        hint.className = 'drag-hint';
+        hint.textContent = '长按拖动地点';
+        document.body.appendChild(hint);
     }
 }
+
+// 关闭地图编辑器
+function closeMapEditor() {
+    document.getElementById('mapEditorPage').classList.remove('show');
+
+    // 隐藏拖动提示
+    const hint = document.getElementById('mapDragHint');
+    if (hint) {
+        hint.classList.remove('show');
+    }
+}
+
+// 加载地图数据
+function loadMapData() {
+    const mapContainer = document.getElementById('mapContainer');
+    const mapImage = document.getElementById('worldMapImage');
+
+    // 检查当前世界是否有地图
+    if (currentWorldId) {
+        const world = worldsData.find(w => w.id === currentWorldId);
+
+        if (world && world.mapUrl) {
+            mapImage.src = world.mapUrl;
+            mapContainer.classList.remove('empty');
+
+            // 检查是否是默认地图
+            const isDefaultMap = world.mapUrl.includes('1760979959274_qdqqd_m9jrpo.jpg');
+
+            // 加载已保存的大头针或默认地点
+            const savedPins = localStorage.getItem(`mapPins_${currentWorldId}`);
+
+            if (savedPins) {
+                mapPins = JSON.parse(savedPins);
+            } else if (isDefaultMap) {
+                // 如果是默认地图且没有保存的数据，使用预设地点
+                mapPins = [...DEFAULT_MAP_LOCATIONS];
+                console.log('已加载默认地图的预设地点');
+            } else {
+                mapPins = [];
+            }
+
+            // 等待图片加载完成后再渲染大头针
+            mapImage.onload = () => {
+                renderMapPins();
+                setupMapDragListeners();
+            };
+
+            // 如果图片已经加载过（从缓存），直接渲染
+            if (mapImage.complete) {
+                renderMapPins();
+                setupMapDragListeners();
+            }
+        } else {
+            mapContainer.classList.add('empty');
+            mapPins = [];
+        }
+    } else {
+        mapContainer.classList.add('empty');
+        mapPins = [];
+    }
+}
+
+// 添加大头针到地图
+function addMapPin(event) {
+    // 如果正在拖动或点击的是大头针，不添加新的
+    if (isDraggingPin || event.target.closest('.map-pin')) return;
+
+    const mapContainer = document.getElementById('mapContainer');
+    const rect = mapContainer.getBoundingClientRect();
+
+    // 计算相对位置（百分比）
+    const x = ((event.clientX - rect.left) / rect.width) * 100;
+    const y = ((event.clientY - rect.top) / rect.height) * 100;
+
+    // 创建新的大头针数据
+    const newPin = {
+        id: 'PIN_' + Date.now(),
+        x: x,
+        y: y,
+        name: '新地点',
+        description: '',
+        type: 'city'
+    };
+
+    mapPins.push(newPin);
+    renderMapPins();
+    setupMapDragListeners();
+
+    // 立即打开编辑弹窗
+    editMapPin(newPin.id);
+}
+
+// 渲染所有大头针
+function renderMapPins() {
+    const mapContainer = document.getElementById('mapContainer');
+
+    // 移除旧的大头针
+    document.querySelectorAll('.map-pin').forEach(pin => pin.remove());
+
+    // 添加新的大头针
+    mapPins.forEach(pin => {
+        const pinElement = document.createElement('div');
+        pinElement.className = 'map-pin';
+        pinElement.style.left = pin.x + '%';
+        pinElement.style.top = pin.y + '%';
+        pinElement.dataset.pinId = pin.id;
+
+        // 根据类型选择不同的图标
+        const icons = {
+            city: '🏙️',
+            village: '🏘️',
+            dungeon: '🏰',
+            landmark: '⭐',
+            other: '📍'
+        };
+
+        pinElement.innerHTML = `
+            <div class="map-pin-icon">${icons[pin.type] || '📍'}</div>
+            <div class="map-pin-label">${escapeHTML(pin.name)}</div>
+        `;
+
+        mapContainer.appendChild(pinElement);
+    });
+}
+
+// 设置地图拖动监听器
+function setupMapDragListeners() {
+    const pins = document.querySelectorAll('.map-pin');
+
+    pins.forEach(pin => {
+        let longPressTimer = null;
+        let startPos = {x: 0, y: 0};
+        let hasMoved = false;
+
+        // 触摸开始/鼠标按下
+        const handleStart = (e) => {
+            e.preventDefault();
+            const touch = e.touches ? e.touches[0] : e;
+            startPos = {x: touch.clientX, y: touch.clientY};
+            hasMoved = false;
+
+            // 长按检测（500ms）
+            longPressTimer = setTimeout(() => {
+                startDragging(pin, touch);
+                showDragHint();
+            }, 500);
+        };
+
+        // 触摸移动/鼠标移动
+        const handleMove = (e) => {
+            const touch = e.touches ? e.touches[0] : e;
+            const distance = Math.sqrt(
+                Math.pow(touch.clientX - startPos.x, 2) +
+                Math.pow(touch.clientY - startPos.y, 2)
+            );
+
+            // 如果移动超过5像素，取消长按
+            if (distance > 5 && !isDraggingPin) {
+                clearTimeout(longPressTimer);
+                hasMoved = true;
+            }
+
+            // 如果正在拖动，更新位置
+            if (isDraggingPin && draggedPin === pin) {
+                updateDragPosition(touch);
+            }
+        };
+
+        // 触摸结束/鼠标释放
+        const handleEnd = (e) => {
+            clearTimeout(longPressTimer);
+
+            if (isDraggingPin && draggedPin === pin) {
+                endDragging();
+            } else if (!hasMoved) {
+                // 如果没有移动且没有触发长按，执行点击
+                editMapPin(pin.dataset.pinId);
+            }
+        };
+
+        // 绑定事件
+        pin.addEventListener('touchstart', handleStart, {passive: false});
+        pin.addEventListener('mousedown', handleStart);
+
+        pin.addEventListener('touchmove', handleMove, {passive: false});
+        pin.addEventListener('mousemove', handleMove);
+
+        pin.addEventListener('touchend', handleEnd);
+        pin.addEventListener('mouseup', handleEnd);
+
+        // 防止触摸时的默认行为
+        pin.addEventListener('touchcancel', () => {
+            clearTimeout(longPressTimer);
+            if (isDraggingPin && draggedPin === pin) {
+                endDragging();
+            }
+        });
+    });
+}
+
+// 开始拖动
+function startDragging(pin, touch) {
+    isDraggingPin = true;
+    draggedPin = pin;
+    pin.classList.add('dragging');
+
+    const mapContainer = document.getElementById('mapContainer');
+    const rect = mapContainer.getBoundingClientRect();
+    const pinRect = pin.getBoundingClientRect();
+
+    // 计算偏移量
+    dragOffset.x = touch.clientX - pinRect.left;
+    dragOffset.y = touch.clientY - pinRect.top;
+
+    // 添加全局移动和释放监听
+    document.addEventListener('touchmove', globalDragMove, {passive: false});
+    document.addEventListener('mousemove', globalDragMove);
+    document.addEventListener('touchend', globalDragEnd);
+    document.addEventListener('mouseup', globalDragEnd);
+}
+
+// 全局拖动移动
+function globalDragMove(e) {
+    if (!isDraggingPin || !draggedPin) return;
+    e.preventDefault();
+    const touch = e.touches ? e.touches[0] : e;
+    updateDragPosition(touch);
+}
+
+// 更新拖动位置
+function updateDragPosition(touch) {
+    if (!draggedPin) return;
+
+    const mapContainer = document.getElementById('mapContainer');
+    const rect = mapContainer.getBoundingClientRect();
+
+    // 计算新位置（百分比）
+    let x = ((touch.clientX - rect.left) / rect.width) * 100;
+    let y = ((touch.clientY - rect.top) / rect.height) * 100;
+
+    // 限制在地图范围内
+    x = Math.max(0, Math.min(100, x));
+    y = Math.max(0, Math.min(100, y));
+
+    // 更新DOM位置
+    draggedPin.style.left = x + '%';
+    draggedPin.style.top = y + '%';
+
+    // 更新数据
+    const pinId = draggedPin.dataset.pinId;
+    const pinData = mapPins.find(p => p.id === pinId);
+    if (pinData) {
+        pinData.x = x;
+        pinData.y = y;
+    }
+}
+
+// 全局拖动结束
+function globalDragEnd() {
+    if (isDraggingPin) {
+        endDragging();
+    }
+}
+
+// 结束拖动
+function endDragging() {
+    if (draggedPin) {
+        draggedPin.classList.remove('dragging');
+    }
+
+    isDraggingPin = false;
+    draggedPin = null;
+
+    // 移除全局监听
+    document.removeEventListener('touchmove', globalDragMove);
+    document.removeEventListener('mousemove', globalDragMove);
+    document.removeEventListener('touchend', globalDragEnd);
+    document.removeEventListener('mouseup', globalDragEnd);
+
+    // 隐藏提示
+    hideDragHint();
+
+    // 自动保存
+    saveMapData();
+}
+
+// 显示拖动提示
+function showDragHint() {
+    const hint = document.getElementById('mapDragHint');
+    if (hint) {
+        hint.textContent = '拖动到新位置';
+        hint.classList.add('show');
+    }
+}
+
+// 隐藏拖动提示
+function hideDragHint() {
+    const hint = document.getElementById('mapDragHint');
+    if (hint) {
+        hint.classList.remove('show');
+    }
+}
+
+// 编辑大头针
+function editMapPin(pinId) {
+    if (isDraggingPin) return; // 拖动时不打开编辑
+
+    currentEditingPin = mapPins.find(p => p.id === pinId);
+    if (!currentEditingPin) return;
+
+    // 填充表单
+    document.getElementById('locationName').value = currentEditingPin.name;
+    document.getElementById('locationDesc').value = currentEditingPin.description;
+    document.getElementById('locationType').value = currentEditingPin.type;
+
+    // 显示弹窗
+    document.getElementById('locationModal').classList.add('show');
+}
+
+// 关闭地点编辑弹窗
+function closeLocationModal() {
+    document.getElementById('locationModal').classList.remove('show');
+    currentEditingPin = null;
+}
+
+// 保存地点信息
+function saveLocation() {
+    if (!currentEditingPin) return;
+
+    // 更新数据
+    currentEditingPin.name = document.getElementById('locationName').value.trim() || '未命名地点';
+    currentEditingPin.description = document.getElementById('locationDesc').value.trim();
+    currentEditingPin.type = document.getElementById('locationType').value;
+
+    // 重新渲染
+    renderMapPins();
+    setupMapDragListeners();
+
+    // 关闭弹窗
+    closeLocationModal();
+
+    // 自动保存
+    saveMapData();
+
+    // 显示成功提示
+    showSuccessModal('保存成功', '地点信息已更新');
+}
+
+// 删除地点
+function deleteLocation() {
+    if (!currentEditingPin) return;
+
+    if (confirm('确定要删除这个地点吗？')) {
+        mapPins = mapPins.filter(p => p.id !== currentEditingPin.id);
+        renderMapPins();
+        setupMapDragListeners();
+        closeLocationModal();
+
+        // 自动保存
+        saveMapData();
+
+        showSuccessModal('删除成功', '地点已移除');
+    }
+}
+
+// 保存地图数据
+function saveMapData() {
+    if (!currentWorldId) {
+        console.log('没有选择世界，无法保存');
+        return;
+    }
+
+    // 保存到localStorage
+    localStorage.setItem(`mapPins_${currentWorldId}`, JSON.stringify(mapPins));
+    console.log('地图数据已自动保存');
+}
+
+// 打开世界书绑定
+function openWorldbookBinding() {
+    alert('世界书绑定功能开发中...');
+}
+
+// 打开世界设定编辑
+function openWorldSettings() {
+    if (!currentWorldId) {
+        alert('请先选择一个世界！');
+        return;
+    }
+
+    const world = worldsData.find(w => w.id === currentWorldId);
+    if (!world) {
+        alert('未找到当前世界数据！');
+        return;
+    }
+
+    // 填充当前世界的数据
+    document.getElementById('worldSettingsName').value = world.name || '';
+    document.getElementById('worldSettingsDesc').value = world.description || '';
+    document.getElementById('worldSettingsStyle').value = world.style || 'fantasy';
+    document.getElementById('worldSettingsRules').value = world.rules || '';
+    document.getElementById('worldSettingsSpecial').value = world.special || '';
+
+    // 显示页面
+    document.getElementById('worldSettingsPage').classList.add('show');
+}
+
+// 关闭世界设定编辑
+function closeWorldSettings() {
+    document.getElementById('worldSettingsPage').classList.remove('show');
+}
+
+// 保存世界设定
+function saveWorldSettings() {
+    if (!currentWorldId) {
+        alert('未选择世界！');
+        return;
+    }
+
+    const world = worldsData.find(w => w.id === currentWorldId);
+    if (!world) {
+        alert('未找到世界数据！');
+        return;
+    }
+
+    // 获取表单数据
+    const name = document.getElementById('worldSettingsName').value.trim();
+    const description = document.getElementById('worldSettingsDesc').value.trim();
+    const style = document.getElementById('worldSettingsStyle').value;
+    const rules = document.getElementById('worldSettingsRules').value.trim();
+    const special = document.getElementById('worldSettingsSpecial').value.trim();
+
+    if (!name) {
+        alert('世界名称不能为空！');
+        return;
+    }
+
+    // 更新世界数据
+    world.name = name;
+    world.description = description;
+    world.style = style;
+    world.rules = rules;
+    world.special = special;
+
+    // 保存到localStorage
+    saveWorldsData();
+
+    // 关闭页面并显示成功提示
+    closeWorldSettings();
+    showSuccessModal('保存成功', '世界设定已更新！');
+
+    // 更新世界列表显示
+    renderWorldList();
+}
+
+// 删除当前世界
+function deleteCurrentWorld() {
+    if (!currentWorldId) {
+        alert('未选择世界！');
+        return;
+    }
+
+    const world = worldsData.find(w => w.id === currentWorldId);
+    if (!world) {
+        alert('未找到世界数据！');
+        return;
+    }
+
+    if (confirm(`确定要删除世界"${world.name}"吗？\n\n这将同时删除：\n- 世界的所有设定\n- 世界地图和地点\n- 关联的所有联系人\n\n此操作无法撤销！`)) {
+        // 从数组中删除世界
+        worldsData = worldsData.filter(w => w.id !== currentWorldId);
+
+        // 删除地图数据
+        localStorage.removeItem(`mapPins_${currentWorldId}`);
+
+        // 保存更新后的世界列表
+        saveWorldsData();
+
+        // 清除当前世界ID
+        currentWorldId = null;
+        localStorage.removeItem('currentWorldId');
+
+        // 关闭所有相关页面
+        closeWorldSettings();
+        closeSweetheartSettings();
+        closeSweetheartList(false);
+
+        // 显示成功提示
+        showSuccessModal('删除成功', '世界已被永久删除');
+
+        // 返回世界选择页面
+        setTimeout(() => {
+            openWorldSelect();
+        }, 500);
+    }
+}
+
+// 删除不需要的函数
+// 删除 openWorldbookBinding 函数，因为已经移除了这个功能
 
 /**
  * 编辑猫咪状态数值
@@ -6231,22 +8934,2362 @@ function loadCatWidgetData() {
     loadCatStats();
 }
 
+/* ▼▼▼ 步骤三：在这里粘贴新的JavaScript代码 ▼▼▼ */
 
-function initializeApp() {
-    // ===== 第一步：获取DOM元素（加上安全检查）=====
-    const chatInput = document.getElementById('chatInput');
-    const chatInputArea = document.querySelector('.chat-input-area');
+// ========== 密友聊天背景功能 - 开始 ==========
 
-    // 检查元素是否存在
-    if (!chatInput || !chatInputArea) {
-        console.error('❌ 关键元素未找到，请检查HTML结构');
-        return; // 提前退出，避免后续错误
+/**
+ * 应用密友聊天背景图的核心函数
+ * @param {string} imageUrl - 图片的URL或Base64数据。如果为空字符串，则恢复默认背景。
+ */
+function applySweetheartChatBackground(imageUrl) {
+    const chatPage = document.getElementById('sweetheartChatPage');
+    if (!chatPage) return;
+
+    if (imageUrl) {
+        // 设置背景图片
+        chatPage.style.backgroundImage = `url('${imageUrl}')`;
+        // 使用 localStorage 保存用户的选择
+        localStorage.setItem('sweetheartChatBackground', imageUrl);
+        showChatBgStatus('背景已应用', 'sweetheart');
+    } else {
+        // 恢复默认背景
+        chatPage.style.backgroundImage = '';
+        localStorage.removeItem('sweetheartChatBackground');
+        // 使用你现有的成功提示框
+        showSuccessModal('操作成功', '已恢复为密友专属默认背景。');
+    }
+}
+
+/**
+ * 从本地文件上传处理函数
+ * @param {Event} event - 文件输入框的change事件对象
+ */
+function handleSweetheartChatBgUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // 使用FileReader将图片转为Base64，以便保存和预览
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        // 调用核心函数应用背景
+        applySweetheartChatBackground(e.target.result);
+    };
+    reader.onerror = () => {
+        showChatBgStatus('读取文件失败', 'sweetheart', 'error');
+    };
+    reader.readAsDataURL(file);
+}
+
+/**
+ * 切换URL输入框的显示/隐藏
+ */
+function toggleSweetheartChatBgUrlInput() {
+    const urlBox = document.getElementById('sweetheart-chat-bg-url-box');
+    if (urlBox) {
+        urlBox.classList.toggle('show');
+    }
+}
+
+/**
+ * 从URL输入框应用背景图
+ */
+function applySweetheartChatBgFromUrl() {
+    const urlInput = document.getElementById('sweetheart-chat-bg-url-input');
+    if (!urlInput) return;
+
+    const url = urlInput.value.trim();
+    if (url) {
+        applySweetheartChatBackground(url);
+        urlInput.value = '';
+        toggleSweetheartChatBgUrlInput(); // 应用后自动隐藏输入框
+    } else {
+        showChatBgStatus('请输入有效的URL', 'sweetheart', 'error');
+    }
+}
+
+/**
+ * 在UI上显示状态消息 (这是一个辅助函数，可以复用)
+ * @param {string} message - 要显示的消息
+ * @param {string} context - 上下文 ('chat' 或 'sweetheart')，用于定位正确的元素
+ * @param {string} type - 消息类型 ('success' 或 'error')
+ */
+function showChatBgStatus(message, context, type = 'success') {
+    const statusEl = document.getElementById(`${context}-chat-bg-status`);
+    if (statusEl) {
+        statusEl.textContent = message;
+        statusEl.className = 'status-message' + (type === 'error' ? ' error' : '');
+        setTimeout(() => {
+            statusEl.textContent = '';
+        }, 3000);
+    }
+}
+
+
+/**
+ * 加载已保存的密友聊天背景图 (这个函数需要在应用初始化时调用)
+ */
+function loadSweetheartChatBackground() {
+    const savedBg = localStorage.getItem('sweetheartChatBackground');
+    if (savedBg) {
+        // 注意：这里我们只调用应用函数，它会处理好一切
+        applySweetheartChatBackground(savedBg);
+    }
+}
+
+// ========== 密友聊天背景功能 - 结束 ==========
+// ========== 气泡库增强版功能 - 开始 ==========
+
+const DEFAULT_PRESETS = [
+    // --- 普通聊天预设 ---
+    {
+        id: 'default_normal_001',
+        name: '简约黑白',
+        chatType: 'normal',
+        isDefault: true,
+        sentCode: `background: #333;
+color: white;
+border-radius: 16px;`,
+        receivedCode: `background: #f1f1f1;
+color: #333;
+border-radius: 16px;`
+    },
+    {
+        id: 'default_normal_002',
+        name: '清新绿野',
+        chatType: 'normal',
+        isDefault: true,
+        sentCode: `background: linear-gradient(135deg, #66BB6A, #43A047);
+color: white;
+border-radius: 20px 20px 5px 20px;`,
+        receivedCode: `background: #F1F8E9;
+color: #388E3C;
+border: 1px solid #DCEDC8;
+border-radius: 20px 20px 20px 5px;`
+    },
+    {
+        id: 'default_normal_003',
+        name: '暗夜星空',
+        chatType: 'normal',
+        isDefault: true,
+        sentCode: `background: linear-gradient(135deg, #434343, #000000);
+color: #EAEAEA;
+border: 1px solid #555;
+border-radius: 10px;`,
+        receivedCode: `background: #2E2E2E;
+color: #CCCCCC;
+border-radius: 10px;`
+    },
+
+    // --- 密友聊天预设 ---
+    {
+        id: 'default_sweetheart_001',
+        name: '甜心粉兔',
+        chatType: 'sweetheart',
+        isDefault: true,
+        sentCode: `background: #FFC0CB;
+color: #A52A2A;
+border-radius: 18px 18px 4px 18px;
+box-shadow: 0 4px 8px rgba(255, 192, 203, 0.5), inset 0 0 5px rgba(255,255,255,0.5);`,
+        receivedCode: `background: #FFF0F5;
+color: #DB7093;
+border: 2px dashed #FFD1DC;
+border-radius: 18px 18px 18px 4px;`
+    },
+    {
+        id: 'default_sweetheart_002',
+        name: '复古信纸',
+        chatType: 'sweetheart',
+        isDefault: true,
+        sentCode: `background: #FDF5E6;
+color: #8B4513;
+border: 1px solid #DEB887;
+border-radius: 8px;
+font-family: 'Georgia', serif;`,
+        receivedCode: `background: #FAF0E6;
+color: #A0522D;
+border: 1px solid #D2B48C;
+border-radius: 8px;
+font-family: 'Georgia', serif;`
+    }
+];
+
+// 示例代码库
+const BUBBLE_EXAMPLES = {
+    normal: {
+        sent: `background: linear-gradient(135deg, #0A84FF, #0066CC);
+color: white;
+border-radius: 20px 20px 5px 20px;
+padding: 12px;
+box-shadow: 0 2px 8px rgba(10, 132, 255, 0.3);`,
+        received: `background: #e9e9eb;
+color: #000;
+border-radius: 20px 20px 20px 5px;
+padding: 12px;
+box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);`
+    },
+    sweetheart: {
+        sent: `background: linear-gradient(135deg, #FFB6C1, #FF9AAD);
+color: white;
+border-radius: 20px 20px 5px 20px;
+padding: 12px;
+box-shadow: 0 3px 8px rgba(255, 182, 193, 0.3);`,
+        received: `background: #FFFFFF;
+color: #8D6E63;
+border: 1px solid #FFE4E9;
+border-radius: 20px 20px 20px 5px;
+padding: 12px;
+box-shadow: 0 2px 6px rgba(161, 136, 127, 0.08);`
+    }
+};
+
+/**
+ * 打开气泡库页面
+ */
+function openBubbleLibrary() {
+    const page = document.getElementById('bubbleLibraryPage');
+    page.classList.add('show');
+    loadBubblePresets('normal');
+    loadBubblePresets('sweetheart');
+    // 首次打开时，加载当前已应用的样式到编辑框和预览
+    loadCurrentStylesToEditor();
+}
+
+/**
+ * 关闭气泡库页面
+ */
+function closeBubbleLibrary() {
+    document.getElementById('bubbleLibraryPage').classList.remove('show');
+}
+
+/**
+ * 切换Tab
+ */
+function switchBubbleTab(tabName) {
+    document.querySelectorAll('.bubble-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.tab === tabName);
+    });
+
+    document.getElementById('normalBubbleEditor').style.display =
+        tabName === 'normal' ? 'block' : 'none';
+    document.getElementById('sweetheartBubbleEditor').style.display =
+        tabName === 'sweetheart' ? 'block' : 'none';
+}
+
+/**
+ * 加载示例代码
+ */
+function loadBubbleExample(chatType, bubbleType) {
+    const example = BUBBLE_EXAMPLES[chatType][bubbleType];
+    const inputId = `${chatType}${bubbleType.charAt(0).toUpperCase() + bubbleType.slice(1)}BubbleCode`;
+    document.getElementById(inputId).value = example;
+    // 触发input事件以更新预览
+    document.getElementById(inputId).dispatchEvent(new Event('input'));
+}
+
+/**
+ * 实时预览气泡样式（在预览框中）
+ */
+function previewBubbleStyle(chatType) {
+    const sentCode = document.getElementById(`${chatType}SentBubbleCode`).value;
+    const receivedCode = document.getElementById(`${chatType}ReceivedBubbleCode`).value;
+
+    const sentPreview = document.querySelector(`#${chatType}SentPreview .preview-bubble`);
+    const receivedPreview = document.querySelector(`#${chatType}ReceivedPreview .preview-bubble`);
+
+    // 清除旧样式再应用新样式
+    sentPreview.style.cssText = '';
+    sentPreview.style.cssText = sentCode;
+
+    receivedPreview.style.cssText = '';
+    receivedPreview.style.cssText = receivedCode;
+}
+
+/**
+ * 保存为预设
+ */
+function saveBubblePreset(chatType) {
+    const sentCode = document.getElementById(`${chatType}SentBubbleCode`).value.trim();
+    const receivedCode = document.getElementById(`${chatType}ReceivedBubbleCode`).value.trim();
+
+    if (!sentCode && !receivedCode) {
+        alert('没有可保存的样式代码！');
+        return;
     }
 
-    // ===== 第二步：初始化输入框状态 =====
-    chatInputArea.classList.remove('has-text');
+    const defaultName = `我的预设 ${new Date().toLocaleDateString()}`;
+    const presetName = prompt('请为这个预设命名：', defaultName);
 
-    // ===== 第三步：加载所有数据 =====
+    if (!presetName) return;
+
+    const preset = {
+        id: 'preset_' + Date.now(),
+        name: presetName,
+        sentCode: sentCode,
+        receivedCode: receivedCode,
+        timestamp: Date.now()
+    };
+
+    const storageKey = `bubblePresets_${chatType}`;
+    let presets = JSON.parse(localStorage.getItem(storageKey) || '[]');
+    presets.unshift(preset); // 新的预设放在最前面
+    localStorage.setItem(storageKey, JSON.stringify(presets));
+
+    loadBubblePresets(chatType);
+
+    showSuccessModal('保存成功', `预设"${presetName}"已保存！`);
+}
+
+/**
+ * 加载预设列表（增强版：包含内置预设）
+ */
+function loadBubblePresets(chatType) {
+    const storageKey = `bubblePresets_${chatType}`;
+
+    // 1. 获取内置预设
+    const defaultPresets = DEFAULT_PRESETS.filter(p => p.chatType === chatType);
+
+    // 2. 获取用户自定义预设
+    const userPresets = JSON.parse(localStorage.getItem(storageKey) || '[]');
+
+    // 3. 合并两个列表
+    const allPresets = [...defaultPresets, ...userPresets];
+
+    const listContainer = document.getElementById(`${chatType}PresetList`);
+
+    if (allPresets.length === 0) {
+        listContainer.innerHTML = '<div class="preset-empty">暂无保存的预设</div>';
+        return;
+    }
+
+    listContainer.innerHTML = '';
+
+    allPresets.forEach(preset => {
+        const card = document.createElement('div');
+        card.className = 'preset-card';
+
+        // 如果是用户预设，才显示日期
+        const dateStr = preset.isDefault ? '' : new Date(preset.timestamp).toLocaleDateString();
+
+        // **核心改动**：如果是内置预设，显示“内置”标签；否则显示“删除”按钮
+        const actionButtonHtml = preset.isDefault
+            ? `<div class="preset-tag">内置</div>`
+            : `<button class="preset-btn delete-btn" onclick="deleteBubblePreset('${chatType}', '${preset.id}')">
+                × 删除
+               </button>`;
+
+        card.innerHTML = `
+            <div class="preset-card-header">
+                <div class="preset-name">${escapeHTML(preset.name)}</div>
+                <div class="preset-date">${dateStr}</div>
+            </div>
+            <div class="preset-preview-mini">
+                <div class="mini-bubble sent" style="${preset.sentCode}">发送</div>
+                <div class="mini-bubble received" style="${preset.receivedCode}">接收</div>
+            </div>
+            <div class="preset-actions">
+                <button class="preset-btn apply-btn" onclick="applyBubblePreset('${chatType}', '${preset.id}')">
+                    ✓ 应用
+                </button>
+                ${actionButtonHtml}
+            </div>
+        `;
+
+        listContainer.appendChild(card);
+    });
+}
+
+/**
+ * 应用预设（增强版：能应用内置预设）
+ */
+function applyBubblePreset(chatType, presetId) {
+    // 1. 从内置预设中查找
+    let preset = DEFAULT_PRESETS.find(p => p.id === presetId);
+
+    // 2. 如果没找到，再从用户自定义预设中查找
+    if (!preset) {
+        const storageKey = `bubblePresets_${chatType}`;
+        const presets = JSON.parse(localStorage.getItem(storageKey) || '[]');
+        preset = presets.find(p => p.id === presetId);
+    }
+
+    if (!preset) {
+        alert('预设不存在！');
+        return;
+    }
+
+    // --- 后续逻辑与之前完全相同 ---
+
+    const prefix = chatType === 'normal' ? '.chat-page' : '.sweetheart-chat-page';
+    let styleId = `customBubbleStyle_${chatType}`;
+    let styleEl = document.getElementById(styleId);
+
+    if (!styleEl) {
+        styleEl = document.createElement('style');
+        styleEl.id = styleId;
+        document.head.appendChild(styleEl);
+    }
+
+    let css = '';
+    if (preset.sentCode) {
+        css += `${prefix} .message-row.sent .chat-bubble { ${preset.sentCode} }\n`;
+    }
+    if (preset.receivedCode) {
+        css += `${prefix} .message-row.received .chat-bubble { ${preset.receivedCode} }\n`;
+    }
+
+    styleEl.textContent = css;
+
+    document.getElementById(`${chatType}SentBubbleCode`).value = preset.sentCode;
+    document.getElementById(`${chatType}ReceivedBubbleCode`).value = preset.receivedCode;
+
+    previewBubbleStyle(chatType);
+    showSuccessModal('应用成功', `已应用预设"${preset.name}"！`);
+}
+
+/**
+ * 核心函数：将CSS应用到页面
+ */
+function applyStyleToPage(chatType, sentCode, receivedCode) {
+    let styleId = `customBubbleStyle_${chatType}`;
+    let styleEl = document.getElementById(styleId);
+
+    if (!styleEl) {
+        styleEl = document.createElement('style');
+        styleEl.id = styleId;
+        document.head.appendChild(styleEl);
+    }
+
+    // 移除之前的预览样式
+    const previewStyle = document.getElementById('bubblePreviewStyle');
+    if (previewStyle) previewStyle.textContent = '';
+
+    const prefix = chatType === 'normal' ? '.chat-page' : '.sweetheart-chat-page';
+
+    let css = '';
+    css += `${prefix} .message-row.sent .chat-bubble { ${sentCode || ''} }\n`;
+    css += `${prefix} .message-row.received .chat-bubble { ${receivedCode || ''} }\n`;
+
+    styleEl.textContent = css;
+}
+
+/**
+ * 删除预设
+ */
+function deleteBubblePreset(chatType, presetId) {
+    const storageKey = `bubblePresets_${chatType}`;
+    let presets = JSON.parse(localStorage.getItem(storageKey) || '[]');
+    const preset = presets.find(p => p.id === presetId);
+    if (!preset) return;
+
+    if (!confirm(`确定要删除预设 "${preset.name}" 吗？`)) return;
+
+    presets = presets.filter(p => p.id !== presetId);
+    localStorage.setItem(storageKey, JSON.stringify(presets));
+
+    loadBubblePresets(chatType);
+    showSuccessModal('删除成功', '预设已删除。');
+}
+
+/**
+ * 清空当前输入并重置预览
+ */
+function resetBubbleStyle(chatType) {
+    if (!confirm('确定要清空当前输入框并恢复默认预览吗？')) return;
+
+    ['sent', 'received'].forEach(bubbleType => {
+        const inputId = `${chatType}${bubbleType.charAt(0).toUpperCase() + bubbleType.slice(1)}BubbleCode`;
+        document.getElementById(inputId).value = '';
+        document.getElementById(inputId).dispatchEvent(new Event('input'));
+    });
+}
+
+/**
+ * 加载所有已应用的样式
+ */
+function loadSavedBubbleStyles() {
+    ['normal', 'sweetheart'].forEach(chatType => {
+        const saved = localStorage.getItem(`activeBubbleStyle_${chatType}`);
+        if (saved) {
+            try {
+                const {sent, received} = JSON.parse(saved);
+                applyStyleToPage(chatType, sent, received);
+            } catch (e) {
+                console.error('加载气泡样式失败:', e);
+            }
+        }
+    });
+}
+
+/**
+ * 将当前已应用的样式加载到编辑框中
+ */
+function loadCurrentStylesToEditor() {
+    ['normal', 'sweetheart'].forEach(chatType => {
+        const saved = localStorage.getItem(`activeBubbleStyle_${chatType}`);
+        if (saved) {
+            try {
+                const {sent, received} = JSON.parse(saved);
+                const sentInput = document.getElementById(`${chatType}SentBubbleCode`);
+                const receivedInput = document.getElementById(`${chatType}ReceivedBubbleCode`);
+                sentInput.value = sent || '';
+                receivedInput.value = received || '';
+                sentInput.dispatchEvent(new Event('input'));
+                receivedInput.dispatchEvent(new Event('input'));
+            } catch (e) {
+            }
+        }
+    });
+}
+
+/**
+ * 设置实时预览监听器
+ */
+function setupLivePreviewListeners() {
+    ['normal', 'sweetheart'].forEach(chatType => {
+        document.getElementById(`${chatType}SentBubbleCode`).addEventListener('input', () => previewBubbleStyle(chatType));
+        document.getElementById(`${chatType}ReceivedBubbleCode`).addEventListener('input', () => previewBubbleStyle(chatType));
+    });
+}
+
+// ========== 气泡库增强版功能 - 结束 ==========
+
+/**
+ * 🧪 测试状态更新功能
+ */
+function testStatusUpdate() {
+    const testJSON = {
+        "reply": "宝宝...测试中...💕",
+        "status": {
+            "character": {
+                "location": "在温暖的被窝里",
+                "appearance": "穿着粉色睡衣",
+                "action": "正在想你",
+                "thoughts": "好想抱抱你...",
+                "private_thoughts": "身体有点发烫..."
+            },
+            "user": {
+                "location": "应该在工作吧",
+                "appearance": "穿着帅气的衬衫",
+                "action": "认真工作的样子",
+                "features": "脖子上我昨天留下的吻痕还在吗？"
+            }
+        }
+    };
+
+    console.log("🧪 开始测试状态更新...");
+    console.log("测试数据:", testJSON);
+
+    // 调用更新函数
+    updateStatusPopup(testJSON.status);
+
+    // 打开状态弹窗
+    openStatusPopup();
+
+    alert("✅ 测试完成！请查看状态弹窗是否正确显示。");
+}
+// ========================================================================
+// ========== 联系人库 (管理/选择双模式) 功能 - 完整且无省略 ==========
+// ========================================================================
+
+/**
+ * 全局变量，用于标记联系人库的当前模式。
+ * 'edit': 管理模式，从设置进入，点击联系人进行编辑。
+ * 'select': 选择模式，从通讯录进入，点击联系人创建新的聊天实例。
+ */
+let contactLibraryMode = 'edit';
+
+/**
+ * 打开联系人库的核心函数。
+ * @param {'edit' | 'select'} mode - 指定打开的模式。
+ */
+function openContactLibrary(mode = 'edit') {
+    // 设置当前模式
+    contactLibraryMode = mode;
+
+    // 获取DOM元素
+    const page = document.getElementById('contactLibraryPage');
+    const title = document.getElementById('contactLibraryTitle');
+
+    // 根据模式更新页面标题
+    if (mode === 'select' || mode === 'selectForSweetheart') { // <-- 修改这里
+        title.textContent = '选择联系人';
+    } else {
+        title.textContent = '联系人库';
+    }
+
+    // 显示页面
+    page.classList.add('show');
+
+    // 渲染联系人列表
+    renderContactLibrary();
+}
+
+// script.js
+
+/**
+ * [已修复] 关闭联系人库页面
+ */
+function closeContactLibrary() {
+    // 🔥 核心修复：在关闭页面时，如果处在多选模式，则退出
+    if (isMultiSelectMode) {
+        exitMultiSelectMode();
+    }
+
+    // 隐藏页面
+    document.getElementById('contactLibraryPage').classList.remove('show');
+    // 清空搜索框
+    document.getElementById('contactLibrarySearch').value = '';
+}
+
+
+/**
+ * 渲染联系人库的列表内容。
+ */
+function renderContactLibrary() {
+    const container = document.getElementById('contactLibraryList');
+    container.innerHTML = '';
+
+    const allContactsMap = new Map();
+
+    // 1. 添加密友列表中的源联系人
+    sweetheartContactsData.forEach(contact => {
+        if (!contact.id.includes('_')) {
+            allContactsMap.set(contact.id, { ...contact, type: 'sweetheart' });
+        }
+    });
+
+    // 2. 添加普通联系人列表中的源联系人
+    contactsData.forEach(contact => {
+        if (!contact.id.includes('_') && !allContactsMap.has(contact.id)) {
+            allContactsMap.set(contact.id, { ...contact, type: 'normal' });
+        }
+    });
+
+    // 🆕 3. 添加仅存在于库中的联系人
+    libraryOnlyContactsData.forEach(contact => {
+        if (!allContactsMap.has(contact.id)) {
+            allContactsMap.set(contact.id, { ...contact, type: 'library-only' });
+        }
+    });
+
+    const allContacts = Array.from(allContactsMap.values())
+        .sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
+
+    if (allContacts.length === 0) {
+        container.innerHTML = '<div style="text-align: center; padding: 60px 20px; color: #999; font-size: 14px;">空空如也~<br/>请先创建一个联系人。</div>';
+        return;
+    }
+
+    allContacts.forEach(contact => {
+        const item = document.createElement('div');
+        item.className = 'contact-library-item';
+        item.dataset.contactId = contact.id;
+
+        const isUrl = contact.avatar && (String(contact.avatar).startsWith('http') || String(contact.avatar).startsWith('data:'));
+        const avatarContent = isUrl
+            ? `<img src="${escapeHTML(contact.avatar)}" alt="">`
+            : `<span>${escapeHTML(contact.avatar)}</span>`;
+
+        // 🆕 修改：不再显示类型标签
+        item.innerHTML = `
+            <div class="contact-library-avatar">${avatarContent}</div>
+            <div class="contact-library-info">
+                <div class="contact-library-name">${escapeHTML(contact.name)}</div>
+            </div>
+            <div class="settings-arrow">›</div>
+        `;
+
+        if (isMultiSelectMode) {
+            item.classList.add('multi-select-mode');
+            if (selectedContactIds.has(contact.id)) {
+                item.classList.add('selected');
+            }
+            item.onclick = () => toggleContactSelection(contact.id);
+        } else {
+            if (contactLibraryMode === 'select' || contactLibraryMode === 'selectForSweetheart') {
+                item.onclick = () => selectContactFromLibrary(contact);
+            } else {
+                item.onclick = () => editContactFromLibrary(contact.id, contact.type);
+            }
+        }
+
+        container.appendChild(item);
+    });
+}
+
+
+/**
+ * [最终版] 从联系人库选择联系人
+ * 取消实例逻辑，直接检查是否已存在
+ */
+function selectContactFromLibrary(sourceContact) {
+    const contactId = sourceContact.id;
+
+    // 确定目标列表
+    let targetList, targetName, saveFunc, renderFunc;
+
+    if (contactLibraryMode === 'selectForSweetheart') {
+        targetList = sweetheartContactsData;
+        targetName = '密友列表';
+        saveFunc = saveSweetheartContacts;
+        renderFunc = renderSweetheartList;
+    } else {
+        targetList = contactsData;
+        targetName = '通讯录';
+        saveFunc = () => localStorage.setItem('phoneContactsData', JSON.stringify(contactsData));
+        renderFunc = () => renderContacts(contactsData);
+    }
+
+    // 🔥 核心修改：检查是否已存在（不再创建实例）
+    const alreadyExists = targetList.some(c => c.id === contactId);
+
+    if (alreadyExists) {
+        showSuccessModal(
+            '已有聊天',
+            `"${sourceContact.name}" 已在${targetName}中。`,
+            2000
+        );
+        closeContactLibrary();
+        return;
+    }
+
+    // 如果不存在，直接添加（共享同一个ID）
+    targetList.push(sourceContact);
+    saveFunc();
+    renderFunc();
+
+    showSuccessModal('添加成功', `已将"${sourceContact.name}"添加到${targetName}。`);
+    closeContactLibrary();
+}
+
+// ========== 联系人库多选模式功能 ==========
+
+/**
+ * [已修复] 进入多选模式
+ */
+function enterMultiSelectMode() {
+    if (isMultiSelectMode) return; // 防止重复进入
+    isMultiSelectMode = true;
+    selectedContactIds.clear();
+
+    // 更新UI
+    document.getElementById('multiSelectToggle').style.display = 'none';
+    document.getElementById('multiSelectToolbar').style.display = 'flex';
+    document.getElementById('contactLibraryTitle').textContent = '选择联系人';
+
+    // 重新渲染列表以应用多选模式
+    renderContactLibrary();
+}
+
+
+/**
+ * 退出多选模式
+ */
+function exitMultiSelectMode() {
+    isMultiSelectMode = false;
+    selectedContactIds.clear();
+
+    // 恢复UI
+    document.getElementById('multiSelectToggle').style.display = 'flex';
+    document.getElementById('multiSelectToolbar').style.display = 'none';
+
+    const title = contactLibraryMode === 'select' || contactLibraryMode === 'selectForSweetheart'
+        ? '选择联系人'
+        : '联系人库';
+    document.getElementById('contactLibraryTitle').textContent = title;
+
+    // 重新渲染联系人库以恢复原始状态
+    renderContactLibrary();
+}
+
+/**
+ * 切换单个联系人的选中状态
+ */
+function toggleContactSelection(contactId) {
+    const item = document.querySelector(`.contact-library-item[data-contact-id="${contactId}"]`);
+    if (!item) return;
+
+    if (selectedContactIds.has(contactId)) {
+        selectedContactIds.delete(contactId);
+        item.classList.remove('selected');
+    } else {
+        selectedContactIds.add(contactId);
+        item.classList.add('selected');
+    }
+}
+
+/**
+ * 批量删除选中的联系人
+ */
+function batchDeleteContacts() {
+    if (selectedContactIds.size === 0) {
+        alert('请先选择要删除的联系人');
+        return;
+    }
+
+    const confirmMsg = `确定要删除选中的 ${selectedContactIds.size} 个联系人吗？\n\n删除后将清除所有相关聊天记录。`;
+    if (!confirm(confirmMsg)) return;
+
+    selectedContactIds.forEach(contactId => {
+        // 从普通列表删除
+        contactsData = contactsData.filter(c => c.id !== contactId);
+        // 从密友列表删除
+        sweetheartContactsData = sweetheartContactsData.filter(c => c.id !== contactId);
+        // 🆕 从仅库中列表删除
+        libraryOnlyContactsData = libraryOnlyContactsData.filter(c => c.id !== contactId);
+
+        // 删除聊天记录
+        const normalHistory = JSON.parse(localStorage.getItem('phoneChatHistory') || '{}');
+        delete normalHistory[contactId];
+        localStorage.setItem('phoneChatHistory', JSON.stringify(normalHistory));
+
+        const sweetheartHistory = JSON.parse(localStorage.getItem('phoneSweetheartChatHistory') || '{}');
+        delete sweetheartHistory[contactId];
+        localStorage.setItem('phoneSweetheartChatHistory', JSON.stringify(sweetheartHistory));
+    });
+
+    // 保存更新
+    localStorage.setItem('phoneContactsData', JSON.stringify(contactsData));
+    saveSweetheartContacts();
+    localStorage.setItem('phoneLibraryOnlyContactsData', JSON.stringify(libraryOnlyContactsData));
+
+    const deletedCount = selectedContactIds.size;
+    exitMultiSelectMode();
+    showSuccessModal('删除成功', `已删除 ${deletedCount} 个联系人`);
+}
+
+
+/**
+ * 批量克隆选中的联系人
+ */
+function batchCloneContacts() {
+    if (selectedContactIds.size === 0) {
+        alert('请先选择要克隆的联系人');
+        return;
+    }
+
+    const confirmMsg = `确定要克隆选中的 ${selectedContactIds.size} 个联系人吗？\n\n克隆后将创建拥有相同信息但ID不同的新联系人，仅存在于联系人库中。`;
+    if (!confirm(confirmMsg)) return;
+
+    let clonedCount = 0;
+
+    selectedContactIds.forEach(contactId => {
+        let sourceContact = sweetheartContactsData.find(c => c.id === contactId) ||
+                            contactsData.find(c => c.id === contactId) ||
+                            libraryOnlyContactsData.find(c => c.id === contactId);
+
+        if (!sourceContact) return;
+
+        const clonedContact = cloneContact(sourceContact);
+
+        // 🆕 修改：只添加到仅库中的数组
+        libraryOnlyContactsData.push(clonedContact);
+
+        clonedCount++;
+    });
+
+    // 保存到localStorage
+    localStorage.setItem('phoneLibraryOnlyContactsData', JSON.stringify(libraryOnlyContactsData));
+
+    const count = selectedContactIds.size;
+    exitMultiSelectMode();
+    showSuccessModal('克隆成功', `已克隆 ${count} 个联系人，现在只在联系人库中可见。`);
+}
+
+
+/**
+ * 克隆单个联系人（核心函数）
+ * @param {Object} sourceContact - 原始联系人对象
+ * @returns {Object} 克隆后的新联系人
+ */
+function cloneContact(sourceContact) {
+    // 生成新的唯一ID
+    const newId = sourceContact.id.startsWith('SH')
+        ? 'SH' + Date.now() + Math.floor(Math.random() * 1000)
+        : 'ID' + Math.floor(100000 + Math.random() * 900000);
+
+    // 深拷贝所有属性
+    const clonedContact = {
+        id: newId,
+        name: sourceContact.name,
+        status: sourceContact.status,
+        avatar: sourceContact.avatar,
+        // 密友专属属性（如果有）
+        ...(sourceContact.personality && { personality: sourceContact.personality }),
+        ...(sourceContact.occupation && { occupation: sourceContact.occupation }),
+        ...(sourceContact.catchphrase && { catchphrase: sourceContact.catchphrase }),
+        ...(sourceContact.history && { history: sourceContact.history }),
+        ...(sourceContact.relationship && { relationship: sourceContact.relationship }),
+        ...(sourceContact.memoryRounds && { memoryRounds: sourceContact.memoryRounds }),
+        // 绑定的世界书（深拷贝数组）
+        boundWorldbooks: sourceContact.boundWorldbooks ? [...sourceContact.boundWorldbooks] : []
+    };
+
+    console.log(`✅ 克隆成功: ${sourceContact.name} (${sourceContact.id} → ${newId})`);
+
+    return clonedContact;
+}
+
+
+/**
+ * 当在“管理”模式下点击联系人时调用此函数。
+ * 它的作用是跳转到对应类型的联系人编辑卡片。
+ * @param {string} contactId - 被点击联系人的ID。
+ * @param {'normal' | 'sweetheart'} type - 被点击联系人的类型。
+ */
+/**
+ * [全新版本] 从联系人库编辑联系人 - 使用统一角色卡
+ */
+function editContactFromLibrary(contactId, type) {
+    // 1. 查找联系人数据
+    let contactData;
+    if (type === 'sweetheart') {
+        contactData = sweetheartContactsData.find(c => c.id === contactId);
+    } else if (type === 'library-only') {
+        contactData = libraryOnlyContactsData.find(c => c.id === contactId);
+    } else {
+        contactData = contactsData.find(c => c.id === contactId);
+    }
+
+    if (!contactData) {
+        console.error("找不到联系人数据:", contactId);
+        return;
+    }
+
+    // 2. 打开统一角色卡弹窗
+    openLibraryCharacterModal(contactData, type);
+}
+
+/**
+ * 打开联系人库统一角色卡
+ */
+function openLibraryCharacterModal(contactData, sourceType) {
+    renderLibraryMasksList(contactData.boundMasks || []);
+
+    const modal = document.getElementById('libraryCharacterModal');
+
+    // 存储编辑信息
+    modal.dataset.editingId = contactData.id;
+    modal.dataset.sourceType = sourceType;
+
+    // 填充基础信息
+    document.getElementById('library-name').value = contactData.name || '';
+    document.getElementById('library-persona').value = contactData.status || '';
+    document.getElementById('library-instance-id').textContent = contactData.id;
+
+    // 填充头像
+    const avatarPreview = document.getElementById('library-avatar-preview');
+    const isUrl = contactData.avatar && (contactData.avatar.startsWith('http') || contactData.avatar.startsWith('data:'));
+    avatarPreview.src = isUrl ? contactData.avatar : '';
+
+    // 填充密友专属字段
+    document.getElementById('library-personality').value = contactData.personality || '';
+    document.getElementById('library-occupation').value = contactData.occupation || '';
+    document.getElementById('library-catchphrase').value = contactData.catchphrase || '';
+    document.getElementById('library-history').value = contactData.history || '';
+    document.getElementById('library-relationship').value = contactData.relationship || '';
+
+    // 渲染世界书列表
+    renderLibraryWorldbooksList(contactData.boundWorldbooks || []);
+
+    // 显示弹窗
+    modal.classList.add('show');
+}
+
+/**
+ * 关闭联系人库统一角色卡
+ */
+function closeLibraryCharacterModal() {
+    const modal = document.getElementById('libraryCharacterModal');
+    modal.classList.remove('show');
+
+    // 清理数据
+    delete modal.dataset.editingId;
+    delete modal.dataset.sourceType;
+}
+
+/**
+ * 切换密友专属字段
+ */
+function toggleLibraryExtendedFields() {
+    const fields = document.getElementById('library-extended-fields');
+    const arrow = document.getElementById('library-extended-arrow');
+
+    if (fields.style.display === 'none') {
+        fields.style.display = 'block';
+        arrow.classList.add('open');
+    } else {
+        fields.style.display = 'none';
+        arrow.classList.remove('open');
+    }
+}
+
+/**
+ * 切换世界书列表
+ */
+function toggleLibraryWorldbooks() {
+    const list = document.getElementById('library-worldbooks-list');
+    const arrow = document.getElementById('library-wb-arrow');
+
+    if (list.style.display === 'none') {
+        list.style.display = 'block';
+        arrow.classList.add('open');
+    } else {
+        list.style.display = 'none';
+        arrow.classList.remove('open');
+    }
+}
+
+/**
+ * 渲染世界书列表
+ */
+function renderLibraryWorldbooksList(boundIds = []) {
+    const container = document.getElementById('library-worldbooks-list');
+
+    if (worldbookData.length === 0) {
+        container.innerHTML = '<div style="text-align: center; color: #999; padding: 20px; font-size: 13px;">暂无世界书</div>';
+        return;
+    }
+
+    container.innerHTML = '';
+
+    worldbookData.forEach(wb => {
+        const item = document.createElement('div');
+        item.className = 'library-wb-item';
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.id = `library-wb-${wb.id}`;
+        checkbox.value = wb.id;
+        checkbox.checked = boundIds.includes(wb.id);
+
+        const label = document.createElement('label');
+        label.htmlFor = `library-wb-${wb.id}`;
+        label.textContent = wb.title;
+
+        item.appendChild(checkbox);
+        item.appendChild(label);
+        container.appendChild(item);
+    });
+}
+
+/**
+ * 打开头像选择器
+ */
+function openLibraryAvatarPicker() {
+    document.getElementById('library-avatar-input').click();
+}
+
+/**
+ * 保存联系人库角色数据
+ */
+function saveLibraryCharacter() {
+    const modal = document.getElementById('libraryCharacterModal');
+    const contactId = modal.dataset.editingId;
+    const sourceType = modal.dataset.sourceType;
+
+    if (!contactId) {
+        alert('保存失败：无法获取联系人ID');
+        return;
+    }
+
+    // 获取基础信息
+    const name = document.getElementById('library-name').value.trim();
+    const persona = document.getElementById('library-persona').value.trim();
+
+    if (!name) {
+        alert('请填写姓名！');
+        return;
+    }
+
+    if (!persona) {
+        alert('请填写基础设定！');
+        return;
+    }
+
+    // 获取其他信息
+    const avatar = document.getElementById('library-avatar-preview').src;
+    const personality = document.getElementById('library-personality').value.trim();
+    const occupation = document.getElementById('library-occupation').value.trim();
+    const catchphrase = document.getElementById('library-catchphrase').value.trim();
+    const history = document.getElementById('library-history').value.trim();
+    const relationship = document.getElementById('library-relationship').value.trim();
+
+    // 获取绑定的世界书
+    const boundWorldbooks = [];
+    document.querySelectorAll('#library-worldbooks-list input[type="checkbox"]:checked').forEach(cb => {
+        boundWorldbooks.push(cb.value);
+    });
+
+    // 获取绑定的面具
+    const boundMasks = [];
+    document.querySelectorAll('#library-masks-list input[type="checkbox"]:checked').forEach(cb => {
+        boundMasks.push(cb.value);
+    });
+
+    // 组装数据
+    const contactData = {
+        id: contactId,
+        name,
+        status: persona,
+        avatar: avatar && !avatar.includes('data:image/gif') ? avatar : '👤',
+        personality,
+        occupation,
+        catchphrase,
+        history,
+        relationship,
+        boundWorldbooks,
+        boundMasks
+    };
+
+    // 保存到对应的列表
+    if (sourceType === 'sweetheart') {
+        const index = sweetheartContactsData.findIndex(c => c.id === contactId);
+        if (index !== -1) {
+            sweetheartContactsData[index] = contactData;
+        }
+        saveSweetheartContacts();
+        renderSweetheartList();
+    } else if (sourceType === 'library-only') {
+        const index = libraryOnlyContactsData.findIndex(c => c.id === contactId);
+        if (index !== -1) {
+            libraryOnlyContactsData[index] = contactData;
+        }
+        localStorage.setItem('phoneLibraryOnlyContactsData', JSON.stringify(libraryOnlyContactsData));
+    } else {
+        const index = contactsData.findIndex(c => c.id === contactId);
+        if (index !== -1) {
+            contactsData[index] = contactData;
+        }
+        localStorage.setItem('phoneContactsData', JSON.stringify(contactsData));
+        renderContacts(contactsData);
+    }
+
+    // 刷新联系人库显示
+    renderContactLibrary();
+
+    // 关闭弹窗
+    closeLibraryCharacterModal();
+
+    showSuccessModal('保存成功', `已更新 ${name} 的信息`);
+}
+
+/**
+ * 搜索过滤联系人库列表。
+ * 在搜索框输入时被调用。
+ */
+function filterContactLibrary() {
+    const searchTerm = document.getElementById('contactLibrarySearch').value.toLowerCase().trim();
+
+    document.querySelectorAll('.contact-library-item').forEach(item => {
+        const name = item.querySelector('.contact-library-name').textContent.toLowerCase();
+        // 如果名字包含搜索词，则显示，否则隐藏
+        item.style.display = name.includes(searchTerm) ? 'flex' : 'none';
+    });
+}
+
+/**
+ * 这是从“普通联系人”页面右上角菜单触发的函数。
+ * 它会以“选择”模式打开联系人库。
+ */
+function selectExistingContact() {
+    const menu = document.getElementById('contactMenu');
+    if (menu) menu.classList.remove('show');
+
+    openContactLibrary('select');
+}
+
+// ========================================================================
+// ========== 联系人库功能 - 代码结束 ==========
+// ========================================================================
+// ===========================================
+// ========== 密友聊天 - 世界地图剧情功能 ==========
+// ===========================================
+
+let currentMapPins = []; // 用于存储当前地图的地点数据
+
+/**
+ * 打开世界地图弹窗
+ */
+function openWorldMapPopup() {
+    const popup = document.getElementById('worldMapPopup');
+    if (!currentWorldId) {
+        alert('错误：找不到当前所在的世界！');
+        return;
+    }
+
+    const world = worldsData.find(w => w.id === currentWorldId);
+    if (!world || !world.mapUrl) {
+        showSuccessModal('提示', '当前世界还没有设置地图哦~', 2000);
+        return;
+    }
+
+    // 1. 设置地图图片
+    const mapImage = document.getElementById('mapPopupImage');
+    mapImage.src = world.mapUrl;
+
+    // 2. 加载该世界的地点数据
+    const savedPins = localStorage.getItem(`mapPins_${currentWorldId}`);
+    if (savedPins) {
+        try {
+            currentMapPins = JSON.parse(savedPins);
+        } catch (e) {
+            console.error('解析地图地点数据失败', e);
+            currentMapPins = [];
+        }
+    } else {
+        // 如果是默认地图，加载默认地点
+        const isDefaultMap = world.mapUrl.includes('1760979959274_qdqqd_m9jrpo.jpg');
+        currentMapPins = isDefaultMap ? DEFAULT_MAP_LOCATIONS : [];
+    }
+
+    // 3. 渲染地点大头针
+    renderMapPinsForPopup();
+
+    // 4. 显示弹窗
+    popup.classList.add('show');
+}
+
+/**
+ * 关闭世界地图弹窗
+ */
+function closeWorldMapPopup() {
+    const popup = document.getElementById('worldMapPopup');
+    popup.classList.remove('show');
+}
+
+/**
+ * 在弹窗中渲染所有地点大头针
+ */
+function renderMapPinsForPopup() {
+    const container = document.getElementById('mapPopupContainer');
+    if (!container) return;
+
+    // 先清除旧的大头针
+    container.querySelectorAll('.map-popup-pin').forEach(pin => pin.remove());
+
+    if (currentMapPins.length === 0) {
+        console.log('当前地图没有可交互的地点。');
+        return;
+    }
+
+    // 遍历地点数据，创建DOM元素
+    currentMapPins.forEach(pin => {
+        const pinElement = document.createElement('div');
+        pinElement.className = 'map-popup-pin';
+        pinElement.style.left = `${pin.x}%`;
+        pinElement.style.top = `${pin.y}%`;
+
+        const icons = {
+            city: '🏙️',
+            village: '🏘️',
+            dungeon: '🏰',
+            landmark: '⭐',
+            other: '📍'
+        };
+
+        pinElement.innerHTML = `
+            <div class="map-popup-pin-icon">${icons[pin.type] || '📍'}</div>
+            <div class="map-popup-pin-label">${escapeHTML(pin.name)}</div>
+        `;
+
+        // 为每个大头针绑定点击事件，用于触发剧情
+        pinElement.onclick = (event) => triggerLocationPlot(event, pin.id);
+
+        container.appendChild(pinElement);
+    });
+}
+
+/* ▼▼▼ 用这个新版本替换旧的 triggerLocationPlot 函数 ▼▼▼ */
+
+/**
+ * 触发地点剧情的核心函数（记忆互通增强版）
+ * @param {Event} event - 点击事件
+ * @param {string} pinId - 被点击的地点的ID
+ */
+async function triggerLocationPlot(event, pinId) {
+    event.stopPropagation();
+
+    const pin = currentMapPins.find(p => p.id === pinId);
+    if (!pin) {
+        console.error('未找到对应的地点数据');
+        return;
+    }
+
+    if (!currentSweetheartChatContact) {
+        console.error('未找到当前密友联系人');
+        return;
+    }
+
+    const contactId = currentSweetheartChatContact.id;
+
+    // === 步骤1: 获取聊天历史（双份） ===
+    // 密友聊天历史
+    const chatHistory = JSON.parse(localStorage.getItem('phoneSweetheartChatHistory') || '{}')[contactId] || [];
+    // 普通聊天历史（背景记忆）
+    const normalChatHistory = JSON.parse(localStorage.getItem('phoneChatHistory') || '{}')[contactId] || [];
+
+    // 关闭地图弹窗
+    closeWorldMapPopup();
+
+    // ✅ 地图触发自动切换到线下模式
+    currentChatMode = 'offline';
+    updateChatModeButton();
+
+    const messagesEl = document.getElementById('sweetheartChatMessages');
+    if (!messagesEl) return;
+
+    // === 步骤2: 创建并保存地点提示消息 ===
+    const locationMessage = {
+        sender: 'system',
+        type: 'location',
+        locationName: pin.name,
+        locationDesc: pin.description || '一个神秘的地方',
+        timestamp: Date.now()
+    };
+
+    const newIndex = saveSweetheartMessage(contactId, locationMessage);
+    const locationNotice = _createMessageDOM(contactId, locationMessage, newIndex);
+    messagesEl.appendChild(locationNotice);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+
+    // === 步骤3: 构建发送给AI的完整消息数组 ===
+    const messages = [];
+
+    // 3.1 系统提示词（线下模式专用）
+    messages.push({
+        role: "system",
+        content: OFFLINE_MODE_PROMPT
+    });
+
+    // 3.2 静态上下文 - 世界书、世界设定、角色设定
+    const worldbookContext = gatherWorldbookContext();
+    if (worldbookContext) {
+        messages.push({ role: "system", content: worldbookContext });
+    }
+
+    if (currentWorldId) {
+        const world = worldsData.find(w => w.id === currentWorldId);
+        if (world) {
+            let worldSettingText = `[世界设定]\n世界名称：${world.name}\n`;
+            if (world.description) worldSettingText += `描述：${world.description}\n`;
+            if (world.rules) worldSettingText += `基本法则：${world.rules}\n`;
+            if (world.special) worldSettingText += `特殊设定：${world.special}\n`;
+            messages.push({ role: "system", content: worldSettingText });
+        }
+    }
+
+    let characterSetting = `[角色设定]\n姓名：${currentSweetheartChatContact.name}\n`;
+    if (currentSweetheartChatContact.status) characterSetting += `基础设定：${currentSweetheartChatContact.status}\n`;
+    if (currentSweetheartChatContact.personality) characterSetting += `性格：${currentSweetheartChatContact.personality}\n`;
+    if (currentSweetheartChatContact.occupation) characterSetting += `职业：${currentSweetheartChatContact.occupation}\n`;
+    if (currentSweetheartChatContact.history) characterSetting += `过去的经历：${currentSweetheartChatContact.history}\n`;
+    if (currentSweetheartChatContact.relationship) characterSetting += `与用户的关系：${currentSweetheartChatContact.relationship}\n`;
+    messages.push({ role: "system", content: characterSetting });
+
+    if (userProfile.persona) {
+        messages.push({ role: "system", content: `[用户设定]\n昵称：${userProfile.name}\n${userProfile.persona}` });
+    }
+
+    if (currentSweetheartChatContact.boundMasks && currentSweetheartChatContact.boundMasks.length > 0) {
+        let maskContent = '[用户人设]\n';
+        currentSweetheartChatContact.boundMasks.forEach(maskId => {
+            const mask = masksData.find(m => m.id === maskId);
+            if (mask) maskContent += `${mask.name}: ${mask.content}\n\n`;
+        });
+        messages.push({ role: "system", content: maskContent });
+    }
+
+    // ⭐ 3.3 背景信息：从"学习模式"提取历史记录
+    if (normalChatHistory.length > 0) {
+        const recentNormalChat = normalChatHistory.slice(-10);
+        let backgroundInfo = `[背景信息：以下是你和用户在"学习模式"中的最近对话记录，仅供你参考]\n\n`;
+
+        recentNormalChat.forEach((msg) => {
+            const sender = msg.sender === 'user' ? '用户' : currentSweetheartChatContact.name;
+            const textContent = (msg.text || '').replace(/<[^>]+>/g, '[多媒体内容]');
+            backgroundInfo += `${sender}: ${textContent}\n`;
+        });
+
+        messages.push({ role: "system", content: backgroundInfo });
+    }
+
+    // ⭐ 3.4 当前对话历史：遵守记忆轮数设置
+    const memoryRounds = currentSweetheartChatContact.memoryRounds || 10;
+    const recentMessages = chatHistory.slice(-(memoryRounds * 2));
+
+    const conversationHistory = recentMessages.map(msg => ({
+        role: msg.sender === 'user' ? 'user' : 'assistant',
+        content: (msg.text || '').replace(/<render>[\s\S]*?<\/render>/, '[特殊渲染内容]')
+    }));
+    messages.push(...conversationHistory);
+
+    // 3.5 地点触发事件（作为用户输入）
+    const plotPrompt = `[地点事件] 我们来到了"${pin.name}"。这里的特点是："${pin.description || '一个神秘的地方'}"。请基于这个场景，生动地描述接下来发生的故事或对话。`;
+    messages.push({ role: "user", content: plotPrompt });
+
+    // === 步骤4: 显示"思考中"气泡并调用API ===
+    console.log('🗺️ 地图触发 - 最终发送给AI的Prompt结构:', messages.map(m => ({role: m.role, content: m.content.substring(0, 50) + '...'})));
+
+    const thinkingBubble = _createMessageDOM(contactId, { sender: 'contact', text: '...' }, -1);
+    messagesEl.appendChild(thinkingBubble);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+
+    const result = await callApi(messages);
+    thinkingBubble.remove();
+
+    if (!result.success) {
+        alert('网络错误：' + result.message);
+        return;
+    }
+
+    // === 步骤5: 处理AI回复 ===
+    const { chatReplyText, statusData } = parseOfflineResponse(result);
+
+    if (statusData) {
+        updateStatusPopup(statusData);
+        saveStatusData(contactId, statusData);
+        console.log('✅ 地图触发 - 状态已更新');
+    }
+
+    // 将AI回复分段显示
+    const segments = chatReplyText.split('---').filter(s => s.trim());
+    if (segments.length > 0) {
+        for (const segmentText of segments) {
+            const messageObj = { sender: 'contact', text: segmentText.trim() };
+            const newIndex = saveSweetheartMessage(contactId, messageObj);
+            const messageRow = _createMessageDOM(contactId, messageObj, newIndex);
+            messagesEl.appendChild(messageRow);
+            await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 400));
+        }
+    }
+
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    renderSweetheartList();
+}
+
+/* ▲▲▲ 替换到这里结束 ▲▲▲ */
+
+/**
+ * 安全解析线下模式的AI回复
+ * @param {Object} result - API返回的结果对象
+ * @returns {Object} 包含 chatReplyText 和 statusData 的对象
+ */
+function parseOfflineResponse(result) {
+    let chatReplyText = '';
+    let statusData = null;
+
+    if (!result.success) {
+        return {
+            chatReplyText: `[网络错误] ${result.message}`,
+            statusData: null
+        };
+    }
+
+    try {
+        // 1. 首先尝试清理可能的markdown代码块标记
+        let cleanedMessage = result.message.trim();
+
+        // 移除可能的 ```json 和 ``` 标记
+        cleanedMessage = cleanedMessage.replace(/^```json\s*/i, '');
+        cleanedMessage = cleanedMessage.replace(/^```\s*/i, '');
+        cleanedMessage = cleanedMessage.replace(/\s*```$/i, '');
+        cleanedMessage = cleanedMessage.trim();
+
+        // 2. 尝试解析JSON
+        const parsed = JSON.parse(cleanedMessage);
+
+        // 3. 提取回复文本
+        chatReplyText = parsed.reply || parsed.message || parsed.text || "...";
+
+        // 4. 提取状态数据
+        if (parsed.status && typeof parsed.status === 'object') {
+            statusData = parsed.status;
+            console.log('✅ 成功解析线下模式状态数据');
+        }
+
+    } catch (parseError) {
+        console.warn('⚠️ JSON解析失败，尝试智能提取:', parseError.message);
+
+        // 智能降级处理：尝试提取可能的JSON片段
+        try {
+            const jsonMatch = result.message.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                const extracted = JSON.parse(jsonMatch[0]);
+                chatReplyText = extracted.reply || extracted.message || result.message;
+                statusData = extracted.status || null;
+                console.log('✅ 智能提取成功');
+            } else {
+                // 完全降级：直接使用原始文本
+                chatReplyText = result.message;
+                console.log('ℹ️ 使用原始文本作为回复');
+            }
+        } catch (secondError) {
+            chatReplyText = result.message;
+            console.log('ℹ️ 降级处理：使用原始文本');
+        }
+    }
+
+    return { chatReplyText, statusData };
+}
+
+
+// ========== 消息多选功能 - 开始 ==========
+
+// 全局变量
+let isNormalMultiSelectMode = false; // 普通聊天是否处于多选模式
+let isSweetheartMultiSelectMode = false; // 密友聊天是否处于多选模式
+let selectedNormalMessageIndexes = new Set(); // 普通聊天选中的消息索引
+let selectedSweetheartMessageIndexes = new Set(); // 密友聊天选中的消息索引
+
+/**
+ * 进入普通聊天的多选模式
+ */
+function enterNormalMultiSelectMode() {
+    isNormalMultiSelectMode = true;
+    selectedNormalMessageIndexes.clear();
+
+    // 切换UI
+    document.getElementById('normalHeaderActions').style.display = 'none';
+    document.getElementById('normalMultiSelectToolbar').style.display = 'flex';
+    document.getElementById('chatContactName').textContent = '选择消息';
+
+    // 为所有消息添加复选框
+    addCheckboxesToMessages('normal');
+
+    // 隐藏操作菜单
+    hideMessageActionSheet();
+}
+
+/**
+ * 退出普通聊天的多选模式（修复版）
+ */
+function exitNormalMultiSelectMode() {
+    isNormalMultiSelectMode = false;
+    selectedNormalMessageIndexes.clear();
+
+    // 恢复UI
+    document.getElementById('normalHeaderActions').style.display = 'flex';
+    document.getElementById('normalMultiSelectToolbar').style.display = 'none';
+    if (currentChatContact) {
+        document.getElementById('chatContactName').textContent = currentChatContact.name;
+    }
+
+    // 🔥 核心修复：重新渲染消息列表，恢复所有事件绑定
+    if (currentChatContact) {
+        const contactId = currentChatContact.id;
+        const chatHistory = JSON.parse(localStorage.getItem('phoneChatHistory') || '{}');
+        const messages = chatHistory[contactId] || [];
+
+        const messagesEl = document.getElementById('chatMessages');
+        if (messagesEl) {
+            messagesEl.innerHTML = ''; // 清空
+            messages.forEach((msg, index) => {
+                const messageRow = _createMessageDOM(contactId, msg, index);
+                messagesEl.appendChild(messageRow);
+            });
+            messagesEl.scrollTop = messagesEl.scrollHeight; // 滚动到底部
+        }
+    }
+}
+/**
+ * 进入密友聊天的多选模式
+ */
+function enterSweetheartMultiSelectMode() {
+    isSweetheartMultiSelectMode = true;
+    selectedSweetheartMessageIndexes.clear();
+
+    // 切换UI
+    document.getElementById('sweetheartHeaderActions').style.display = 'none';
+    document.getElementById('sweetheartMultiSelectToolbar').style.display = 'flex';
+    document.getElementById('sweetheartChatContactName').textContent = '选择消息';
+
+    // 为所有消息添加复选框
+    addCheckboxesToMessages('sweetheart');
+
+    // 隐藏操作菜单
+    hideSweetheartMessageActionSheet();
+}
+
+/**
+ * 退出密友聊天的多选模式（修复版）
+ */
+function exitSweetheartMultiSelectMode() {
+    isSweetheartMultiSelectMode = false;
+    selectedSweetheartMessageIndexes.clear();
+
+    // 恢复UI
+    document.getElementById('sweetheartHeaderActions').style.display = 'flex';
+    document.getElementById('sweetheartMultiSelectToolbar').style.display = 'none';
+    if (currentSweetheartChatContact) {
+        document.getElementById('sweetheartChatContactName').textContent = currentSweetheartChatContact.name;
+    }
+
+    // 🔥 核心修复：重新渲染消息列表，恢复所有事件绑定
+    if (currentSweetheartChatContact) {
+        const contactId = currentSweetheartChatContact.id;
+        const chatHistory = JSON.parse(localStorage.getItem('phoneSweetheartChatHistory') || '{}');
+        const messages = chatHistory[contactId] || [];
+
+        const messagesEl = document.getElementById('sweetheartChatMessages');
+        if (messagesEl) {
+            messagesEl.innerHTML = ''; // 清空
+            messages.forEach((msg, index) => {
+                const messageRow = _createMessageDOM(contactId, msg, index);
+                messagesEl.appendChild(messageRow);
+            });
+            messagesEl.scrollTop = messagesEl.scrollHeight; // 滚动到底部
+        }
+    }
+}
+/**
+ * 为消息添加复选框
+ * @param {string} chatType - 'normal' 或 'sweetheart'
+ */
+function addCheckboxesToMessages(chatType) {
+    const messagesContainer = chatType === 'normal'
+        ? document.getElementById('chatMessages')
+        : document.getElementById('sweetheartChatMessages');
+
+    if (!messagesContainer) return;
+
+    const messageRows = messagesContainer.querySelectorAll('.message-row');
+
+    messageRows.forEach((row, index) => {
+        // 添加多选模式类
+        row.classList.add('multi-select-mode');
+
+        // 创建复选框容器
+        const checkboxContainer = document.createElement('div');
+        checkboxContainer.className = 'message-checkbox-container';
+        checkboxContainer.dataset.index = index;
+
+        const checkbox = document.createElement('div');
+        checkbox.className = 'message-checkbox';
+
+        checkboxContainer.appendChild(checkbox);
+        row.insertBefore(checkboxContainer, row.firstChild);
+
+        // 绑定点击事件
+        row.onclick = () => toggleMessageSelection(chatType, index, checkbox);
+    });
+}
+
+/**
+ * 移除消息的复选框
+ * @param {string} chatType - 'normal' 或 'sweetheart'
+ */
+function removeCheckboxesFromMessages(chatType) {
+    const messagesContainer = chatType === 'normal'
+        ? document.getElementById('chatMessages')
+        : document.getElementById('sweetheartChatMessages');
+
+    if (!messagesContainer) return;
+
+    const messageRows = messagesContainer.querySelectorAll('.message-row');
+
+    messageRows.forEach(row => {
+        row.classList.remove('multi-select-mode');
+        const checkboxContainer = row.querySelector('.message-checkbox-container');
+        if (checkboxContainer) {
+            checkboxContainer.remove();
+        }
+        row.onclick = null;
+    });
+}
+
+/**
+ * 切换消息的选中状态
+ * @param {string} chatType - 'normal' 或 'sweetheart'
+ * @param {number} index - 消息索引
+ * @param {HTMLElement} checkbox - 复选框元素
+ */
+function toggleMessageSelection(chatType, index, checkbox) {
+    const selectedSet = chatType === 'normal'
+        ? selectedNormalMessageIndexes
+        : selectedSweetheartMessageIndexes;
+
+    if (selectedSet.has(index)) {
+        selectedSet.delete(index);
+        checkbox.classList.remove('checked');
+    } else {
+        selectedSet.add(index);
+        checkbox.classList.add('checked');
+    }
+}
+
+/**
+ * 批量删除普通聊天的选中消息（最终修复版）
+ */
+function batchDeleteNormalMessages() {
+    if (selectedNormalMessageIndexes.size === 0) {
+        alert('请先选择要删除的消息');
+        return;
+    }
+
+    if (!confirm(`确定要删除选中的 ${selectedNormalMessageIndexes.size} 条消息吗？`)) {
+        return;
+    }
+
+    const contactId = currentChatContact.id;
+    const chatHistory = JSON.parse(localStorage.getItem('phoneChatHistory') || '{}');
+
+    if (!chatHistory[contactId]) return;
+
+    const indexesToDelete = Array.from(selectedNormalMessageIndexes).sort((a, b) => b - a);
+
+    indexesToDelete.forEach(index => {
+        chatHistory[contactId].splice(index, 1);
+    });
+
+    try {
+        localStorage.setItem('phoneChatHistory', JSON.stringify(chatHistory));
+
+        const deletedCount = indexesToDelete.length;
+
+        // 🔥 核心修复：在这里先清理多选状态，然后再调用 openChat 彻底刷新
+        isNormalMultiSelectMode = false;
+        selectedNormalMessageIndexes.clear();
+
+        // 恢复UI
+        document.getElementById('normalHeaderActions').style.display = 'flex';
+        document.getElementById('normalMultiSelectToolbar').style.display = 'none';
+        if (currentChatContact) {
+            document.getElementById('chatContactName').textContent = currentChatContact.name;
+        }
+
+        // 调用 openChat 重新构建整个聊天界面，确保所有事件被正确绑定
+        openChat(currentChatContact);
+
+        // 更新联系人列表的最后一条消息
+        renderContacts(contactsData);
+
+        showSuccessModal('删除成功', `已删除 ${deletedCount} 条消息`);
+    } catch (e) {
+        console.error('删除失败:', e);
+        alert('删除失败，存储空间可能已满');
+    }
+}
+
+/**
+ * 批量删除密友聊天的选中消息（最终修复版）
+ */
+function batchDeleteSweetheartMessages() {
+    if (selectedSweetheartMessageIndexes.size === 0) {
+        alert('请先选择要删除的消息');
+        return;
+    }
+
+    if (!confirm(`确定要删除选中的 ${selectedSweetheartMessageIndexes.size} 条消息吗？`)) {
+        return;
+    }
+
+    const contactId = currentSweetheartChatContact.id;
+    const chatHistory = JSON.parse(localStorage.getItem('phoneSweetheartChatHistory') || '{}');
+
+    if (!chatHistory[contactId]) return;
+
+    const indexesToDelete = Array.from(selectedSweetheartMessageIndexes).sort((a, b) => b - a);
+
+    indexesToDelete.forEach(index => {
+        chatHistory[contactId].splice(index, 1);
+    });
+
+    try {
+        localStorage.setItem('phoneSweetheartChatHistory', JSON.stringify(chatHistory));
+
+        const deletedCount = indexesToDelete.length;
+
+        // 🔥 核心修复：清理多选状态并恢复UI
+        isSweetheartMultiSelectMode = false;
+        selectedSweetheartMessageIndexes.clear();
+
+        document.getElementById('sweetheartHeaderActions').style.display = 'flex';
+        document.getElementById('sweetheartMultiSelectToolbar').style.display = 'none';
+        if (currentSweetheartChatContact) {
+            document.getElementById('sweetheartChatContactName').textContent = currentSweetheartChatContact.name;
+        }
+
+        // 调用 openSweetheartChat 重新构建整个聊天界面
+        openSweetheartChat(currentSweetheartChatContact);
+
+        // 更新密友列表
+        renderSweetheartList();
+
+        showSuccessModal('删除成功', `已删除 ${deletedCount} 条消息`);
+    } catch (e) {
+        console.error('删除失败:', e);
+        alert('删除失败，存储空间可能已满');
+    }
+}
+
+// ========== 消息多选功能 - 结束 ==========
+
+// ========== 面具管理功能 - 开始 ==========
+
+let masksData = []; // 存储所有面具
+let currentEditingMaskId = null; // 当前编辑的面具ID
+
+/**
+ * 打开面具管理页面
+ */
+function openMaskLibrary() {
+    document.getElementById('maskLibraryPage').classList.add('show');
+    renderMaskList();
+}
+
+/**
+ * 关闭面具管理页面
+ */
+function closeMaskLibrary() {
+    document.getElementById('maskLibraryPage').classList.remove('show');
+}
+
+/**
+ * 渲染面具列表
+ */
+function renderMaskList() {
+    const listEl = document.getElementById('maskLibraryList');
+    const emptyEl = document.getElementById('maskEmpty');
+
+    if (masksData.length === 0) {
+        emptyEl.style.display = 'flex';
+        // 移除所有面具项
+        listEl.querySelectorAll('.mask-item').forEach(item => item.remove());
+        return;
+    }
+
+    emptyEl.style.display = 'none';
+
+    // 清除旧的面具项
+    listEl.querySelectorAll('.mask-item').forEach(item => item.remove());
+
+    // 渲染新的面具列表
+    masksData.forEach(mask => {
+        const item = document.createElement('div');
+        item.className = 'mask-item';
+        item.onclick = () => editMask(mask.id);
+
+        const preview = (mask.content || '').substring(0, 60);
+
+        item.innerHTML = `
+            <div class="mask-item-header">
+                <div class="mask-item-icon">🎭</div>
+                <div class="mask-item-title">${escapeHTML(mask.name)}</div>
+            </div>
+            ${mask.description ? `<div class="mask-item-desc">${escapeHTML(mask.description)}</div>` : ''}
+            <div class="mask-item-preview">${escapeHTML(preview)}${preview.length >= 60 ? '...' : ''}</div>
+        `;
+
+        listEl.appendChild(item);
+    });
+}
+
+/**
+ * 打开面具编辑弹窗（新建模式）
+ */
+function openMaskModal() {
+    currentEditingMaskId = null;
+
+    document.getElementById('maskModalTitle').textContent = '新建面具';
+    document.getElementById('maskName').value = '';
+    document.getElementById('maskDesc').value = '';
+    document.getElementById('maskContent').value = '';
+    document.getElementById('maskDeleteBtn').style.display = 'none';
+
+    document.getElementById('maskModal').classList.add('show');
+}
+
+/**
+ * 编辑面具
+ */
+function editMask(maskId) {
+    const mask = masksData.find(m => m.id === maskId);
+    if (!mask) return;
+
+    currentEditingMaskId = maskId;
+
+    document.getElementById('maskModalTitle').textContent = '编辑面具';
+    document.getElementById('maskName').value = mask.name;
+    document.getElementById('maskDesc').value = mask.description || '';
+    document.getElementById('maskContent').value = mask.content;
+    document.getElementById('maskDeleteBtn').style.display = 'block';
+
+    document.getElementById('maskModal').classList.add('show');
+}
+
+/**
+ * 关闭面具编辑弹窗
+ */
+function closeMaskModal() {
+    document.getElementById('maskModal').classList.remove('show');
+    currentEditingMaskId = null;
+}
+
+/**
+ * 保存面具
+ */
+function saveMask() {
+    const name = document.getElementById('maskName').value.trim();
+    const description = document.getElementById('maskDesc').value.trim();
+    const content = document.getElementById('maskContent').value.trim();
+
+    if (!name) {
+        alert('请填写面具名称！');
+        return;
+    }
+
+    if (!content) {
+        alert('请填写人设内容！');
+        return;
+    }
+
+    const maskData = {
+        id: currentEditingMaskId || 'MASK_' + Date.now(),
+        name,
+        description,
+        content,
+        timestamp: Date.now()
+    };
+
+    if (currentEditingMaskId) {
+        // 编辑模式
+        const index = masksData.findIndex(m => m.id === currentEditingMaskId);
+        if (index !== -1) {
+            masksData[index] = maskData;
+        }
+    } else {
+        // 新建模式
+        masksData.push(maskData);
+    }
+
+    saveMasksToStorage();
+    renderMaskList();
+    closeMaskModal();
+    showSuccessModal('保存成功', '面具已更新！');
+}
+
+/**
+ * 删除面具
+ */
+function deleteMask() {
+    if (!currentEditingMaskId) return;
+
+    if (confirm('确定要删除这个面具吗？')) {
+        masksData = masksData.filter(m => m.id !== currentEditingMaskId);
+        saveMasksToStorage();
+        renderMaskList();
+        closeMaskModal();
+        showSuccessModal('删除成功', '面具已移除。');
+    }
+}
+
+/**
+ * 保存面具到localStorage
+ */
+function saveMasksToStorage() {
+    try {
+        localStorage.setItem('phoneMasksData', JSON.stringify(masksData));
+    } catch (e) {
+        console.error('保存面具数据失败:', e);
+    }
+}
+
+/**
+ * 从localStorage加载面具数据
+ */
+function loadMasksData() {
+    try {
+        const saved = localStorage.getItem('phoneMasksData');
+        if (saved) {
+            masksData = JSON.parse(saved);
+            console.log('成功加载面具数据，共', masksData.length, '个');
+        }
+    } catch (e) {
+        console.error('加载面具数据失败:', e);
+    }
+}
+
+// ========== 角色卡中的面具绑定功能 ==========
+
+/**
+ * 切换密友角色卡中的面具列表
+ */
+function toggleSweetheartMasks() {
+    const list = document.getElementById('sweetheartMasksList');
+    const arrow = document.getElementById('sweetheart-mask-arrow');
+
+    if (list.style.display === 'none') {
+        list.style.display = 'block';
+        arrow.classList.add('open');
+    } else {
+        list.style.display = 'none';
+        arrow.classList.remove('open');
+    }
+}
+
+/**
+ * 渲染密友角色卡中的面具列表
+ */
+function renderSweetheartMasksList(boundIds = []) {
+    const container = document.getElementById('sweetheartMasksList');
+
+    if (masksData.length === 0) {
+        container.innerHTML = '<div style="text-align: center; color: #BCAAA4; padding: 20px; font-size: 13px;">还没有面具哦~</div>';
+        return;
+    }
+
+    container.innerHTML = '';
+
+    masksData.forEach(mask => {
+        const item = document.createElement('div');
+        item.className = 'mask-checkbox-item';
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.id = `sh-mask-${mask.id}`;
+        checkbox.value = mask.id;
+        checkbox.checked = boundIds.includes(mask.id);
+
+        const label = document.createElement('label');
+        label.htmlFor = `sh-mask-${mask.id}`;
+        label.textContent = mask.name;
+
+        item.appendChild(checkbox);
+        item.appendChild(label);
+        container.appendChild(item);
+    });
+}
+
+/**
+ * 切换联系人库角色卡中的面具列表
+ */
+function toggleLibraryMasks() {
+    const list = document.getElementById('library-masks-list');
+    const arrow = document.getElementById('library-mask-arrow');
+
+    if (list.style.display === 'none') {
+        list.style.display = 'block';
+        arrow.classList.add('open');
+    } else {
+        list.style.display = 'none';
+        arrow.classList.remove('open');
+    }
+}
+
+/**
+ * 渲染联系人库角色卡中的面具列表
+ */
+function renderLibraryMasksList(boundIds = []) {
+    const container = document.getElementById('library-masks-list');
+
+    if (masksData.length === 0) {
+        container.innerHTML = '<div style="text-align: center; color: #999; padding: 20px; font-size: 13px;">暂无面具</div>';
+        return;
+    }
+
+    container.innerHTML = '';
+
+    masksData.forEach(mask => {
+        const item = document.createElement('div');
+        item.className = 'mask-checkbox-item';
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.id = `lib-mask-${mask.id}`;
+        checkbox.value = mask.id;
+        checkbox.checked = boundIds.includes(mask.id);
+
+        const label = document.createElement('label');
+        label.htmlFor = `lib-mask-${mask.id}`;
+        label.textContent = mask.name;
+
+        item.appendChild(checkbox);
+        item.appendChild(label);
+        container.appendChild(item);
+    });
+}
+
+/**
+ * 切换普通角色卡中的面具列表
+ */
+function toggleCharacterMasks() {
+    const list = document.getElementById('charMasksList');
+    const arrow = document.getElementById('char-mask-arrow');
+
+    if (list.style.display === 'none') {
+        list.style.display = 'block';
+        arrow.classList.add('open');
+    } else {
+        list.style.display = 'none';
+        arrow.classList.remove('open');
+    }
+}
+
+/**
+ * 渲染普通角色卡中的面具列表
+ */
+function renderCharacterMasksList(boundIds = []) {
+    const container = document.getElementById('charMasksList');
+
+    if (masksData.length === 0) {
+        container.innerHTML = '<div style="text-align: center; color: #999; padding: 20px; font-size: 13px;">还没有面具哦~</div>';
+        return;
+    }
+
+    container.innerHTML = '';
+
+    masksData.forEach(mask => {
+        const item = document.createElement('div');
+        item.className = 'mask-checkbox-item';
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.id = `char-mask-${mask.id}`;
+        checkbox.value = mask.id;
+        checkbox.checked = boundIds.includes(mask.id);
+
+        const label = document.createElement('label');
+        label.htmlFor = `char-mask-${mask.id}`;
+        label.textContent = mask.name;
+
+        item.appendChild(checkbox);
+        item.appendChild(label);
+        container.appendChild(item);
+    });
+}
+
+// ========== 面具管理功能 - 结束 ==========
+
+/**
+ * 总结知识点功能
+ */
+async function summarizeKnowledge() {
+    if (!currentChatContact) {
+        alert('请先打开一个聊天窗口');
+        return;
+    }
+
+    const contactId = currentChatContact.id;
+    const memoryRounds = currentChatContact.memoryRounds || 10;
+
+    // 获取聊天历史
+    const chatHistory = JSON.parse(localStorage.getItem('phoneChatHistory') || '{}');
+    const messages = chatHistory[contactId] || [];
+
+    if (messages.length === 0) {
+        alert('还没有聊天记录可以总结哦~');
+        return;
+    }
+
+    // 获取最近N轮对话
+    const recentMessages = messages.slice(-memoryRounds * 2); // 每轮包含用户和AI的消息
+
+    // 构建总结提示词
+    const conversationText = recentMessages.map(msg => {
+        const role = msg.sender === 'user' ? '我' : currentChatContact.name;
+        return `${role}: ${msg.text}`;
+    }).join('\n');
+
+    const summaryPrompt = `请根据以下对话内容，提取和总结其中涉及的知识点、要点和关键信息。
+请以清单的形式列出，每个知识点简洁明了。
+
+对话内容：
+${conversationText}
+
+请按以下格式输出：
+【知识点清单】
+1. [知识点标题] - [简要说明]
+2. [知识点标题] - [简要说明]
+...`;
+
+    // 显示加载提示
+    const messagesEl = document.getElementById('chatMessages');
+    const loadingMsg = _createMessageDOM(contactId, {
+        sender: 'contact',
+        text: '正在为你总结知识点...'
+    }, -1);
+    messagesEl.appendChild(loadingMsg);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+
+    try {
+        // 调用API
+        const apiMessages = [
+            { role: 'system', content: '你是一个专业的知识整理助手。' },
+            { role: 'user', content: summaryPrompt }
+        ];
+
+        const result = await callApi(apiMessages);
+
+        // 移除加载提示
+        loadingMsg.remove();
+
+        if (!result.success) {
+            alert('总结失败：' + result.message);
+            return;
+        }
+
+        // 保存总结到知识库
+        const summary = {
+            id: 'SUMMARY_' + Date.now(),
+            contactId: contactId,
+            contactName: currentChatContact.name,
+            content: result.message,
+            memoryRounds: memoryRounds,
+            messageCount: recentMessages.length,
+            timestamp: Date.now()
+        };
+
+        // 保存到localStorage
+        const knowledgeBase = JSON.parse(localStorage.getItem('knowledgeBase') || '[]');
+        knowledgeBase.unshift(summary); // 新的放在前面
+        localStorage.setItem('knowledgeBase', JSON.stringify(knowledgeBase));
+
+        // 在聊天中显示总结
+        const summaryMessage = {
+            sender: 'contact',
+            text: `📝 知识点总结（基于最近${memoryRounds}轮对话）\n\n${result.message}`
+        };
+
+        const newIndex = saveMessage(contactId, summaryMessage);
+        const messageRow = _createMessageDOM(contactId, summaryMessage, newIndex);
+        messagesEl.appendChild(messageRow);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+
+        showSuccessModal('总结成功', '知识点已保存到记忆存储中心！');
+
+    } catch (error) {
+        loadingMsg.remove();
+        console.error('总结失败:', error);
+        alert('总结失败，请重试');
+    }
+}
+
+/**
+ * 绑定总结按钮事件
+ */
+function setupSummarizeButton() {
+    const summarizeBtn = document.getElementById('summarizeKnowledgeBtn');
+    if (summarizeBtn) {
+        summarizeBtn.addEventListener('click', () => {
+            // 关闭附件菜单
+            document.getElementById('attachmentMenu').classList.remove('show');
+            // 执行总结
+            summarizeKnowledge();
+        });
+    }
+}
+// ========== 记忆存储中心功能 ==========
+
+/**
+ * 打开记忆存储中心
+ */
+function openMemoryCenter() {
+    document.getElementById('memoryCenterPage').classList.add('show');
+    renderKnowledgeList();
+}
+
+/**
+ * 关闭记忆存储中心
+ */
+function closeMemoryCenter() {
+    document.getElementById('memoryCenterPage').classList.remove('show');
+}
+
+/**
+ * 切换Tab
+ */
+function switchMemoryTab(tabName) {
+    // 更新tab样式
+    document.querySelectorAll('.memory-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.tab === tabName);
+    });
+
+    // 切换内容区域
+    document.getElementById('knowledgeMemoryArea').style.display =
+        tabName === 'knowledge' ? 'block' : 'none';
+    document.getElementById('otherMemoryArea').style.display =
+        tabName === 'other' ? 'block' : 'none';
+}
+
+/**
+ * 渲染知识清单列表
+ */
+function renderKnowledgeList() {
+    const container = document.getElementById('knowledgeList');
+    const knowledgeBase = JSON.parse(localStorage.getItem('knowledgeBase') || '[]');
+
+    if (knowledgeBase.length === 0) {
+        container.innerHTML = `
+            <div class="memory-empty">
+                <div class="memory-empty-icon">📚</div>
+                <div class="memory-empty-text">还没有保存的知识点</div>
+                <div class="memory-empty-hint">在聊天中点击"总结"按钮来生成知识清单</div>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = '';
+
+    knowledgeBase.forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'knowledge-card';
+
+        const date = new Date(item.timestamp).toLocaleDateString('zh-CN', {
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+
+        card.innerHTML = `
+            <div class="knowledge-card-header">
+                <div class="knowledge-card-title">💡 知识总结</div>
+                <div class="knowledge-card-meta">
+                    <div class="knowledge-card-date">${date}</div>
+                    <div class="knowledge-card-badge">${item.memoryRounds}轮对话</div>
+                </div>
+            </div>
+            <div class="knowledge-card-content">${escapeHTML(item.content)}</div>
+            <div class="knowledge-card-footer">
+                <div class="knowledge-card-source">来源: ${escapeHTML(item.contactName)}</div>
+                <div class="knowledge-card-actions">
+                    <button class="knowledge-action-btn delete-knowledge-btn" onclick="deleteKnowledge('${item.id}')">
+                        删除
+                    </button>
+                </div>
+            </div>
+        `;
+
+        container.appendChild(card);
+    });
+}
+
+/**
+ * 删除知识点
+ */
+function deleteKnowledge(knowledgeId) {
+    if (!confirm('确定要删除这条知识总结吗？')) return;
+
+    let knowledgeBase = JSON.parse(localStorage.getItem('knowledgeBase') || '[]');
+    knowledgeBase = knowledgeBase.filter(item => item.id !== knowledgeId);
+    localStorage.setItem('knowledgeBase', JSON.stringify(knowledgeBase));
+
+    renderKnowledgeList();
+    showSuccessModal('删除成功', '知识点已移除');
+}
+
+
+function initializeApp() {
+    const chatInput = document.getElementById('chatInput');
+    const chatInputArea = document.querySelector('.chat-input-area');
+    if (!chatInput || !chatInputArea) {
+        console.error('❌ 关键元素未找到，请检查HTML结构');
+        return;
+    }
+    chatInputArea.classList.remove('has-text');
     loadWorldsData();
     currentWorldId = localStorage.getItem('currentWorldId');
     updateBattery();
@@ -6254,20 +11297,21 @@ function initializeApp() {
     loadUserProfile();
     loadWorldbookData();
     loadCategoriesData();
-
-    // ===== 第四步：初始化UI组件 =====
+    loadSweetheartChatBackground();
+    loadSavedBubbleStyles(); // <<< 加载已应用的气泡样式
     setupCategorySelector();
     updateCategoryOptions();
     updateWorldbookCategorySelector();
     setupAttachmentMenu();
     setupStyleSelector();
-
-    // ===== 第五步：应用保存的设置 =====
+    setupLivePreviewListeners(); // <<< 设置实时预览
     applyChatStyle(localStorage.getItem('chatMessageStyle') || 'bubble');
     loadChatBackground();
     loadGlobalConfig();
     loadDockedIcons();
-
+    loadMasksData();
+    updateChatModeButton();
+    setupSummarizeButton();
     // ===== 第六步：加载联系人数据 =====
     const savedContacts = localStorage.getItem('phoneContactsData');
     if (savedContacts) {
@@ -6293,6 +11337,15 @@ function initializeApp() {
         console.log('✅ 已初始化默认密友列表');
     }
 
+    const savedLibraryOnlyContacts = localStorage.getItem('phoneLibraryOnlyContactsData');
+    if (savedLibraryOnlyContacts) {
+        try {
+            libraryOnlyContactsData = JSON.parse(savedLibraryOnlyContacts);
+            console.log('✅ 成功加载仅库中的联系人列表');
+        } catch (e) {
+            console.error('❌ 解析仅库中的联系人数据失败:', e);
+        }
+    }
 
     // ===== 第七步：绑定聊天输入框事件（现在是安全的）=====
     chatInput.addEventListener('input', function () {
@@ -6316,21 +11369,18 @@ function initializeApp() {
         });
     }
 
-    // ===== 消息操作菜单 =====
+    // 在普通聊天消息操作菜单的事件监听中添加
     const actionSheet = document.getElementById('messageActionSheet');
     if (actionSheet) {
         actionSheet.addEventListener('click', function (event) {
             const button = event.target.closest('.action-option');
             if (!button) return;
-
             const {contactId, index} = actionSheet.dataset;
             const messageIndex = parseInt(index, 10);
-
             if (contactId === undefined || isNaN(messageIndex)) {
                 hideMessageActionSheet();
                 return;
             }
-
             switch (button.id) {
                 case 'deleteMessageBtn':
                     deleteMessage(contactId, messageIndex);
@@ -6344,10 +11394,51 @@ function initializeApp() {
                 case 'quoteMessageBtn':
                     quoteMessage(contactId, messageIndex);
                     break;
+                case 'multiSelectNormalBtn': // ✅ 新增
+                    enterNormalMultiSelectMode();
+                    break;
             }
-
             if (button.id !== 'regenerateMessageBtn') {
                 hideMessageActionSheet();
+            }
+        });
+    }
+
+    // 在密友聊天消息操作菜单的事件监听中添加
+    const sweetheartActionSheet = document.getElementById('sweetheartMessageActionSheet');
+    if (sweetheartActionSheet) {
+        sweetheartActionSheet.addEventListener('click', function (event) {
+            const button = event.target.closest('.action-option');
+            if (!button) return;
+
+            const {contactId, index} = sweetheartActionSheet.dataset;
+            const messageIndex = parseInt(index, 10);
+
+            if (contactId === undefined || isNaN(messageIndex)) {
+                hideSweetheartMessageActionSheet();
+                return;
+            }
+
+            switch (button.id) {
+                case 'sweetheartDeleteMessageBtn':
+                    deleteSweetheartMessage(contactId, messageIndex);
+                    break;
+                case 'sweetheartCopyMessageBtn':
+                    copySweetheartMessage(contactId, messageIndex);
+                    break;
+                case 'sweetheartRegenerateMessageBtn':
+                    regenerateSweetheartAiResponse(contactId, messageIndex);
+                    break;
+                case 'sweetheartQuoteMessageBtn':
+                    quoteSweetheartMessage(contactId, messageIndex);
+                    break;
+                case 'multiSelectSweetheartBtn': // ✅ 新增
+                    enterSweetheartMultiSelectMode();
+                    break;
+            }
+
+            if (button.id !== 'sweetheartRegenerateMessageBtn') {
+            hideSweetheartMessageActionSheet();
             }
         });
     }
@@ -6387,9 +11478,120 @@ function initializeApp() {
         applyApiConfig(globalConfig.activeApiConfig);
     }
 
+    setTimeout(loadCatWidgetData, 500); // 延迟加载，确保DOM已渲染
+    // ✅ 新增：初始化密友聊天输入框
+    setupSweetheartChatInput();
+
+    setupSweetheartAttachmentMenu();
+
+    // ===== 密友聊天 - 记忆轮数设置 =====
+    const decreaseBtn = document.getElementById('decreaseMemoryRounds');
+    const increaseBtn = document.getElementById('increaseMemoryRounds');
+    const memoryInput = document.getElementById('memoryRoundsInput');
+    const updateMemoryRounds = (newValue) => {
+        if (!currentSweetheartChatContact) return;
+
+        let value = parseInt(newValue, 10);
+        const min = parseInt(memoryInput.min, 10);
+        const max = parseInt(memoryInput.max, 10);
+
+        // 确保数值在有效范围内
+        if (isNaN(value)) value = 10; // 如果输入无效则重置为默认值
+        value = Math.max(min, Math.min(max, value));
+
+        memoryInput.value = value;
+
+        // 保存到当前联系人对象并持久化
+        currentSweetheartChatContact.memoryRounds = value;
+        saveSweetheartContacts();
+    };
+    if (decreaseBtn) {
+        decreaseBtn.addEventListener('click', () => {
+            updateMemoryRounds(parseInt(memoryInput.value, 10) - 1);
+        });
+    }
+    if (increaseBtn) {
+        increaseBtn.addEventListener('click', () => {
+            updateMemoryRounds(parseInt(memoryInput.value, 10) + 1);
+        });
+    }
+    if (memoryInput) {
+        memoryInput.addEventListener('change', () => {
+            updateMemoryRounds(memoryInput.value);
+        });
+    }
+        // 新增：全局点击事件，用于收回已滑开的联系人项
+    document.addEventListener('click', (e) => {
+        // 检查点击的目标是否在任何一个滑动容器内部
+        if (!e.target.closest('.contact-item-wrapper, .sweetheart-item-wrapper')) {
+            // 如果不在，则关闭所有已滑开的项
+            document.querySelectorAll('.is-swiped').forEach(swipedItem => {
+                swipedItem.classList.remove('is-swiped');
+            });
+        }
+    });
+    // ===== 普通聊天 - 记忆轮数设置 =====
+    const decreaseNormalBtn = document.getElementById('decreaseNormalMemoryRounds');
+    const increaseNormalBtn = document.getElementById('increaseNormalMemoryRounds');
+    const normalMemoryInput = document.getElementById('normalMemoryRoundsInput');
+
+    const updateNormalMemoryRounds = (newValue) => {
+        if (!currentChatContact) return;
+
+        let value = parseInt(newValue, 10);
+        const min = parseInt(normalMemoryInput.min, 10);
+        const max = parseInt(normalMemoryInput.max, 10);
+
+        if (isNaN(value)) value = 10;
+        value = Math.max(min, Math.min(max, value));
+
+        normalMemoryInput.value = value;
+
+        // 保存到当前联系人对象
+        currentChatContact.memoryRounds = value;
+
+        // 持久化到localStorage
+        const index = contactsData.findIndex(c => c.id === currentChatContact.id);
+        if (index !== -1) {
+            contactsData[index].memoryRounds = value;
+            localStorage.setItem('phoneContactsData', JSON.stringify(contactsData));
+        }
+    };
+
+    if (decreaseNormalBtn) {
+        decreaseNormalBtn.addEventListener('click', () => {
+            updateNormalMemoryRounds(parseInt(normalMemoryInput.value, 10) - 1);
+        });
+    }
+
+    if (increaseNormalBtn) {
+        increaseNormalBtn.addEventListener('click', () => {
+            updateNormalMemoryRounds(parseInt(normalMemoryInput.value, 10) + 1);
+        });
+    }
+
+    if (normalMemoryInput) {
+        normalMemoryInput.addEventListener('change', () => {
+            updateNormalMemoryRounds(normalMemoryInput.value);
+        });
+    }
+
+        // 联系人库头像上传监听
+    document.getElementById('library-avatar-input').addEventListener('change', function(event) {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('library-avatar-preview').src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+
+
     console.log('%c🎉 应用初始化完成！', 'color: #667eea; font-size: 16px; font-weight: bold;');
     // 新增：加载小猫组件数据
-    setTimeout(loadCatWidgetData, 500); // 延迟加载，确保DOM已渲染
+
 }
 
 
