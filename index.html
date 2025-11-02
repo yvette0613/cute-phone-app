@@ -181,27 +181,27 @@
             <div class="settings-content">
                 <div class="settings-section">
                     <div class="section-title">配置</div>
+                    <!-- 1. API设置 -->
                     <div class="settings-item" onclick="openApiConfig()">
-                        <div class="settings-icon" style="background: linear-gradient(135deg, #f093fb, #f5576c);">🔌
-                        </div>
+                        <div class="settings-icon icon-api"></div>
                         <div class="settings-info">
                             <div class="settings-label">API设置</div>
                             <div class="settings-desc">管理API配置和模型</div>
                         </div>
                         <div class="settings-arrow">›</div>
                     </div>
+                    <!-- 2. 数据库设置 -->
                     <div class="settings-item" onclick="openConfig('database')">
-                        <div class="settings-icon" style="background: linear-gradient(135deg, #667eea, #764ba2);">🗄️
-                        </div>
+                        <div class="settings-icon icon-database"></div>
                         <div class="settings-info">
                             <div class="settings-label">数据库设置</div>
                             <div class="settings-desc">配置Supabase数据库</div>
                         </div>
                         <div class="settings-arrow">›</div>
                     </div>
+                    <!-- 3. 全屏模式 -->
                     <div class="settings-item">
-                        <div class="settings-icon" style="background: linear-gradient(135deg, #89f7fe, #66a6ff);">📱
-                        </div>
+                        <div class="settings-icon icon-fullscreen"></div>
                         <div class="settings-info">
                             <div class="settings-label">全屏模式</div>
                             <div class="settings-desc">移除手机边框，享受沉浸式体验</div>
@@ -213,74 +213,72 @@
                             </label>
                         </div>
                     </div>
+                    <!-- 4. 云存储设置 -->
                     <div class="settings-item" onclick="openConfig('storage')">
-                        <div class="settings-icon" style="background: linear-gradient(135deg, #4facfe, #00f2fe);">☁️
-                        </div>
+                        <div class="settings-icon icon-storage"></div>
                         <div class="settings-info">
                             <div class="settings-label">云存储设置</div>
                             <div class="settings-desc">配置Supabase Storage</div>
                         </div>
                         <div class="settings-arrow">›</div>
                     </div>
+                    <!-- 5. 联系人库 -->
                     <div class="settings-item" onclick="openContactLibrary('edit')">
-                        <div class="settings-icon" style="background: linear-gradient(135deg, #81D4FA, #29B6F6);">👥
-                        </div>
+                        <div class="settings-icon icon-contacts"></div>
                         <div class="settings-info">
                             <div class="settings-label">联系人库</div>
                             <div class="settings-desc">管理所有密友和普通联系人</div>
                         </div>
                         <div class="settings-arrow">›</div>
                     </div>
+                    <!-- 6. 面具管理 -->
                     <div class="settings-item" onclick="openMaskLibrary()">
-                        <div class="settings-icon" style="background: linear-gradient(135deg, #f093fb, #f5576c);">🎭
-                        </div>
+                        <div class="settings-icon icon-mask"></div>
                         <div class="settings-info">
                             <div class="settings-label">面具管理</div>
                             <div class="settings-desc">管理你的不同人设</div>
                         </div>
                         <div class="settings-arrow">›</div>
                     </div>
-                    <!-- 在设置页面中添加，位置在"面具管理"之后 -->
+                    <!-- 7. 记忆存储中心 -->
                     <div class="settings-item" onclick="openMemoryCenter()">
-                        <div class="settings-icon" style="background: linear-gradient(135deg, #667eea, #764ba2);">
-                            🧠
-                        </div>
+                        <div class="settings-icon icon-memory"></div>
                         <div class="settings-info">
                             <div class="settings-label">记忆存储中心</div>
-                            <div class="settings-desc">查看AI总结的知识点和要点</div>
+                            <div class="settings-desc">查看AI的记忆数据</div>
                         </div>
                         <div class="settings-arrow">›</div>
                     </div>
+                    <!-- 8. 美化 -->
                     <div class="settings-item" onclick="openBeautify()">
-                        <div class="settings-icon" style="background: linear-gradient(135deg, #ff9a9e, #fecfef);">🎨
-                        </div>
+                        <div class="settings-icon icon-beautify"></div>
                         <div class="settings-info">
                             <div class="settings-label">美化</div>
                             <div class="settings-desc">自定义应用图标</div>
                         </div>
                         <div class="settings-arrow">›</div>
                     </div>
+                    <!-- 9. 气泡库 -->
                     <div class="settings-item" onclick="openBubbleLibrary()">
-                        <div class="settings-icon" style="background: linear-gradient(135deg, #a8dadc, #457b9d);">💬
-                        </div>
+                        <div class="settings-icon icon-bubble"></div>
                         <div class="settings-info">
                             <div class="settings-label">气泡库</div>
                             <div class="settings-desc">自定义聊天气泡样式</div>
                         </div>
                         <div class="settings-arrow">›</div>
                     </div>
+                    <!-- 10. 组件 -->
                     <div class="settings-item" onclick="openWidgetManager()">
-                        <div class="settings-icon" style="background: linear-gradient(135deg, #43e97b, #38f9d7);">📦
-                        </div>
+                        <div class="settings-icon icon-widget"></div>
                         <div class="settings-info">
                             <div class="settings-label">组件</div>
                             <div class="settings-desc">自定义桌面组件</div>
                         </div>
                         <div class="settings-arrow">›</div>
                     </div>
+                    <!-- 11. 悬浮球 -->
                     <div class="settings-item">
-                        <div class="settings-icon" style="background: linear-gradient(135deg, #ff9a9e, #fecfef);">🐾
-                        </div>
+                        <div class="settings-icon icon-floatball"></div>
                         <div class="settings-info">
                             <div class="settings-label">悬浮球</div>
                             <div class="settings-desc">在主屏幕显示一个快捷操作悬浮球</div>
@@ -292,18 +290,18 @@
                             </label>
                         </div>
                     </div>
-                    <div class="settings-section">
-                        <div class="section-title">危险区域</div>
-                        <div class="settings-item" onclick="clearAllData()">
-                            <div class="settings-icon" style="background: linear-gradient(135deg, #ff6b6b, #ff8e8e);">
-                                🗑️
-                            </div>
-                            <div class="settings-info">
-                                <div class="settings-label" style="color: #ff3b30;">清空所有数据</div>
-                                <div class="settings-desc">将删除所有设置、联系人、聊天记录和自定义内容</div>
-                            </div>
-                            <div class="settings-arrow">›</div>
+                </div>
+
+                <div class="settings-section">
+                    <div class="section-title">危险区域</div>
+                    <!-- 12. 清空所有数据 -->
+                    <div class="settings-item" onclick="clearAllData()">
+                        <div class="settings-icon icon-danger"></div>
+                        <div class="settings-info">
+                            <div class="settings-label" style="color: #ff3b30;">清空所有数据</div>
+                            <div class="settings-desc">将删除所有设置、联系人、聊天记录和自定义内容</div>
                         </div>
+                        <div class="settings-arrow">›</div>
                     </div>
                 </div>
             </div>
@@ -790,6 +788,86 @@
                 </div>
             </div>
         </div>
+        <!-- ========== 测试配置弹窗 ========== -->
+        <div class="modal-overlay" id="testConfigModal">
+            <div class="test-config-card">
+                <div class="test-config-header">
+                    <span class="header-title">生成测试</span>
+                    <button class="modal-close-btn" onclick="closeTestConfig()">×</button>
+                </div>
+                <div class="test-config-content">
+                    <div class="test-field">
+                        <label class="test-label">选择知识清单</label>
+                        <div class="knowledge-selector" id="knowledgeSelector">
+                            <!-- 动态生成复选框 -->
+                        </div>
+                    </div>
+                    <div class="test-field">
+                        <label class="test-label">题目数量</label>
+                        <div class="number-stepper">
+                            <button class="stepper-btn" onclick="adjustQuestionCount(-1)">-</button>
+                            <input type="number" class="stepper-input" id="questionCountInput" value="5" min="1"
+                                   max="20">
+                            <button class="stepper-btn" onclick="adjustQuestionCount(1)">+</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="test-config-footer">
+                    <button class="test-btn test-btn-cancel" onclick="closeTestConfig()">取消</button>
+                    <button class="test-btn test-btn-generate" onclick="startGenerateTest()">生成测试</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== 测试确认弹窗 ========== -->
+        <div class="modal-overlay" id="testReadyModal">
+            <div class="test-ready-card">
+                <div class="test-ready-icon">✅</div>
+                <h3>测试已生成</h3>
+                <p>是否现在开始测试？</p>
+                <div class="test-ready-actions">
+                    <button class="test-btn test-btn-cancel" onclick="closeTestReady()">稍后</button>
+                    <button class="test-btn test-btn-start" onclick="startTest()">开始测试</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== 测试页面 ========== -->
+        <div class="test-page" id="testPage">
+            <div class="test-header">
+                <div class="back-btn" onclick="closeTest()">←</div>
+                <div class="test-title">知识测试</div>
+                <div class="test-timer" id="testTimer">00:00</div>
+            </div>
+            <div class="test-content" id="testContent">
+                <!-- 测试题目将在这里动态生成 -->
+            </div>
+            <div class="test-footer">
+                <button class="test-submit-btn" onclick="submitTest()">提交答案</button>
+            </div>
+        </div>
+
+        <!-- ========== 测试结果弹窗 ========== -->
+        <div class="modal-overlay" id="testResultModal">
+            <div class="test-result-card">
+                <div class="test-result-header">
+                    <h3>测试结果</h3>
+                    <button class="modal-close-btn" onclick="closeTestResult()">×</button>
+                </div>
+                <div class="test-result-content">
+                    <div class="score-display">
+                        <div class="score-number" id="scoreNumber">0</div>
+                        <div class="score-label">分</div>
+                    </div>
+                    <div class="score-details" id="scoreDetails">
+                        <!-- 详细结果 -->
+                    </div>
+                </div>
+                <div class="test-result-footer">
+                    <button class="test-btn test-btn-close" onclick="closeTestResult()">关闭</button>
+                </div>
+            </div>
+        </div>
 
 
         <div class="contacts-page" id="contactsPage">
@@ -1167,6 +1245,11 @@
                             <div class="attachment-icon">📝</div>
                             <div class="attachment-label">总结</div>
                         </div>
+                        <!-- 新增：测试功能 -->
+                        <div class="attachment-item" id="generateTestBtn" style="opacity: 0.5; pointer-events: none;">
+                            <div class="attachment-icon">📋</div>
+                            <div class="attachment-label">测试</div>
+                        </div>
                     </div>
                     <input type="file" id="fileInput" style="display: none;">
                     <input type="file" id="imageInput" accept="image/*" style="display: none;">
@@ -1323,13 +1406,13 @@
             <div class="sweetheart-chat-header">
                 <div class="back-btn" onclick="closeSweetheartChat()">←</div>
                 <h2 class="sweetheart-chat-title" id="sweetheartChatContactName"></h2>
-
+                <!-- 🆕 新增：模式切换按钮 -->
+                <div class="mode-toggle-btn" id="chatModeToggle" onclick="toggleChatMode()" title="线上模式">
+                    <img src="https://static.eeo.cn/upload/file/20251102/1762092130593288.png" alt="切换模式">
+                </div>
                 <!-- 默认操作按钮 -->
                 <div class="header-actions" id="sweetheartHeaderActions">
-                    <!-- 🆕 新增：模式切换按钮 -->
-                    <div class="mode-toggle-btn" id="chatModeToggle" onclick="toggleChatMode()" title="线上模式">
-                        💬
-                    </div>
+
                     <div class="status-btn" onclick="openStatusPopup()">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M12 2a5 5 0 1 0 0 10 5 5 0 0 0 0-10Zm0 8a3 3 0 1 1 0-6 3 3 0 0 1 0 6Zm0 3c-3.39 0-8 1.63-8 4v2h16v-2c0-2.37-4.61-4-8-4Zm6 4H6v-.57c.1-.6 2.4-1.43 6-1.43s5.9.83 6 1.43V17Z"></path>
@@ -1970,13 +2053,28 @@
             </div>
         </div>
         <!-- ========== 分组管理 - 结束 ========== -->
-
-        <!-- ▼▼▼ 从这里开始添加 ▼▼▼ -->
+        <!-- ▼▼▼ 从这里开始，将整个代码块完整复制 ▼▼▼ -->
         <div class="status-popup-overlay" id="statusPopup">
             <div class="status-popup-backdrop" onclick="closeStatusPopup()"></div>
             <div class="status-popup-modal">
                 <div class="status-popup-header">
-                    当前状态
+                    <span class="header-title-static" id="statusPopupTitleStatic">当前状态</span>
+                    <span class="header-title-editing" id="statusPopupTitleEditing">编辑状态</span>
+
+                    <!-- 编辑按钮 (笔) -->
+                    <div class="status-popup-edit" onclick="openStatusEditor()" title="编辑状态">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83zM3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z"/>
+                        </svg>
+                    </div>
+
+                    <!-- 保存按钮 (对勾) -->
+                    <div class="status-popup-save" onclick="saveStatusEditor()" title="保存状态">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                        </svg>
+                    </div>
+
                     <div class="status-popup-close" onclick="closeStatusPopup()">×</div>
                 </div>
 
@@ -1987,23 +2085,27 @@
                         <div class="status-field">
                             <span class="status-label">📍 所在</span>
                             <div class="status-value" id="status-char-location">...</div>
+                            <input type="text" class="status-input" data-target="status-char-location">
                         </div>
                         <div class="status-field">
                             <span class="status-label">👗 穿着</span>
                             <div class="status-value" id="status-char-appearance">...</div>
+                            <input type="text" class="status-input" data-target="status-char-appearance">
                         </div>
                         <div class="status-field">
                             <span class="status-label">🏃‍♀️ 行为</span>
                             <div class="status-value" id="status-char-action">...</div>
+                            <input type="text" class="status-input" data-target="status-char-action">
                         </div>
                         <div class="status-field">
                             <span class="status-label">💭 心声</span>
                             <div class="status-value" id="status-char-thoughts">...</div>
+                            <input type="text" class="status-input" data-target="status-char-thoughts">
                         </div>
                         <div class="status-field">
-                            <!-- “性想法”的美化包装 -->
                             <span class="status-label">💖 私密心绪</span>
                             <div class="status-value" id="status-char-private-thoughts">...</div>
+                            <input type="text" class="status-input" data-target="status-char-private-thoughts">
                         </div>
                     </div>
 
@@ -2016,27 +2118,30 @@
                         <div class="status-field">
                             <span class="status-label">📍 所在</span>
                             <div class="status-value" id="status-my-location">...</div>
+                            <input type="text" class="status-input" data-target="status-my-location">
                         </div>
                         <div class="status-field">
                             <span class="status-label">👔 穿着</span>
                             <div class="status-value" id="status-my-appearance">...</div>
+                            <input type="text" class="status-input" data-target="status-my-appearance">
                         </div>
                         <div class="status-field">
                             <span class="status-label">🚶 行为</span>
                             <div class="status-value" id="status-my-action">...</div>
+                            <input type="text" class="status-input" data-target="status-my-action">
                         </div>
                         <div class="status-field">
                             <span class="status-label">✨ 身上特点</span>
                             <div class="status-value" id="status-my-features">...</div>
+                            <input type="text" class="status-input" data-target="status-my-features">
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-
+        <!-- ▲▲▲ 复制到这里结束 ▲▲▲ -->
 
     </div>
-
 </div>
 
 <!-- 2. 引入外部的JavaScript文件 (defer属性确保HTML解析完再执行) -->

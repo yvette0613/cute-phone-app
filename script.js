@@ -748,108 +748,192 @@ function formatMessageText(text) {
 
     let formatted = text;
 
-    // 1. 处理代码块（三个反引号）
+    // 1. 处理代码块（三个反引号）- 不创建复制按钮
     formatted = formatted.replace(/```(\w*)\n?([\s\S]*?)```/g, function(match, language, code) {
         const lang = language || 'plaintext';
         const escapedCode = escapeHTML(code.trim());
 
+        // 只创建代码块结构，不包含复制按钮
         return `<div class="code-block-wrapper">
-            <button class="copy-code-btn" onclick="copyCodeToClipboard(this)">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                    <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
-                </svg>
-                复制
-            </button>
             <pre><code class="language-${lang}">${escapedCode}</code></pre>
         </div>`;
     });
 
     // 2. 处理行内代码（单个反引号）
-    formatted = formatted.replace(/`([^`]+)`/g, function(match, code) {
-        return `<code>${escapeHTML(code)}</code>`;
-    });
+    formatted = formatted.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
 
-    // 3. 处理粗体 **text**
+    // 3. 处理粗体（**text** 或 __text__）
     formatted = formatted.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    formatted = formatted.replace(/__(.+?)__/g, '<strong>$1</strong>');
 
-    // 4. 处理斜体 *text*
+    // 4. 处理斜体（*text* 或 _text_）
     formatted = formatted.replace(/\*(.+?)\*/g, '<em>$1</em>');
+    formatted = formatted.replace(/_(.+?)_/g, '<em>$1</em>');
 
-    // 5. 处理链接 [text](url)
-    formatted = formatted.replace(/\[([^\]]+)\]\(([^)]+)\)/g, function(match, text, url) {
-        return `<a href="${escapeHTML(url)}" target="_blank" rel="noopener noreferrer">${escapeHTML(text)}</a>`;
-    });
+    // 5. 处理链接
+    formatted = formatted.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
 
-    // 6. 处理纯 URL
-    formatted = formatted.replace(
-        /(https?:\/\/[^\s<]+)/g,
-        '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>'
-    );
-
-    // 7. 处理换行
+    // 6. 处理换行
     formatted = formatted.replace(/\n/g, '<br>');
 
     return formatted;
 }
 
+
+/**
+ * [修正版] 调整只包含代码块的消息气泡样式
+ * - 解决了错位和圆角不匹配的问题
+ */
+function adjustCodeBlocks() {
+    document.querySelectorAll('.chat-bubble').forEach(bubble => {
+        const codeBlockWrapper = bubble.querySelector('.code-block-wrapper');
+
+        // 检查气泡是否只包含一个代码块作为其直接子元素
+        if (codeBlockWrapper && bubble.children.length === 1) {
+
+            // 1. 将父气泡变为一个透明的、无内边距的容器
+            bubble.style.padding = '0';
+            bubble.style.background = 'transparent';
+            bubble.style.boxShadow = 'none'; // 同时移除阴影，避免留下边框
+
+            // 2. 【核心修复】重置代码块包装器的负外边距，解决错位问题
+            codeBlockWrapper.style.margin = '0';
+            codeBlockWrapper.style.width = '100%';
+
+            // 3. 【视觉优化】让代码块的圆角与原始气泡的圆角(20px)保持一致
+            const preElement = codeBlockWrapper.querySelector('pre');
+            if (preElement) {
+                preElement.style.borderRadius = '20px';
+            }
+        }
+    });
+}
+
+// 在消息渲染后调用
+// 例如在 openChat 函数末尾添加：
+setTimeout(adjustCodeBlocks, 100);
+
+
 /**
  * 复制代码块内容到剪贴板
- * @param {HTMLElement} button - 复制按钮元素
+ * @param {HTMLElement} button - 被点击的复制按钮
  */
 function copyCodeToClipboard(button) {
-    const codeBlock = button.nextElementSibling;
-    if (!codeBlock) return;
+    const wrapper = button.closest('.code-block-wrapper');
+    if (!wrapper) return;
 
-    const code = codeBlock.querySelector('code');
+    const code = wrapper.querySelector('pre code');
     if (!code) return;
 
-    const text = code.textContent;
-
-    // 使用现代剪贴板 API
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text).then(() => {
-            // 显示成功反馈
-            const originalHTML = button.innerHTML;
-            button.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+    navigator.clipboard.writeText(code.textContent).then(() => {
+        const originalHTML = button.innerHTML;
+        button.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-            </svg>已复制`;
-            button.classList.add('copied');
+            </svg>
+            已复制`;
+        button.classList.add('copied');
 
-            setTimeout(() => {
-                button.innerHTML = originalHTML;
-                button.classList.remove('copied');
-            }, 2000);
-        }).catch(err => {
-            console.error('复制失败:', err);
-            alert('复制失败，请手动复制');
-        });
-    } else {
-        // 降级方案：使用 execCommand
-        const textarea = document.createElement('textarea');
-        textarea.value = text;
-        textarea.style.position = 'fixed';
-        textarea.style.opacity = '0';
-        document.body.appendChild(textarea);
-        textarea.select();
+        setTimeout(() => {
+            button.innerHTML = originalHTML;
+            button.classList.remove('copied');
+        }, 2000);
+    }).catch(err => {
+        console.error('复制失败:', err);
+        alert('复制失败，请手动复制');
+    });
+}
+
+// // 修改后的创建复制按钮函数
+function createCopyButton(preElement) {
+    // 检查是否已经有按钮
+    if (preElement.querySelector('.copy-code-btn')) {
+        return;
+    }
+
+    const button = document.createElement('button');
+    button.className = 'copy-code-btn';
+    button.setAttribute('type', 'button');
+
+    // 创建 SVG 图标（调整尺寸）
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('width', '16');  // 调大
+    svg.setAttribute('height', '16'); // 调大
+
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', 'M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z');
+    svg.appendChild(path);
+
+    // 创建文本
+    const span = document.createElement('span');
+    span.textContent = '复制';
+
+    // 组装按钮
+    button.appendChild(svg);
+    button.appendChild(span);
+
+    // 复制功能
+    button.onclick = async function() {
+        const code = preElement.textContent || preElement.innerText;
 
         try {
-            document.execCommand('copy');
-            const originalHTML = button.innerHTML;
-            button.innerHTML = '✓ 已复制';
-            button.classList.add('copied');
+            await navigator.clipboard.writeText(code);
 
+            // 成功反馈
+            button.classList.add('copied');
+            span.textContent = '已复制';
+
+            // 3秒后恢复
             setTimeout(() => {
-                button.innerHTML = originalHTML;
                 button.classList.remove('copied');
-            }, 2000);
+                span.textContent = '复制';
+            }, 3000);
         } catch (err) {
             console.error('复制失败:', err);
-            alert('复制失败，请手动复制');
-        } finally {
-            document.body.removeChild(textarea);
+            alert('复制失败，请手动选择复制');
         }
-    }
+    };
+
+    // 将按钮插入到 pre 元素内部的开头
+    preElement.insertBefore(button, preElement.firstChild);
+
+    return button;
 }
+
+// 为所有代码块添加复制按钮
+document.addEventListener('DOMContentLoaded', function() {
+    // 查找所有代码块
+    const codeBlocks = document.querySelectorAll('.code-block-wrapper pre');
+
+    codeBlocks.forEach(preElement => {
+        createCopyButton(preElement);
+    });
+});
+
+// 如果使用 MutationObserver 监听动态内容
+const observer = new MutationObserver(function(mutations) {
+    mutations.forEach(function(mutation) {
+        mutation.addedNodes.forEach(function(node) {
+            if (node.nodeType === 1) { // Element node
+                const preElements = node.querySelectorAll?.('.code-block-wrapper pre') || [];
+                preElements.forEach(pre => createCopyButton(pre));
+
+                // 如果添加的节点本身就是 pre
+                if (node.matches?.('.code-block-wrapper pre')) {
+                    createCopyButton(node);
+                }
+            }
+        });
+    });
+});
+
+// 开始观察
+observer.observe(document.body, {
+    childList: true,
+    subtree: true
+});
+
 
 /**
  * 转义 HTML 特殊字符，防止 XSS 攻击
@@ -857,12 +941,11 @@ function copyCodeToClipboard(button) {
  * @returns {string} - 转义后的字符串
  */
 function escapeHTML(str) {
-    if (!str) return '';
-
     const div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
 }
+
 
 
 let messageLongPressTimer = null; // 用于检测长按的计时器
@@ -872,7 +955,7 @@ let messageLongPressTimer = null; // 用于检测长按的计时器
  * - 支持渲染 <render> 标签内的HTML/CSS代码，并自动调整iframe高度
  */
 function _createMessageDOM(contactId, messageObj, messageIndex) {
-    // ✅ 新增：检测地点提示类型消息
+    // 1. ✅ 处理特殊消息类型：地点提示
     if (messageObj.type === 'location') {
         const locationNotice = document.createElement('div');
         locationNotice.className = 'location-notice';
@@ -884,253 +967,166 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
                 <p>${escapeHTML(messageObj.locationDesc)}</p>
             </div>
         `;
-        // ✅ 新增：支持长按操作
+        // 为地点提示也添加长按操作
         let longPressTimer = null;
-
         locationNotice.addEventListener('touchstart', (e) => {
             longPressTimer = setTimeout(() => {
                 showSweetheartMessageActionSheet(contactId, messageIndex);
             }, 500);
         });
-
-        locationNotice.addEventListener('touchend', () => {
-            clearTimeout(longPressTimer);
-        });
-
-        locationNotice.addEventListener('touchmove', () => {
-            clearTimeout(longPressTimer);
-        });
+        locationNotice.addEventListener('touchend', () => clearTimeout(longPressTimer));
+        locationNotice.addEventListener('touchmove', () => clearTimeout(longPressTimer));
         return locationNotice;
     }
+
+    // 2. 创建消息行和基础结构
     const messageRow = document.createElement('div');
     messageRow.className = 'message-row';
     messageRow.classList.add(messageObj.sender === 'user' ? 'sent' : 'received');
 
-    // 1. 创建头像（简洁模式会用到）
+    // 3. 创建头像（简洁模式会用到）
     const avatarEl = document.createElement('div');
     avatarEl.className = 'message-chat-avatar';
 
-    // 安全获取联系人数据
-    let contactData = null;
-    if (currentSweetheartChatContact && currentSweetheartChatContact.id === contactId) {
-        contactData = currentSweetheartChatContact;
-    } else if (currentChatContact && currentChatContact.id === contactId) {
-        contactData = currentChatContact;
-    }
+    // 安全获取联系人数据用于头像和昵称
+    let contactData = (currentSweetheartChatContact && currentSweetheartChatContact.id === contactId)
+        ? currentSweetheartChatContact
+        : currentChatContact;
 
     if (messageObj.sender === 'user') {
-        if (userProfile && userProfile.avatar) {
-            const isUrl = userProfile.avatar.startsWith('http') || userProfile.avatar.startsWith('data:');
-            avatarEl.innerHTML = isUrl
-                ? `<img src="${userProfile.avatar}" alt="">`
-                : `<div class="initials">${userProfile.avatar}</div>`;
-        } else {
-            avatarEl.innerHTML = '<div class="initials">👤</div>';
-        }
+        const avatarSrc = userProfile?.avatar || '👤';
+        const isUrl = avatarSrc.startsWith('http') || avatarSrc.startsWith('data:');
+        avatarEl.innerHTML = isUrl ? `<img src="${avatarSrc}" alt="">` : `<div class="initials">${avatarSrc}</div>`;
     } else {
-        if (contactData && contactData.avatar) {
-            const isUrl = contactData.avatar.startsWith('http') || contactData.avatar.startsWith('data:');
-            avatarEl.innerHTML = isUrl
-                ? `<img src="${contactData.avatar}" alt="">`
-                : `<div class="initials">${contactData.avatar}</div>`;
-        } else {
-            avatarEl.innerHTML = '<div class="initials">💬</div>';
-        }
+        const avatarSrc = contactData?.avatar || '💬';
+        const isUrl = avatarSrc.startsWith('http') || avatarSrc.startsWith('data:');
+        avatarEl.innerHTML = isUrl ? `<img src="${avatarSrc}" alt="">` : `<div class="initials">${avatarSrc}</div>`;
     }
 
-    // 2. 创建消息内容容器
+    // 4. 创建消息内容容器和发送者名称
     const messageContent = document.createElement('div');
     messageContent.className = 'message-content';
 
-    // 3. 创建发送者名称
     const senderName = document.createElement('div');
     senderName.className = 'message-sender-name';
     senderName.textContent = messageObj.sender === 'user'
         ? (userProfile.name || '我')
         : (contactData ? contactData.name : '联系人');
 
-    // 4. 创建气泡
-    let bubble;
+    // 5. ▼▼▼ 核心改造：创建和填充气泡 ▼▼▼
+    const bubble = document.createElement('div');
+    bubble.className = 'chat-bubble';
+
     const text = messageObj.text || '';
-
-    // 检查是否是 HTML 渲染消息
     const renderMatch = text.match(/<render>([\s\S]*?)<\/render>/);
-
-    if (renderMatch && renderMatch[1]) {
-        // HTML 渲染气泡
-        bubble = document.createElement('div');
-        bubble.className = 'chat-bubble render-bubble';
-        bubble.style.position = 'relative';
-
-        const iframe = document.createElement('iframe');
-        iframe.className = 'render-iframe';
-        iframe.sandbox = 'allow-scripts allow-same-origin';
-
-        // ✅ 安全设置 srcdoc
-        try {
-            iframe.srcdoc = renderMatch[1];
-        } catch (e) {
-            console.error('设置 iframe srcdoc 失败:', e);
-            iframe.srcdoc = '<p style="color:red;">内容加载失败</p>';
-        }
-
-        // ✅ 增强的 onload 处理
-        iframe.onload = function() {
-            setTimeout(() => {
-                try {
-                    // 检查 iframe 是否可访问
-                    if (!iframe.contentWindow || !iframe.contentWindow.document) {
-                        iframe.style.height = '250px';
-                        return;
-                    }
-
-                    const iframeDoc = iframe.contentWindow.document;
-                    const iframeBody = iframeDoc.body;
-
-                    if (!iframeBody) {
-                        iframe.style.height = '250px';
-                        return;
-                    }
-
-                    // 立即设置初始高度
-                    const initialHeight = iframeBody.scrollHeight;
-                    iframe.style.height = (initialHeight + 4) + 'px';
-
-                    // 尝试使用 ResizeObserver
-                    if (window.ResizeObserver) {
-                        try {
-                            const observer = new ResizeObserver(() => {
-                                try {
-                                    if (iframeBody) {
-                                        iframe.style.height = (iframeBody.scrollHeight + 4) + 'px';
-                                    }
-                                } catch (resizeError) {
-                                    console.warn('ResizeObserver 回调错误:', resizeError);
-                                }
-                            });
-                            observer.observe(iframeBody);
-                        } catch (observerError) {
-                            console.warn('ResizeObserver 创建失败:', observerError);
-                        }
-                    }
-
-                } catch (accessError) {
-                    console.warn('无法访问 iframe 内容:', accessError.message);
-                    iframe.style.height = '250px';
-                }
-            }, 100);
-        };
-
-        // ✅ 添加 onerror 处理
-        iframe.onerror = function() {
-            console.error('iframe 加载错误');
-            iframe.style.height = '250px';
-        };
-
-        bubble.appendChild(iframe);
-
-    } else if (messageObj.imageUrl) {
-        // 图片消息
-        bubble = document.createElement('div');
-        bubble.className = 'chat-bubble image-only';
+    // 5b. 处理图片消息
+    if (messageObj.imageUrl) {
+        bubble.classList.add('image-only');
         const img = document.createElement('img');
         img.src = messageObj.imageUrl;
         img.alt = '图片';
         bubble.appendChild(img);
+    // 5a. 处理 <render> 标签的HTML/CSS渲染
+    } else if (renderMatch && renderMatch[1]) {
+        bubble.classList.add('render-bubble');
+        const iframe = document.createElement('iframe');
+        iframe.className = 'render-iframe';
+        iframe.sandbox = 'allow-scripts allow-same-origin';
+        iframe.srcdoc = renderMatch[1];
 
+        iframe.onload = function() {
+            // (此处为您原有的 iframe 高度自适应逻辑，保持不变)
+            setTimeout(() => {
+                try {
+                    const iframeBody = iframe.contentWindow.document.body;
+                    if (iframeBody) {
+                        iframe.style.height = (iframeBody.scrollHeight + 4) + 'px';
+                        if (window.ResizeObserver) {
+                            new ResizeObserver(() => {
+                                iframe.style.height = (iframeBody.scrollHeight + 4) + 'px';
+                            }).observe(iframeBody);
+                        }
+                    }
+                } catch (e) { console.warn('无法访问 iframe 内容:', e.message); iframe.style.height = '250px'; }
+            }, 100);
+        };
+        bubble.appendChild(iframe);
+
+    // 5c. 【最终修复】处理普通文本、代码块和引用
     } else {
-        // 普通文本消息
-        bubble = document.createElement('div');
-        bubble.className = 'chat-bubble';
+        let contentHTML = '';
 
-        // 处理引用
+        // 优先处理引用
         if (messageObj.quotedMessage) {
-            const quotedWrapper = document.createElement('div');
-            quotedWrapper.className = 'quoted-message-wrapper';
-            quotedWrapper.innerHTML = `
-                <div class="quoted-sender">${escapeHTML(messageObj.quotedMessage.sender === 'user' ? (userProfile.name || '我') : (contactData ? contactData.name : '联系人'))}</div>
-                <div class="quoted-text">${escapeHTML(messageObj.quotedMessage.text.substring(0, 50))}${messageObj.quotedMessage.text.length > 50 ? '...' : ''}</div>
+            const senderName = messageObj.quotedMessage.sender === 'user' ? (userProfile.name || '我') : (contactData ? contactData.name : '联系人');
+            let quotedText = messageObj.quotedMessage.text.substring(0, 50);
+            if (messageObj.quotedMessage.text.length > 50) quotedText += '...';
+
+            contentHTML += `
+                <div class="quoted-message-wrapper">
+                    <div class="quoted-sender">${escapeHTML(senderName)}</div>
+                    <div class="quoted-text">${escapeHTML(quotedText)}</div>
+                </div>
             `;
-            bubble.appendChild(quotedWrapper);
         }
 
-        // 主消息内容
-        const mainText = document.createElement('div');
-        mainText.className = 'main-message-text';
-        mainText.innerHTML = formatMessageText(text);
-        bubble.appendChild(mainText);
+        // 然后处理主消息文本（包含代码块等）
+        contentHTML += formatMessageText(text);
+
+        bubble.innerHTML = contentHTML;
     }
 
-    // 5. 组装 DOM 结构
+    // ▲▲▲ 核心改造结束 ▲▲▲
+
+    // 6. 组装最终的 DOM 结构
     messageContent.appendChild(senderName);
     messageContent.appendChild(bubble);
     messageRow.appendChild(avatarEl);
     messageRow.appendChild(messageContent);
 
-        // 6. ✅ 添加消息操作菜单的事件监听器（同时支持长按和右键）
-    if (bubble && typeof bubble.addEventListener === 'function') {
+    // 7. ✅ 统一绑定消息操作事件（长按和右键）
+    if (bubble.addEventListener) {
         let longPressTimer = null;
         let startPos = { x: 0, y: 0 };
-        let hasMoved = false;
 
-        // === 长按逻辑（触摸设备） ===
-        const handleTouchStart = (e) => {
-            const touch = e.touches[0];
+        const handleStart = (e) => {
+            const touch = e.touches ? e.touches[0] : e;
             startPos = { x: touch.clientX, y: touch.clientY };
-            hasMoved = false;
-
             longPressTimer = setTimeout(() => {
                 showMessageMenu(contactId, messageIndex, messageRow);
             }, 500);
         };
 
-        const handleTouchMove = (e) => {
+        const handleMove = (e) => {
             if (!longPressTimer) return;
-
-            const touch = e.touches[0];
-            const distance = Math.sqrt(
-                Math.pow(touch.clientX - startPos.x, 2) +
-                Math.pow(touch.clientY - startPos.y, 2)
-            );
-
-            if (distance > 10) {
-                clearTimeout(longPressTimer);
-                longPressTimer = null;
-                hasMoved = true;
-            }
-        };
-
-        const handleTouchEnd = () => {
-            if (longPressTimer) {
+            const touch = e.touches ? e.touches[0] : e;
+            if (Math.sqrt(Math.pow(touch.clientX - startPos.x, 2) + Math.pow(touch.clientY - startPos.y, 2)) > 10) {
                 clearTimeout(longPressTimer);
                 longPressTimer = null;
             }
         };
 
-        // === 右键菜单逻辑（桌面设备） ===
+        const handleEnd = () => {
+            if (longPressTimer) clearTimeout(longPressTimer);
+        };
+
         const handleContextMenu = (e) => {
-            e.preventDefault(); // 阻止浏览器默认右键菜单
+            e.preventDefault();
             showMessageMenu(contactId, messageIndex, messageRow);
         };
 
-        // === 绑定事件 ===
-        try {
-            // 触摸事件（移动端）
-            bubble.addEventListener('touchstart', handleTouchStart, { passive: true });
-            bubble.addEventListener('touchmove', handleTouchMove, { passive: true });
-            bubble.addEventListener('touchend', handleTouchEnd);
-            bubble.addEventListener('touchcancel', handleTouchEnd);
-
-            // 右键菜单（桌面端）
-            bubble.addEventListener('contextmenu', handleContextMenu);
-
-        } catch (eventError) {
-            console.warn('添加事件监听器失败:', eventError);
-        }
+        bubble.addEventListener('touchstart', handleStart, { passive: true });
+        bubble.addEventListener('mousedown', handleStart);
+        bubble.addEventListener('touchmove', handleMove, { passive: true });
+        bubble.addEventListener('mousemove', handleMove);
+        bubble.addEventListener('touchend', handleEnd);
+        bubble.addEventListener('mouseup', handleEnd);
+        bubble.addEventListener('contextmenu', handleContextMenu);
     }
 
     return messageRow;
 }
+
 
 /**
  * 显示消息操作菜单（普通聊天版本）
@@ -1246,175 +1242,6 @@ function copyMessage(contactId, messageIndex) {
     hideMessageActionSheet();
 }
 
-// ========== 密友聊天消息操作函数 - 开始 ==========
-
-/**
- * 显示密友消息操作菜单
- */
-function showSweetheartMessageActionSheet(contactId, index) {
-    const actionSheet = document.getElementById('sweetheartMessageActionSheet');
-    if (!actionSheet) {
-        console.error('❌ 找不到 sweetheartMessageActionSheet 元素');
-        return;
-    }
-    actionSheet.dataset.contactId = contactId;
-    actionSheet.dataset.index = index;
-    actionSheet.classList.add('show');
-    console.log('✅ 密友消息菜单已显示', {contactId, index});
-}
-
-/**
- * 隐藏密友消息操作菜单
- */
-function hideSweetheartMessageActionSheet() {
-    const actionSheet = document.getElementById('sweetheartMessageActionSheet');
-    if (actionSheet) {
-        actionSheet.classList.remove('show');
-        delete actionSheet.dataset.contactId;
-        delete actionSheet.dataset.index;
-    }
-}
-
-/**
- * 删除密友聊天消息
- */
-function deleteSweetheartMessage(contactId, messageIndex) {
-    if (confirm('确定要永久删除这条消息吗？')) {
-        // ⚠️ 注意：这里用的是 phoneSweetheartChatHistory 而不是 phoneChatHistory
-        const chatHistory = JSON.parse(localStorage.getItem('phoneSweetheartChatHistory') || '{}');
-
-        if (chatHistory[contactId] && chatHistory[contactId][messageIndex] !== undefined) {
-            chatHistory[contactId].splice(messageIndex, 1);
-
-            try {
-                localStorage.setItem('phoneSweetheartChatHistory', JSON.stringify(chatHistory));
-                console.log(`✅ 密友消息已删除 (Contact: ${contactId}, Index: ${messageIndex})`);
-
-                // 重新打开聊天以刷新界面
-                if (currentSweetheartChatContact && currentSweetheartChatContact.id === contactId) {
-                    openSweetheartChat(currentSweetheartChatContact);
-                }
-                renderSweetheartList();
-            } catch (e) {
-                console.error('保存失败:', e);
-                alert('存储空间不足，请清理数据');
-            }
-        }
-    }
-    hideSweetheartMessageActionSheet();
-}
-
-/**
- * 复制密友聊天消息
- */
-function copySweetheartMessage(contactId, messageIndex) {
-    const chatHistory = JSON.parse(localStorage.getItem('phoneSweetheartChatHistory') || '{}');
-    const message = chatHistory[contactId]?.[messageIndex];
-
-    if (message && message.text) {
-        let textToCopy = message.text;
-
-        // 处理图片消息
-        if (textToCopy.trim().startsWith('<img')) {
-            textToCopy = '[图片]';
-        }
-        // 处理渲染消息
-        else if (textToCopy.includes('<render>')) {
-            textToCopy = textToCopy.replace(/<render>[\s\S]*?<\/render>/g, '[特殊内容]');
-        }
-
-        // 复制到剪贴板
-        navigator.clipboard.writeText(textToCopy).then(() => {
-            showSuccessModal('复制成功', '消息内容已复制到剪贴板。', 1500);
-        }).catch(err => {
-            console.error('复制失败', err);
-            // 降级方案
-            const textarea = document.createElement('textarea');
-            textarea.value = textToCopy;
-            document.body.appendChild(textarea);
-            textarea.select();
-            document.execCommand('copy');
-            document.body.removeChild(textarea);
-            showSuccessModal('复制成功', '消息内容已复制到剪贴板。', 1500);
-        });
-    }
-    hideSweetheartMessageActionSheet();
-}
-
-/**
- * 重新生成密友AI回复
- */
-function regenerateSweetheartAiResponse(contactId, messageIndex) {
-    const chatHistory = JSON.parse(localStorage.getItem('phoneSweetheartChatHistory') || '{}');
-    const message = chatHistory[contactId]?.[messageIndex];
-
-    if (!message) {
-        alert('消息不存在！');
-        hideSweetheartMessageActionSheet();
-        return;
-    }
-
-    // 只能重新生成AI的回复
-    if (message.sender !== 'contact') {
-        alert('只能重新生成AI的回复！');
-        hideSweetheartMessageActionSheet();
-        return;
-    }
-
-    if (!confirm('确定要重新生成这条回复吗？')) {
-        hideSweetheartMessageActionSheet();
-        return;
-    }
-
-    // 删除这条AI回复
-    chatHistory[contactId].splice(messageIndex, 1);
-    localStorage.setItem('phoneSweetheartChatHistory', JSON.stringify(chatHistory));
-
-    // 重新打开聊天并触发AI回复
-    if (currentSweetheartChatContact && currentSweetheartChatContact.id === contactId) {
-        openSweetheartChat(currentSweetheartChatContact);
-        setTimeout(() => {
-            getSweetheartAiReply(); // 调用AI回复函数
-        }, 300);
-    }
-
-    hideSweetheartMessageActionSheet();
-}
-
-/**
- * 引用密友聊天消息
- */
-function quoteSweetheartMessage(contactId, messageIndex) {
-    const chatHistory = JSON.parse(localStorage.getItem('phoneSweetheartChatHistory') || '{}');
-    const message = chatHistory[contactId]?.[messageIndex];
-
-    if (!message) {
-        hideSweetheartMessageActionSheet();
-        return;
-    }
-
-    // 设置引用数据
-    currentSweetheartQuoteData = {
-        sender: message.sender === 'user' ? userProfile.name : currentSweetheartChatContact.name,
-        text: message.text.replace(/<render>[\s\S]*?<\/render>/g, '[特殊内容]').substring(0, 100)
-    };
-
-    // 显示引用预览
-    const previewEl = document.getElementById('sweetheartQuotePreview');
-    if (previewEl) {
-        document.getElementById('sweetheartQuotePreviewSender').textContent = currentSweetheartQuoteData.sender;
-        document.getElementById('sweetheartQuotePreviewText').textContent = currentSweetheartQuoteData.text;
-        previewEl.classList.add('show');
-    }
-
-    // 聚焦输入框
-    const inputEl = document.getElementById('sweetheartChatInput');
-    if (inputEl) inputEl.focus();
-
-    hideSweetheartMessageActionSheet();
-}
-
-// ========== 密友聊天消息操作函数 - 结束 ==========
 
 
 /**
@@ -4439,7 +4266,6 @@ function closeChat() {
     }, 350);
 }
 
-
 // ========== 开始：用这个全新的、支持识图的 callApi 函数替换旧的 ==========
 async function callApi(messages) {
     // 1. 检查 API 配置
@@ -4457,7 +4283,7 @@ async function callApi(messages) {
 
     if (hasImage && !isVisionModel) {
         console.warn(`当前模型 ${model} 可能不支持识图。为获得最佳效果，请在设置中选用 gpt-4o 或 gpt-4-vision-preview 等模型。`);
-        // 你也可以在这里直接返回错误，强制用户选择视觉模型
+        // 您也可以在这里直接返回错误，强制用户选择视觉模型
         // return { success: false, message: `当前模型(${model})不支持图片识别，请在设置中切换为视觉模型。` };
     }
 
@@ -4499,8 +4325,8 @@ async function callApi(messages) {
         return {success: false, message: `网络或API错误: ${error.message}`};
     }
 }
-
 // ========== 结束：替换 callApi 函数 ==========
+
 
 
 /**
@@ -4663,68 +4489,78 @@ async function getAiReply() {
         });
     }
 
-    // ✅ 6. 当前聊天历史（正序：旧→新）
-    const recentHistory = chatHistory.slice(-20);
+    // 3. [核心改造] 智能处理聊天历史，识别图片
+    const memoryRounds = currentChatContact.memoryRounds || 10;
+    const recentHistory = chatHistory.slice(-(memoryRounds * 2));
     recentHistory.forEach(msg => {
-        messages.push({
-            role: msg.sender === 'user' ? 'user' : 'assistant',
-            content: msg.text
-        });
-    });
+        const role = msg.sender === 'user' ? 'user' : 'assistant';
+        const textContent = msg.text || '';
+        // 使用正则表达式查找消息中的 base64 图片
+        const imgMatch = textContent.match(/<img src="(data:image\/[^;]+;base64,[^"]+)"[^>]*>/);
+        if (imgMatch && role === 'user') { // 只处理用户发送的图片
+            const imageUrl = imgMatch[1]; // 提取 Base64 数据
+            // 移除 img 标签，获取周围的文字
+            const surroundingText = textContent.replace(/<img[^>]*>/, '').replace(/<br>/g, '\n').trim();
+            // 构建符合 Vision API 的多部分 content 数组
+            const contentArray = [];
+            if (surroundingText) {
+                contentArray.push({ type: 'text', text: surroundingText });
+            }
+            contentArray.push({
+                type: 'image_url',
+                image_url: { url: imageUrl }
+            });
 
-    // 7. 当前用户输入
+            messages.push({ role, content: contentArray });
+        } else {
+            // 如果没有图片，或者消息是AI发的，则作为纯文本处理
+            messages.push({ role, content: textContent.replace(/<br>/g, '\n') });
+        }
+    });
+    // 4. 处理当前输入框中可能存在的新消息 (这部分逻辑不变)
     const userMessage = chatInput.value.trim();
     if (userMessage) {
-        const messageObj = { sender: 'user', text: userMessage };
-        const result = saveMessage(contactId, messageObj);
-        if (result.success) {
-            const messageRow = _createMessageDOM(contactId, messageObj, result.index);
-            messagesEl.appendChild(messageRow);
-        }
+        simulateSendingMessage(userMessage);
+        messages.push({ role: 'user', content: userMessage });
         chatInput.value = '';
+        document.querySelector('.chat-input-area').classList.remove('has-text');
     }
 
-    // 调试日志
-    console.log('📋 普通聊天 - 发送给AI的消息顺序：');
-    messages.forEach((msg, i) => {
-        const preview = msg.content.substring(0, 40).replace(/\n/g, ' ');
-        console.log(`${i}. [${msg.role}] ${preview}...`);
-    });
-
-    // === 显示"思考中"气泡 ===
-    const thinkingBubble = _createMessageDOM(contactId, { sender: 'contact', text: '...' }, -1);
-    messagesEl.appendChild(thinkingBubble);
-    messagesEl.scrollTop = messagesEl.scrollHeight;
-
-    // === 调用API ===
-    const result = await callApi(messages);
-    thinkingBubble.remove();
-
-    if (!result.success) {
-        alert('网络错误：' + result.message);
+    // 如果没有任何用户消息，则不调用API
+    if (messages.filter(m => m.role === 'user').length === 0) {
         getReplyBtn.disabled = false;
         chatInput.disabled = false;
         return;
     }
-
-    // ✅ 分段显示AI回复
-    const segments = result.message.split('---').filter(s => s.trim());
-
-    if (segments.length === 0) {
-        segments.push(result.message || '...');
-    }
-
-    for (const segmentText of segments) {
-        const messageObj = { sender: 'contact', text: segmentText.trim() };
-        const newIndex = saveMessage(contactId, messageObj);
-        const messageRow = _createMessageDOM(contactId, messageObj, newIndex);
-        if (!result.success) {
-            messageRow.querySelector('.chat-bubble').style.backgroundColor = '#ffebee';
+    // 5. 显示"思考中"气泡并调用API (这部分逻辑不变)
+    console.log('📋 [带图识别] - 发送给AI的消息结构：', messages);
+    const thinkingBubble = _createMessageDOM(contactId, { sender: 'contact', text: '...' }, -1);
+    messagesEl.appendChild(thinkingBubble);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    const result = await callApi(messages);
+    thinkingBubble.remove();
+    // 6. 处理和显示AI回复
+    if (!result.success) {
+        alert('网络错误：' + result.message);
+    } else {
+        // ✅ [功能已恢复] 分段显示AI回复
+        const segments = result.message.split('---').filter(s => s.trim());
+        // 如果AI没有使用分割符，则将整个回复作为一个气泡
+        if (segments.length === 0) {
+            segments.push(result.message || '...');
         }
-        messagesEl.appendChild(messageRow);
-        await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 400));
+        // 遍历每个片段，依次显示为独立的气泡
+        for (const segmentText of segments) {
+            const messageObj = { sender: 'contact', text: segmentText.trim() };
+            const newIndex = saveMessage(contactId, messageObj);
+            const messageRow = _createMessageDOM(contactId, messageObj, newIndex);
+            messagesEl.appendChild(messageRow);
+            messagesEl.scrollTop = messagesEl.scrollHeight; // 每次都滚动到底部
+            // 增加一个自然的延迟
+            await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 400));
+        }
     }
-
+    // 7. 清理和收尾工作 (这部分不变)
     renderContacts(contactsData);
     messagesEl.scrollTop = messagesEl.scrollHeight;
     getReplyBtn.disabled = false;
@@ -5246,93 +5082,51 @@ function setupAttachmentMenu() {
     });
 
     // 图片选择的逻辑保持不变，仅作本地预览
-    // ========== 开始：粘贴这个全新的 imageInput 事件监听器 ==========
+    // 5. 【核心修复】当用户选择了图片后，将文字和图片合并发送
     imageInput.addEventListener('change', (event) => {
         const file = event.target.files[0];
-        if (!file || !currentChatContact) {
-            event.target.value = ''; // 重置 input 以便下次能选择相同文件
+        if (!file || !currentSweetheartChatContact) {
+            event.target.value = '';
             return;
         }
-
         const reader = new FileReader();
-        reader.onload = async function (e) {
+        reader.onload = function (e) {
             const base64Image = e.target.result;
+            const chatInput = document.getElementById('sweetheartChatInput');
+            const chatInputArea = document.querySelector('.sweetheart-chat-input-area');
 
-            // 1. [UI] 先在用户侧显示发送的图片
-            const imageHtmlForDisplay = `<img src="${base64Image}" style="max-width: 150px; border-radius: 10px;" alt="${file.name}">`;
-            simulateSendingMessage(imageHtmlForDisplay);
+            // 1. 构建图片消息的HTML内容
+            const imageHtml = `<img src="${base64Image}" style="max-width: 150px; border-radius: 10px;" alt="用户发送的图片">`;
 
-            // 2. [UI] 显示 "AI 正在分析..." 的提示
-            const messagesEl = document.getElementById('chatMessages');
-            const thinkingBubble = _createMessageDOM(currentChatContact.id, {
-                sender: 'contact',
-                text: '正在分析图片...'
-            }, -1);
-            // 使用-1索引表示这是临时消息
-            messagesEl.appendChild(thinkingBubble);
-            messagesEl.scrollTop = messagesEl.scrollHeight;
+            // 2. 获取输入框中的文字
+            const userText = chatInput.value.trim();
 
-            // 3. [核心] 构建发送给 Vision API 的消息体
-            const visionMessage = {
-                role: 'user',
-                content: [
-                    {
-                        type: 'text',
-                        // ========== 开始：仅修改 visionMessage 对象中的这一行 ==========
-                        text: (document.getElementById('chatInput').value.trim() || '这张图片里有什么？请详细描述一下。') + ' (重要：请直接用纯文本回复，不要使用任何Markdown格式，例如 ** 或 *)'
-                        // 这是给AI的指令
-                    },
-                    {
-                        type: 'image_url',
-                        image_url: {
-                            url: base64Image
-                        }
-                    }
-                ]
+            // 3. 将文字和图片HTML组合成一条消息
+            const messageText = userText ? `${userText}<br>${imageHtml}` : imageHtml;
+
+            // 4. 构建一个简单的消息对象（与普通聊天一致）
+            const messagePayload = {
+                sender: 'user',
+                text: messageText,
             };
-            // 4. [API] 调用API
-            // 我们只把这条识图消息发给AI，不一定需要带上之前的聊天记录，这样更专注
-            const result = await callApi([visionMessage]);
-            document.getElementById('chatInput').value = '';
-            chatInputArea.classList.remove('has-text');
-            // 6. [UI] 移除"正在分析"的提示
-            thinkingBubble.remove();
 
-            let aiResponseText;
-            if (result.success) {
-                aiResponseText = result.message;
-            } else {
-                aiResponseText = `抱歉，图片识别失败了: ${result.message}`;
-            }
-
-            // 6. [数据] 保存AI的回复
-            const newIndex = saveMessage(currentChatContact.id, {
-                sender: 'contact',
-                text: aiResponseText
-            });
-
-            // 7. [UI] 显示AI的最终回复
-            const messageRow = _createMessageDOM(currentChatContact.id, {
-                sender: 'contact',
-                text: aiResponseText
-            }, newIndex);
-
-            // 如果是错误信息，给个特殊样式
-            if (!result.success) {
-                messageRow.querySelector('.chat-bubble').style.backgroundColor = '#ffebee';
-                messageRow.querySelector('.chat-bubble').style.color = '#c62828';
-            }
-
+            // 5. 保存并渲染
+            const newIndex = saveSweetheartMessage(currentSweetheartChatContact.id, messagePayload);
+            const messagesEl = document.getElementById('sweetheartChatMessages');
+            const messageRow = _createMessageDOM(currentSweetheartChatContact.id, messagePayload, newIndex);
             messagesEl.appendChild(messageRow);
             messagesEl.scrollTop = messagesEl.scrollHeight;
 
-            // 8. 更新联系人列表的最后消息
-            renderContacts(contactsData);
+            // 6. 清空输入框并更新UI
+            chatInput.value = '';
+            chatInputArea.classList.remove('has-text');
+            renderSweetheartList();
         };
 
-        reader.readAsDataURL(file); // 读取图片文件为 Base64
-        event.target.value = ''; // 读取后立即清空，确保下次还能触发 change 事件
+        reader.readAsDataURL(file);
+        event.target.value = '';
     });
+
 // ========== 结束：粘贴全新的 imageInput 事件监听器 ==========
 
 
@@ -5379,37 +5173,31 @@ function setupSweetheartAttachmentMenu() {
     imageInput.addEventListener('change', (event) => {
         const file = event.target.files[0];
         if (!file || !currentSweetheartChatContact) {
-            event.target.value = ''; // 重置 input
+            event.target.value = '';
             return;
         }
-
         const reader = new FileReader();
         reader.onload = function (e) {
             const base64Image = e.target.result;
-
-            // a. 构建图片消息的HTML内容
-            const imageHtml = `<img src="${base64Image}" style="max-width: 150px; border-radius: 10px;" alt="用户发送的图片">`;
-
-            // b. 创建消息载体
-            const messagePayload = {sender: 'user', text: imageHtml};
-
-            // c. 保存消息到本地历史记录
+            // 1. 构建一个结构化的图片消息对象
+            const messagePayload = {
+                sender: 'user',
+                text: '[图片]', // 显示的文本可以是占位符
+                imageUrl: base64Image, // 关键：用专门的字段存储图片数据
+                isProcessed: false // 新增标志，表示这张图片还未被AI处理过
+            };
+            // 2. 保存这个结构化对象
             const newIndex = saveSweetheartMessage(currentSweetheartChatContact.id, messagePayload);
-
-            // d. 在UI上渲染这条图片消息
+            // 3. 在UI上渲染
             const messagesEl = document.getElementById('sweetheartChatMessages');
             const messageRow = _createMessageDOM(currentSweetheartChatContact.id, messagePayload, newIndex);
             messagesEl.appendChild(messageRow);
-
-            // e. 滚动到底部并更新联系人列表
             messagesEl.scrollTop = messagesEl.scrollHeight;
             renderSweetheartList();
         };
-
         reader.readAsDataURL(file);
-        event.target.value = ''; // 读取后立即清空，确保下次还能触发 change 事件
+        event.target.value = '';
     });
-
     // 6. 关闭菜单的通用逻辑
     document.addEventListener('click', () => {
         if (menu.classList.contains('show')) {
@@ -5419,7 +5207,6 @@ function setupSweetheartAttachmentMenu() {
     menu.addEventListener('click', (event) => event.stopPropagation());
 }
 
-// ========== 结束：替换函数 ==========
 
 // ========== 结束：粘贴全新的JavaScript代码块 ==========
 
@@ -6490,7 +6277,7 @@ function addSweetheartMessageToList() {
 }
 
 /**
- * [修正版] 保存密友消息到独立的localStorage
+ * [修正版] 保存密友消息到独立的localStorage，并添加唯一时间戳
  */
 function saveSweetheartMessage(contactId, message) {
     const chatHistory = JSON.parse(localStorage.getItem('phoneSweetheartChatHistory') || '{}');
@@ -6498,8 +6285,8 @@ function saveSweetheartMessage(contactId, message) {
         chatHistory[contactId] = [];
     }
 
-    // ✅ 核心修复：直接保存整个传入的消息对象，以保留所有属性（如 type, locationName等）
-    const messageToSave = { ...message };
+    // ✅ 核心修复：为每条消息添加唯一的 `timestamp`
+    const messageToSave = { ...message, timestamp: Date.now() };
 
     chatHistory[contactId].push(messageToSave);
 
@@ -6514,34 +6301,146 @@ function saveSweetheartMessage(contactId, message) {
 }
 
 
-
-// ▼▼▼ 步骤3.1：添加弹窗控制函数 ▼▼▼
+/*
+================================================================
+状态弹窗相关功能 - 【终极修复与重构版】
+- 解决了点击无反应的问题
+- 整合了所有相关逻辑，避免冲突
+- 增加了大量安全检查，确保脚本不会因找不到元素而崩溃
+================================================================
+*/
 
 /**
- * 打开状态弹窗
+ * [重构版] 打开状态弹窗。
+ * 这是用户点击状态按钮时调用的唯一入口。
  */
 function openStatusPopup() {
-    // 确保弹窗存在
     const popup = document.getElementById('statusPopup');
-    if (!popup) return;
-
-    // 更新角色名称
-    if (currentSweetheartChatContact) {
-        document.getElementById('statusCharacterName').textContent = `${currentSweetheartChatContact.name} 的状态`;
+    if (!popup) {
+        console.error("【严重错误】找不到 #statusPopup 元素！请检查HTML。");
+        return;
     }
 
-    // 显示弹窗
+    // 1. 更新弹窗内的角色名称
+    if (currentSweetheartChatContact) {
+        const charNameEl = document.getElementById('statusCharacterName');
+        if (charNameEl) {
+            charNameEl.textContent = `${currentSweetheartChatContact.name} 的状态`;
+        }
+    }
+
+    // 2. 【关键】确保每次打开时，都处于“显示模式”，而不是“编辑模式”
+    const modal = popup.querySelector('.status-popup-modal');
+    if (modal) {
+        modal.classList.remove('is-editing');
+    }
+
+    // 3. 显示弹窗
     popup.classList.add('show');
 }
 
+/*
+=====================================================
+状态弹窗 - 就地编辑功能 (最终修复 & 优化版)
+=====================================================
+*/
+
 /**
- * 关闭状态弹窗
+ * [就地编辑版] 进入状态编辑模式
+ */
+function openStatusEditor() {
+    const modal = document.querySelector('#statusPopup .status-popup-modal');
+    // 安全检查，如果找不到元素则直接返回，防止报错
+    if (!modal) {
+        console.error("错误：未能找到 .status-popup-modal 元素！");
+        return;
+    }
+
+    // 1. 给弹窗添加 'is-editing' 类，激活编辑模式CSS
+    modal.classList.add('is-editing');
+
+    // 2. 将当前显示的文本值，填充到对应的输入框中
+    modal.querySelectorAll('.status-field').forEach(field => {
+        const displayDiv = field.querySelector('.status-value');
+        const input = field.querySelector('.status-input');
+
+        if (displayDiv && input) {
+            // 如果显示的是 "..."，则输入框为空，否则填入当前值
+            const currentText = displayDiv.textContent.trim();
+            input.value = currentText === '...' ? '' : currentText;
+        }
+    });
+
+    // 聚焦第一个输入框，提升用户体验
+    const firstInput = modal.querySelector('.status-input');
+    if (firstInput) {
+        firstInput.focus();
+    }
+}
+
+/**
+ * [健壮版] 保存状态编辑器的内容
+ */
+function saveStatusEditor() {
+    // 安全检查：确保有聊天对象和弹窗元素
+    if (!currentSweetheartChatContact) return;
+    const modal = document.querySelector('#statusPopup .status-popup-modal');
+    if (!modal) return;
+
+    // 1. 获取当前已保存的状态数据，或创建一个空对象
+    const allStatuses = JSON.parse(localStorage.getItem('sweetheartStatuses') || '{}');
+    const currentStatus = allStatuses[currentSweetheartChatContact.id] || { character: {}, user: {} };
+
+    // 2. 遍历所有输入框，读取新值并更新UI和数据对象
+    modal.querySelectorAll('.status-input').forEach(input => {
+        const newValue = input.value.trim();
+        const targetId = input.dataset.target;
+        if (!targetId) return; // 如果没有 data-target，跳过
+
+        // 更新界面上的显示文本
+        const displayDiv = document.getElementById(targetId);
+        if (displayDiv) {
+            displayDiv.textContent = newValue || '...';
+        }
+
+        // 3. 【核心修复】使用更安全的方式更新数据对象
+        if (targetId.startsWith('status-char-')) {
+            // e.g., 'status-char-location' -> 'location'
+            const key = targetId.substring('status-char-'.length).replace(/-/g, '_');
+            currentStatus.character[key] = newValue;
+        } else if (targetId.startsWith('status-my-')) {
+            // e.g., 'status-my-location' -> 'location'
+            const key = targetId.substring('status-my-'.length).replace(/-/g, '_');
+            currentStatus.user[key] = newValue;
+        }
+    });
+
+    // 4. 将更新后的数据存回 localStorage
+    saveStatusData(currentSweetheartChatContact.id, currentStatus);
+
+    // 5. 移除 'is-editing' 类，UI将自动切回显示模式
+    modal.classList.remove('is-editing');
+
+    // 6. 给予用户成功反馈
+    showSuccessModal('保存成功', '状态信息已手动更新！');
+}
+
+/**
+ * [最终修复版] 关闭状态弹窗
+ * - 确保关闭时一定能退出编辑模式，防止下次打开UI错乱。
  */
 function closeStatusPopup() {
     const popup = document.getElementById('statusPopup');
-    if (popup) {
-        popup.classList.remove('show');
+    if (!popup) return;
+
+    const modal = popup.querySelector('.status-popup-modal');
+    if (modal) {
+        // 先移除 is-editing 类，确保状态被重置
+        modal.classList.remove('is-editing');
     }
+
+    // 然后再隐藏整个弹窗
+    popup.classList.remove('show');
 }
 
 // ▼▼▼ 粘贴这一个完整的、正确的 Prompt 常量 ▼▼▼
@@ -6888,59 +6787,106 @@ function updateChatModeButton() {
     const modeBtn = document.getElementById('chatModeToggle');
     if (!modeBtn) return;
 
+    // 核心修改：先获取按钮内部的图片元素
+    const img = modeBtn.querySelector('img');
+    if (!img) return; // 如果找不到图片，直接退出
+
     if (currentChatMode === 'offline') {
-        modeBtn.textContent = '📖';
+        // 线下模式：更换图片源和标题
+        img.src = 'https://e3f49eaa46b57.cdn.sohucs.com/2025/11/2/22/14/MTAwMTE0XzE3NjIwOTI4NTE0MzU=.png';
+        img.alt = '线下模式';
         modeBtn.title = '线下模式';
-        modeBtn.style.background = 'linear-gradient(135deg, #A1887F, #8D6E63)';
     } else {
-        modeBtn.textContent = '💬';
+        // 线上模式：更换图片源和标题
+        img.src = 'https://static.eeo.cn/upload/file/20251102/1762092130593288.png';
+        img.alt = '线上模式';
         modeBtn.title = '线上模式';
-        modeBtn.style.background = 'linear-gradient(135deg, #FFB6C1, #FFC0D9)';
     }
 }
 
-/* ▼▼▼ 请将你原来的 getSweetheartAiReply 函数完整地替换成这个新版本 ▼▼▼ */
+/**
+ * [新增] 健壮的AI JSON响应解析器
+ * 它可以处理纯JSON、被文字包裹的JSON和被Markdown包裹的JSON
+ * @param {string} rawMessage - 从AI获取的原始字符串
+ * @returns {{chatReplyText: string, statusData: object|null}}
+ */
+function parseAiJsonResponse(rawMessage) {
+    if (!rawMessage) {
+        return { chatReplyText: '...', statusData: null };
+    }
+
+    // 1. 尝试直接解析，这是最理想的情况
+    try {
+        const parsed = JSON.parse(rawMessage);
+        return {
+            chatReplyText: parsed.reply || rawMessage,
+            statusData: parsed.status || null
+        };
+    } catch (e) {
+        // 直接解析失败，继续下一步
+    }
+
+    // 2. 使用正则表达式提取被包裹的JSON
+    try {
+        const jsonMatch = rawMessage.match(/\{[\s\S]*\}/);
+        if (jsonMatch && jsonMatch) {
+            const parsed = JSON.parse(jsonMatch);
+            console.log("✅ 智能提取JSON成功！");
+            return {
+                chatReplyText: parsed.reply || rawMessage,
+                statusData: parsed.status || null
+            };
+        }
+    } catch (e) {
+        // 提取后解析也失败，继续最后一步
+        console.error("❌ 提取JSON后解析失败:", e);
+    }
+
+    // 3. 彻底失败，返回纯文本内容，状态为null
+    console.warn("⚠️ 未能解析出有效JSON，将作为纯文本处理。");
+    return {
+        chatReplyText: rawMessage,
+        statusData: null
+    };
+}
+
 
 /**
- * 密友聊天 - 获取AI回复（记忆互通增强版）
+ * 密友聊天 - 获取AI回复（【功能完整且未经省略的最终修复版】）
+ * 该版本整合了稳定的逻辑与完整的功能（包括图片识别），可以直接替换使用。
  */
 async function getSweetheartAiReply() {
-    if (!currentSweetheartChatContact) return;
+    console.log("✅ getSweetheartAiReply 函数已触发");
+
+    if (!currentSweetheartChatContact) {
+        console.error("❌ 函数中止：currentSweetheartChatContact 为空！");
+        return;
+    }
 
     const contactId = currentSweetheartChatContact.id;
-    // 密友聊天历史
-    const chatHistory = JSON.parse(localStorage.getItem('phoneSweetheartChatHistory') || '{}')[contactId] || [];
-    // 普通聊天历史（用于背景记忆）
-    const normalChatHistory = JSON.parse(localStorage.getItem('phoneChatHistory') || '{}')[contactId] || [];
-
-    // 获取UI元素
     const chatInput = document.getElementById('sweetheartChatInput');
     const getReplyBtn = document.getElementById('sweetheartGetReplyBtn');
     const messagesEl = document.getElementById('sweetheartChatMessages');
 
-    if (!chatInput || !getReplyBtn || !messagesEl) return;
+    if (!chatInput || !getReplyBtn || !messagesEl) {
+        console.error("❌ 函数中止：找不到聊天界面关键元素！");
+        return;
+    }
 
-    // 禁用输入和按钮
     getReplyBtn.disabled = true;
     chatInput.disabled = true;
 
-    // === 1. 构建发送给AI的消息数组（Messages for AI） ===
+    // --- 步骤 1: 构建发送给AI的消息数组 ---
     const messages = [];
-
-    // ✅ 步骤 1.1: 系统提示词 (System Prompt)
-    // 根据当前是线上模式还是线下模式，选择不同的核心指令
     const systemPrompt = currentChatMode === 'offline' ? OFFLINE_MODE_PROMPT : ENHANCED_PROMPT;
-    messages.push({
-        role: "system",
-        content: systemPrompt
-    });
+    messages.push({ role: "system", content: systemPrompt });
 
-    // 步骤 1.2: 静态上下文 (Static Context) - 世界书、世界设定、角色设定等
-    // 这部分逻辑与你之前的版本保持一致
+    // 添加世界书、角色设定、用户设定等上下文
     const worldbookContext = gatherWorldbookContext();
     if (worldbookContext) {
         messages.push({ role: "system", content: worldbookContext });
     }
+
     if (currentWorldId) {
         const world = worldsData.find(w => w.id === currentWorldId);
         if (world) {
@@ -6951,6 +6897,7 @@ async function getSweetheartAiReply() {
             messages.push({ role: "system", content: worldSettingText });
         }
     }
+
     let characterSetting = `[角色设定]\n姓名：${currentSweetheartChatContact.name}\n`;
     if (currentSweetheartChatContact.status) characterSetting += `基础设定：${currentSweetheartChatContact.status}\n`;
     if (currentSweetheartChatContact.personality) characterSetting += `性格：${currentSweetheartChatContact.personality}\n`;
@@ -6962,6 +6909,7 @@ async function getSweetheartAiReply() {
     if (userProfile.persona) {
         messages.push({ role: "system", content: `[用户设定]\n昵称：${userProfile.name}\n${userProfile.persona}` });
     }
+
     if (currentSweetheartChatContact.boundMasks && currentSweetheartChatContact.boundMasks.length > 0) {
         let maskContent = '[用户人设]\n';
         currentSweetheartChatContact.boundMasks.forEach(maskId => {
@@ -6971,48 +6919,100 @@ async function getSweetheartAiReply() {
         messages.push({ role: "system", content: maskContent });
     }
 
-    // ⭐⭐⭐ 步骤 1.3: 背景信息 (Background Info from Normal Chat) ⭐⭐⭐
-    // 从"学习模式"的聊天记录中提取最近的10条作为长期记忆参考
+    const normalChatHistory = JSON.parse(localStorage.getItem('phoneChatHistory') || '{}')[contactId] || [];
     if (normalChatHistory.length > 0) {
-        const recentNormalChat = normalChatHistory.slice(-10); // 取最后10条
+        const recentNormalChat = normalChatHistory.slice(-10);
         let backgroundInfo = `[背景信息：以下是你和用户在"学习模式"中的最近对话记录，仅供你参考，不要直接回复这些内容]\n\n`;
-
         recentNormalChat.forEach((msg) => {
             const sender = msg.sender === 'user' ? '用户' : currentSweetheartChatContact.name;
-            // 将消息中的HTML标签（如图片）替换为文字描述，避免干扰AI
             const textContent = (msg.text || '').replace(/<[^>]+>/g, '[多媒体内容]');
             backgroundInfo += `${sender}: ${textContent}\n`;
         });
-
         messages.push({ role: "system", content: backgroundInfo });
     }
 
-    // ✅ 步骤 1.4: 当前对话历史 (Current Conversation History)
-    // 使用设置中定义的记忆轮数
-    const memoryRounds = currentSweetheartChatContact.memoryRounds || 10; // 默认10轮
-    const recentMessages = chatHistory.slice(-(memoryRounds * 2)); // 每轮包含用户和AI两条消息
+    // --- 步骤 2: 【核心修复逻辑】处理聊天历史、图片和当前输入 ---
+    const chatHistory = JSON.parse(localStorage.getItem('phoneSweetheartChatHistory') || '{}');
+    const contactMessages = chatHistory[contactId] || [];
+    const memoryRounds = currentSweetheartChatContact.memoryRounds || 10;
+    const recentMessages = contactMessages.slice(-(memoryRounds * 2));
+    const currentUserInput = chatInput.value.trim();
+    let userMessageForApi = null;
 
-    const conversationHistory = recentMessages.map(msg => ({
-        role: msg.sender === 'user' ? 'user' : 'assistant',
-        // 同样清理HTML标签
-        content: (msg.text || '').replace(/<render>[\s\S]*?<\/render>/, '[特殊渲染内容]')
-    }));
-    messages.push(...conversationHistory);
+    // 2.1 添加历史记录到上下文
+    recentMessages.forEach(msg => {
+        // 跳过未处理的图片，它们将在下一步被专门处理
+        if (msg.sender === 'user' && msg.imageUrl && !msg.isProcessed) {
+            return;
+        }
+        if (msg.type === 'location') {
+             messages.push({ role: 'system', content: `[场景变化] 你们来到了【${msg.locationName}】。描述：${msg.locationDesc}`});
+        } else if (msg.text) {
+             const role = msg.sender === 'user' ? 'user' : 'assistant';
+             const content = (msg.text || '').replace(/<render>[\s\S]*?<\/render>/, '[特殊渲染内容]');
+             messages.push({ role, content });
+        }
+    });
 
-    // 步骤 1.5: 用户当前输入 (User's Current Input)
-    const userMessage = chatInput.value.trim();
-    if (userMessage) {
-        // 先将用户消息保存并显示到界面上
-        const messageObj = { sender: 'user', text: userMessage };
+    // 2.2 查找最近一条未处理的图片
+    // 逻辑调整：从全部历史记录中倒序查找，确保找到的是最新的那张
+    let unprocessedImage = null;
+    for (let i = contactMessages.length - 1; i >= 0; i--) {
+        const msg = contactMessages[i];
+        if (msg.sender === 'user' && msg.imageUrl && !msg.isProcessed) {
+            unprocessedImage = msg;
+            break;
+        }
+    }
+
+    // 2.3 构建当前用户的最终输入 (文本 + 图片 或 纯文本)
+    if (currentUserInput || unprocessedImage) {
+        if (unprocessedImage) {
+            console.log("🖼️ 检测到未处理的图片，构建多模态消息。");
+            const contentArray = [];
+            if (currentUserInput) {
+                contentArray.push({ type: 'text', text: currentUserInput });
+            }
+            contentArray.push({
+                type: 'image_url',
+                image_url: { url: unprocessedImage.imageUrl }
+            });
+            userMessageForApi = { role: 'user', content: contentArray };
+
+            // 标记图片为“已处理”
+            const msgIndex = contactMessages.findIndex(m => m.timestamp === unprocessedImage.timestamp);
+            if (msgIndex !== -1) {
+                chatHistory[contactId][msgIndex].isProcessed = true;
+                localStorage.setItem('phoneSweetheartChatHistory', JSON.stringify(chatHistory));
+            }
+        } else {
+            console.log("💬 仅检测到文本输入。");
+            userMessageForApi = { role: 'user', content: currentUserInput };
+        }
+    }
+
+    // 2.4 如果有新文本输入，先在UI上渲染出来
+    if (currentUserInput) {
+        const messageObj = { sender: 'user', text: currentUserInput };
         const newIndex = saveSweetheartMessage(contactId, messageObj);
         const messageRow = _createMessageDOM(contactId, messageObj, newIndex);
         messagesEl.appendChild(messageRow);
         chatInput.value = '';
     }
 
-    // === 2. 显示"思考中"气泡并调用API ===
-    console.log('📋 最终发送给AI的Prompt结构:', messages.map(m => ({role: m.role, content: m.content.substring(0, 50) + '...'})));
+    // --- 步骤 3: 检查是否有内容可发送 ---
+    if (!userMessageForApi) {
+        console.warn("🤔 没有新的用户输入（文本或图片），不调用API。");
+        getReplyBtn.disabled = false;
+        chatInput.disabled = false;
+        return;
+    }
 
+    // 将最终的用户输入添加到请求中
+    messages.push(userMessageForApi);
+
+    // --- 步骤 4: 调用API并处理回复 ---
+    console.log('🚀 准备调用API，最终发送结构:', messages);
     const thinkingBubble = _createMessageDOM(contactId, { sender: 'contact', text: '...' }, -1);
     messagesEl.appendChild(thinkingBubble);
     messagesEl.scrollTop = messagesEl.scrollHeight;
@@ -7022,57 +7022,32 @@ async function getSweetheartAiReply() {
 
     if (!result.success) {
         alert('网络错误：' + result.message);
-        getReplyBtn.disabled = false;
-        chatInput.disabled = false;
-        return;
-    }
-
-    // === 3. 处理并显示AI的回复 ===
-    let chatReplyText = '';
-    let statusData = null;
-    try {
-        const jsonMatch = result.message.match(/({[\s\S]*})/);
-        if (jsonMatch && jsonMatch[1]) {
-            const parsed = JSON.parse(jsonMatch[1]);
-            chatReplyText = parsed.reply || "我...";
-            statusData = parsed.status || null;
-            console.log("✅ 成功解析AI返回的JSON数据！");
-        } else {
-            chatReplyText = result.message;
-            console.warn("⚠️ AI回复中未找到有效的JSON格式，已作为纯文本处理。");
+    } else {
+        const { chatReplyText, statusData } = parseAiJsonResponse(result.message);
+        if (statusData) {
+            updateStatusPopup(statusData);
+            saveStatusData(contactId, statusData);
         }
-    } catch (e) {
-        console.error("❌ 解析AI返回的JSON时出错:", e);
-        chatReplyText = result.message;
-    }
+        const segments = chatReplyText.split('---').filter(s => s.trim());
+        if (segments.length === 0) segments.push(chatReplyText || '...');
 
-    if (statusData) {
-        updateStatusPopup(statusData);
-        saveStatusData(contactId, statusData);
-    }
-
-    const segments = chatReplyText.split('---').filter(s => s.trim());
-    if (segments.length === 0) {
-        segments.push(chatReplyText || '...');
-    }
-    for (const segmentText of segments) {
-        const messageObj = { sender: 'contact', text: segmentText.trim() };
-        const newIndex = saveSweetheartMessage(contactId, messageObj);
-        const messageRow = _createMessageDOM(contactId, messageObj, newIndex);
-        if (!result.success) {
-            messageRow.querySelector('.chat-bubble').style.backgroundColor = '#ffebee';
+        for (const segmentText of segments) {
+            const messageObj = { sender: 'contact', text: segmentText.trim() };
+            const newIndex = saveSweetheartMessage(contactId, messageObj);
+            const messageRow = _createMessageDOM(contactId, messageObj, newIndex);
+            messagesEl.appendChild(messageRow);
+            await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 400));
         }
-        messagesEl.appendChild(messageRow);
-        await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 400));
     }
 
-    // === 4. 收尾工作 ===
+    // --- 步骤 5: 收尾工作 ---
     renderSweetheartList();
     messagesEl.scrollTop = messagesEl.scrollHeight;
     getReplyBtn.disabled = false;
     chatInput.disabled = false;
     chatInput.focus();
 }
+
 
 /* ▲▲▲ 替换到这里结束 ▲▲▲ */
 
@@ -10331,13 +10306,76 @@ async function triggerLocationPlot(event, pinId) {
 
     // ⭐ 3.4 当前对话历史：遵守记忆轮数设置
     const memoryRounds = currentSweetheartChatContact.memoryRounds || 10;
-    const recentMessages = chatHistory.slice(-(memoryRounds * 2));
-
+    let recentMessages = chatHistory.slice(-(memoryRounds * 2));
+    const currentUserInput = chatInput.value.trim();
     const conversationHistory = recentMessages.map(msg => ({
         role: msg.sender === 'user' ? 'user' : 'assistant',
         content: (msg.text || '').replace(/<render>[\s\S]*?<\/render>/, '[特殊渲染内容]')
     }));
     messages.push(...conversationHistory);
+    // 检查最后一条消息是否是未处理的图片
+    const lastMessage = recentMessages.length > 0 ? recentMessages[recentMessages.length - 1] : null;
+    let multimodalMessage = null;
+    if (lastMessage && lastMessage.sender === 'user' && lastMessage.imageUrl && !lastMessage.isProcessed) {
+
+        console.log("检测到未处理的图片，准备进行多模态识别...");
+        // 标记图片为已处理，防止重复发送
+        lastMessage.isProcessed = true;
+        // 更新本地存储
+        const fullHistory = JSON.parse(localStorage.getItem('phoneSweetheartChatHistory') || '{}');
+        if (fullHistory[contactId]) {
+            const msgIndex = fullHistory[contactId].findIndex(msg => msg.timestamp === lastMessage.timestamp);
+            if (msgIndex !== -1) {
+                fullHistory[contactId][msgIndex].isProcessed = true;
+                localStorage.setItem('phoneSweetheartChatHistory', JSON.stringify(fullHistory));
+            }
+        }
+        // 构建多模态消息内容
+        multimodalMessage = {
+            role: 'user',
+            content: [
+                {
+                    type: 'text',
+                    text: currentUserInput || '分析一下这张图片。' // 如果用户没输入文字，给一个默认提示
+                },
+                {
+                    type: 'image_url',
+                    image_url: {
+                        url: lastMessage.imageUrl
+                    }
+                }
+            ]
+        };
+        // 从要发送到API的历史记录中移除最后一条纯图片消息，因为它将被合并后的消息替代
+        recentMessages.pop();
+    }
+    // 将历史消息（可能已移除了最后一条图片消息）添加到API请求中
+    recentMessages.forEach(msg => {
+        if (msg.type === 'location') {
+             messages.push({ role: 'system', content: `[场景变化] 你们来到了【${msg.locationName}】。描述：${msg.locationDesc}`});
+        } else if (msg.text) {
+             messages.push({
+                role: msg.sender === 'user' ? 'user' : 'assistant',
+                content: msg.text.replace(/<render>[\s\S]*?<\/render>/, '[特殊渲染内容]')
+             });
+        }
+    });
+    // 如果有多模态消息，就添加它
+    if (multimodalMessage) {
+        messages.push(multimodalMessage);
+    }
+    // 否则，如果只有普通文本输入，就正常添加
+    else if (currentUserInput) {
+        messages.push({ role: 'user', content: currentUserInput });
+    }
+    // 如果用户有输入，无论是否带图片，都需要在UI上显示这条文本消息并保存
+    if (currentUserInput) {
+        const messageObj = { sender: 'user', text: currentUserInput };
+        const newIndex = saveSweetheartMessage(contactId, messageObj);
+        const messageRow = _createMessageDOM(contactId, messageObj, newIndex);
+        messagesEl.appendChild(messageRow);
+        chatInput.value = '';
+    }
 
     // 3.5 地点触发事件（作为用户输入）
     const plotPrompt = `[地点事件] 我们来到了"${pin.name}"。这里的特点是："${pin.description || '一个神秘的地方'}"。请基于这个场景，生动地描述接下来发生的故事或对话。`;
@@ -11159,6 +11197,7 @@ ${conversationText}
         const knowledgeBase = JSON.parse(localStorage.getItem('knowledgeBase') || '[]');
         knowledgeBase.unshift(summary); // 新的放在前面
         localStorage.setItem('knowledgeBase', JSON.stringify(knowledgeBase));
+        updateTestButtonState(); // 更新测试按钮状态
 
         // 在聊天中显示总结
         const summaryMessage = {
@@ -11194,6 +11233,630 @@ function setupSummarizeButton() {
         });
     }
 }
+/**
+ * 绑定测试按钮事件
+ */
+function setupTestButton() {
+    const testBtn = document.getElementById('generateTestBtn');
+    if (testBtn) {
+        testBtn.addEventListener('click', () => {
+            openTestConfig();
+        });
+    }
+}
+
+// ========== 测试功能相关变量 ==========
+let testData = {
+    questions: [],
+    answers: {},
+    startTime: null,
+    selectedKnowledgeIds: []
+};
+
+// ========== 测试功能：启用/禁用测试按钮 ==========
+function updateTestButtonState() {
+    const testBtn = document.getElementById('generateTestBtn');
+    const knowledgeBase = JSON.parse(localStorage.getItem('knowledgeBase') || '[]');
+
+    if (knowledgeBase.length > 0) {
+        // 有知识清单，启用按钮
+        testBtn.style.opacity = '1';
+        testBtn.style.pointerEvents = 'auto';
+    } else {
+        // 没有知识清单，禁用按钮
+        testBtn.style.opacity = '0.5';
+        testBtn.style.pointerEvents = 'none';
+    }
+}
+
+// ========== 打开测试配置弹窗 ==========
+function openTestConfig() {
+    const knowledgeBase = JSON.parse(localStorage.getItem('knowledgeBase') || '[]');
+
+    if (knowledgeBase.length === 0) {
+        alert('请先生成知识清单！');
+        return;
+    }
+
+    // 渲染知识清单选择器
+    const selector = document.getElementById('knowledgeSelector');
+    selector.innerHTML = '';
+
+    knowledgeBase.forEach((item, index) => {
+        const checkboxItem = document.createElement('div');
+        checkboxItem.className = 'knowledge-checkbox-item';
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.id = `knowledge-${item.id}`;
+        checkbox.value = item.id;
+        checkbox.checked = index === 0; // 默认选中第一个
+
+        const label = document.createElement('label');
+        label.className = 'knowledge-checkbox-label';
+        label.htmlFor = `knowledge-${item.id}`;
+
+        const date = new Date(item.timestamp).toLocaleDateString('zh-CN');
+        label.textContent = `${date} - ${item.contactName} (${item.memoryRounds}轮对话)`;
+
+        checkboxItem.appendChild(checkbox);
+        checkboxItem.appendChild(label);
+        selector.appendChild(checkboxItem);
+    });
+
+    document.getElementById('testConfigModal').classList.add('show');
+    document.getElementById('attachmentMenu').classList.remove('show');
+}
+
+// ========== 关闭测试配置弹窗 ==========
+function closeTestConfig() {
+    document.getElementById('testConfigModal').classList.remove('show');
+}
+
+// ========== 调整题目数量 ==========
+function adjustQuestionCount(delta) {
+    const input = document.getElementById('questionCountInput');
+    let value = parseInt(input.value) || 5;
+    value = Math.max(1, Math.min(20, value + delta));
+    input.value = value;
+}
+
+// ========== 开始生成测试 ==========
+async function startGenerateTest() {
+    // 获取选中的知识清单
+    const selectedIds = [];
+    document.querySelectorAll('.knowledge-checkbox-item input:checked').forEach(cb => {
+        selectedIds.push(cb.value);
+    });
+
+    if (selectedIds.length === 0) {
+        alert('请至少选择一个知识清单！');
+        return;
+    }
+
+    const questionCount = parseInt(document.getElementById('questionCountInput').value) || 5;
+
+    // 获取知识内容
+    const knowledgeBase = JSON.parse(localStorage.getItem('knowledgeBase') || '[]');
+    const selectedKnowledge = knowledgeBase.filter(item => selectedIds.includes(item.id));
+
+    // 组合知识内容
+    let knowledgeContent = '';
+    selectedKnowledge.forEach((item, index) => {
+        knowledgeContent += `\n\n知识清单 ${index + 1}:\n${item.content}`;
+    });
+
+    // 构建提示词
+    const prompt = `请根据以下知识内容，生成${questionCount}道测试题。题目类型包括选择题、填空题和主观题。
+
+知识内容:${knowledgeContent}
+
+请严格按照以下JSON格式输出，不要添加任何其他文字：
+{
+  "questions": [
+    {
+      "type": "choice",
+      "question": "题目内容",
+      "options": ["选项A", "选项B", "选项C", "选项D"],
+      "answer": "正确答案"
+    },
+    {
+      "type": "fill",
+      "question": "题目内容（用____表示填空）",
+      "answer": "正确答案"
+    },
+    {
+      "type": "subjective",
+      "question": "题目内容",
+      "answer": "参考答案"
+    }
+  ]
+}`;
+
+    closeTestConfig();
+
+    // 显示加载提示
+    showSuccessModal('生成中', '正在生成测试题目，请稍候...', 0);
+
+    try {
+        // 调用API生成题目
+        const result = await callApi([
+            { role: 'system', content: '你是一个专业的教育测试专家。' },
+            { role: 'user', content: prompt }
+        ]);
+
+        if (!result.success) {
+            throw new Error(result.message);
+        }
+
+        // 解析生成的题目
+        let questionsData;
+        try {
+            // 尝试从返回内容中提取JSON
+            const jsonMatch = result.message.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                questionsData = JSON.parse(jsonMatch[0]);
+            } else {
+                questionsData = JSON.parse(result.message);
+            }
+        } catch (parseError) {
+            console.error('JSON解析失败:', parseError);
+            throw new Error('题目格式错误，请重试');
+        }
+
+        // 保存测试数据
+        testData.questions = questionsData.questions || [];
+        testData.answers = {};
+        testData.selectedKnowledgeIds = selectedIds;
+
+        // 关闭加载提示
+        document.getElementById('successModal').classList.remove('show');
+
+        // 显示测试准备弹窗
+        document.getElementById('testReadyModal').classList.add('show');
+
+    } catch (error) {
+        document.getElementById('successModal').classList.remove('show');
+        console.error('生成测试失败:', error);
+        alert('生成测试失败：' + error.message);
+    }
+}
+
+// ========== 关闭测试准备弹窗 ==========
+function closeTestReady() {
+    document.getElementById('testReadyModal').classList.remove('show');
+}
+
+// ========== 开始测试 ==========
+function startTest() {
+    closeTestReady();
+
+    // 渲染测试页面
+    const testContent = document.getElementById('testContent');
+    testContent.innerHTML = '';
+
+    testData.questions.forEach((q, index) => {
+        const questionDiv = document.createElement('div');
+        questionDiv.className = 'test-question';
+
+        let typeLabel = '';
+        let typeClass = '';
+        if (q.type === 'choice') {
+            typeLabel = '选择题';
+            typeClass = 'choice';
+        } else if (q.type === 'fill') {
+            typeLabel = '填空题';
+            typeClass = 'fill';
+        } else {
+            typeLabel = '主观题';
+            typeClass = 'subjective';
+        }
+
+        let optionsHTML = '';
+        if (q.type === 'choice') {
+            optionsHTML = '<div class="question-options">';
+            q.options.forEach((option, optIndex) => {
+                optionsHTML += `
+                    <div class="option-item" onclick="selectOption(${index}, '${option}', this)">
+                        <input type="radio" name="q${index}" value="${option}" id="q${index}_opt${optIndex}">
+                        <label class="option-label" for="q${index}_opt${optIndex}">${option}</label>
+                    </div>
+                `;
+            });
+            optionsHTML += '</div>';
+        } else {
+            optionsHTML = `<textarea class="answer-input" id="answer_${index}" placeholder="请输入你的答案..."></textarea>`;
+        }
+
+        questionDiv.innerHTML = `
+            <div class="question-header">
+                <div class="question-number">${index + 1}</div>
+                <div class="question-type ${typeClass}">${typeLabel}</div>
+            </div>
+            <div class="question-text">${q.question}</div>
+            ${optionsHTML}
+        `;
+
+        testContent.appendChild(questionDiv);
+    });
+
+    // 开始计时
+    testData.startTime = Date.now();
+    if (timerInterval) {
+        clearInterval(timerInterval);
+    }
+    timerInterval = setInterval(updateTimer, 1000); // 每秒更新一次
+    updateTimer(); // 立即更新一次
+
+
+    // 显示测试页面
+    document.getElementById('testPage').classList.add('show');
+}
+
+// ========== 选择选项 ==========
+function selectOption(questionIndex, answer, element) {
+    // 移除同组其他选项的选中状态
+    const parent = element.parentElement;
+    parent.querySelectorAll('.option-item').forEach(item => {
+        item.classList.remove('selected');
+    });
+
+    // 添加选中状态
+    element.classList.add('selected');
+    element.querySelector('input').checked = true;
+
+    // 保存答案
+    testData.answers[questionIndex] = answer;
+}
+
+// ========== 更新计时器 ==========
+let timerInterval = null; // 新增：存储计时器ID
+
+function updateTimer() {
+    const timerEl = document.getElementById('testTimer');
+    if (!testData.startTime || !document.getElementById('testPage').classList.contains('show')) {
+        if (timerInterval) {
+            clearInterval(timerInterval);
+            timerInterval = null;
+        }
+        return;
+    }
+
+    const elapsed = Math.floor((Date.now() - testData.startTime) / 1000);
+    const minutes = Math.floor(elapsed / 60);
+    const seconds = elapsed % 60;
+    timerEl.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
+// ========== 提交测试 ==========
+async function submitTest() {
+    // 停止计时
+    if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+    }
+
+    const useTime = document.getElementById('testTimer').textContent;
+
+    // 收集所有答案
+    testData.questions.forEach((q, index) => {
+        if (q.type !== 'choice' && !testData.answers[index]) {
+            const answerInput = document.getElementById(`answer_${index}`);
+            if (answerInput) {
+                testData.answers[index] = answerInput.value.trim();
+            }
+        }
+    });
+
+    // 检查是否所有题目都已作答
+    const unanswered = testData.questions.filter((q, index) => !testData.answers[index]);
+    if (unanswered.length > 0) {
+        if (!confirm(`还有${unanswered.length}道题未作答，确定要提交吗？`)) {
+            // 如果取消，重新开始计时
+            timerInterval = setInterval(updateTimer, 1000);
+            return;
+        }
+    }
+
+    // 计算得分（只计算客观题）
+    let correctCount = 0;
+    let objectiveTotal = 0; // 客观题总数
+    const subjectiveQuestions = []; // 主观题列表
+    const wrongAnswers = []; // 错误答案列表
+
+    testData.questions.forEach((q, index) => {
+        const userAnswer = testData.answers[index] || '';
+
+        if (q.type === 'subjective') {
+            // 主观题单独收集
+            subjectiveQuestions.push({
+                question: q.question,
+                userAnswer: userAnswer,
+                referenceAnswer: q.answer
+            });
+        } else {
+            // 客观题（选择题和填空题）
+            objectiveTotal++;
+            if (userAnswer === q.answer) {
+                correctCount++;
+            } else {
+                wrongAnswers.push({
+                    question: q.question,
+                    type: q.type === 'choice' ? '选择题' : '填空题',
+                    userAnswer: userAnswer || '未作答',
+                    correctAnswer: q.answer
+                });
+            }
+        }
+    });
+
+    // 计算客观题得分
+    const objectiveScore = objectiveTotal > 0 ? Math.round((correctCount / objectiveTotal) * 100) : 0;
+
+    // 显示结果弹窗
+    document.getElementById('scoreNumber').textContent = objectiveScore;
+
+    let detailsHTML = `
+        <div class="detail-item">
+            <span class="detail-label">客观题总数</span>
+            <span class="detail-value">${objectiveTotal}</span>
+        </div>
+        <div class="detail-item">
+            <span class="detail-label">答对数</span>
+            <span class="detail-value">${correctCount}</span>
+        </div>
+        <div class="detail-item">
+            <span class="detail-label">主观题数</span>
+            <span class="detail-value">${subjectiveQuestions.length}</span>
+        </div>
+        <div class="detail-item">
+            <span class="detail-label">用时</span>
+            <span class="detail-value">${useTime}</span>
+        </div>
+    `;
+
+    // 展示错题
+    if (wrongAnswers.length > 0) {
+        detailsHTML += '<div class="wrong-answers-section"><div class="section-title">错题解析</div>';
+        wrongAnswers.forEach((item, index) => {
+            detailsHTML += `
+                <div class="wrong-answer-item">
+                    <div class="wrong-q-number">第${index + 1}题 (${item.type})</div>
+                    <div class="wrong-q-text">${item.question}</div>
+                    <div class="wrong-answer-row">
+                        <span class="answer-label wrong">你的答案：</span>
+                        <span class="answer-text">${item.userAnswer}</span>
+                    </div>
+                    <div class="wrong-answer-row">
+                        <span class="answer-label correct">正确答案：</span>
+                        <span class="answer-text">${item.correctAnswer}</span>
+                    </div>
+                </div>
+            `;
+        });
+        detailsHTML += '</div>';
+    }
+
+    document.getElementById('scoreDetails').innerHTML = detailsHTML;
+    document.getElementById('testResultModal').classList.add('show');
+
+    // 保存测试数据，用于后续生成AI反馈
+    testData.testResult = {
+        objectiveScore,
+        correctCount,
+        objectiveTotal,
+        subjectiveQuestions,
+        wrongAnswers,
+        useTime
+    };
+}
+
+// ========== 关闭测试 ==========
+function closeTest() {
+    if (confirm('确定要退出测试吗？答案将不会保存。')) {
+        // 停止计时
+        if (timerInterval) {
+            clearInterval(timerInterval);
+            timerInterval = null;
+        }
+
+        document.getElementById('testPage').classList.remove('show');
+        testData = { questions: [], answers: {}, startTime: null, selectedKnowledgeIds: [] };
+    }
+}
+
+
+// ========== 关闭测试结果并生成AI反馈 ==========
+async function closeTestResult() {
+    document.getElementById('testResultModal').classList.remove('show');
+    document.getElementById('testPage').classList.remove('show');
+
+    // 如果有测试结果，生成AI反馈
+    if (testData.testResult && currentChatContact) {
+        await generateTestFeedback();
+    }
+
+    // 清空测试数据
+    testData = { questions: [], answers: {}, startTime: null, selectedKnowledgeIds: [] };
+}
+
+// ========== 生成测试反馈 ==========
+async function generateTestFeedback() {
+    const result = testData.testResult;
+    const contactId = currentChatContact.id;
+
+    // 构建测试情况报告
+    let reportText = `我刚刚完成了一次知识测试，以下是测试情况：\n\n`;
+    reportText += `📊 客观题成绩：${result.objectiveScore}分\n`;
+    reportText += `✅ 答对：${result.correctCount}/${result.objectiveTotal}题\n`;
+    reportText += `⏱️ 用时：${result.useTime}\n\n`;
+
+    // 添加错题信息
+    if (result.wrongAnswers.length > 0) {
+        reportText += `❌ 错题详情：\n`;
+        result.wrongAnswers.forEach((item, index) => {
+            reportText += `\n第${index + 1}题：${item.question}\n`;
+            reportText += `我的答案：${item.userAnswer}\n`;
+            reportText += `正确答案：${item.correctAnswer}\n`;
+        });
+        reportText += `\n`;
+    }
+
+    // 添加主观题信息
+    if (result.subjectiveQuestions.length > 0) {
+        reportText += `📝 主观题作答情况：\n`;
+        result.subjectiveQuestions.forEach((item, index) => {
+            reportText += `\n第${index + 1}题：${item.question}\n`;
+            reportText += `我的答案：${item.userAnswer || '未作答'}\n`;
+            reportText += `参考答案：${item.referenceAnswer}\n`;
+        });
+        reportText += `\n`;
+    }
+
+    reportText += `请你：\n`;
+    reportText += `1. 对我的主观题作答进行评价和打分\n`;
+    reportText += `2. 分析我在这次测试中的表现\n`;
+    reportText += `3. 给出针对性的学习建议`;
+
+    // 在聊天消息区显示用户的测试报告
+    const messagesEl = document.getElementById('chatMessages');
+
+    const reportMessage = {
+        sender: 'user',
+        text: reportText
+    };
+
+    const reportIndex = saveMessage(contactId, reportMessage);
+    const reportRow = _createMessageDOM(contactId, reportMessage, reportIndex);
+    messagesEl.appendChild(reportRow);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+
+    // 显示加载提示
+    const loadingMsg = _createMessageDOM(contactId, {
+        sender: 'contact',
+        text: '正在分析你的测试情况...'
+    }, -1);
+    messagesEl.appendChild(loadingMsg);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+
+    try {
+        // 构建完整的对话上下文（包括人设、面具等）
+        const apiMessages = buildChatContext(contactId, reportText);
+
+        // 调用API生成反馈
+        const response = await callApi(apiMessages);
+
+        // 移除加载提示
+        loadingMsg.remove();
+
+        if (!response.success) {
+            throw new Error(response.message);
+        }
+
+        // 保存并显示AI的反馈
+        const feedbackMessage = {
+            sender: 'contact',
+            text: response.message
+        };
+
+        const feedbackIndex = saveMessage(contactId, feedbackMessage);
+        const feedbackRow = _createMessageDOM(contactId, feedbackMessage, feedbackIndex);
+        messagesEl.appendChild(feedbackRow);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+
+    } catch (error) {
+        loadingMsg.remove();
+        console.error('生成测试反馈失败:', error);
+
+        const errorMessage = {
+            sender: 'contact',
+            text: '抱歉，生成反馈时出现了问题：' + error.message
+        };
+        const errorIndex = saveMessage(contactId, errorMessage);
+        const errorRow = _createMessageDOM(contactId, errorMessage, errorIndex);
+        messagesEl.appendChild(errorRow);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+}
+
+// ========== 构建聊天上下文（包括人设、面具等）==========
+function buildChatContext(contactId, userMessage) {
+    const contact = contactsData.find(c => c.id === contactId);
+    if (!contact) {
+        return [
+            { role: 'user', content: userMessage }
+        ];
+    }
+
+    const messages = [];
+
+    // 1. 添加系统提示词（角色设定）
+    let systemPrompt = '';
+
+    // 添加角色persona
+    if (contact.status) {
+        systemPrompt += contact.status + '\n\n';
+    }
+
+    // 添加绑定的世界书
+    if (contact.boundWorldbooks && contact.boundWorldbooks.length > 0) {
+        contact.boundWorldbooks.forEach(wbId => {
+            const wb = worldbookData.find(w => w.id === wbId);
+            if (wb) {
+                systemPrompt += `${wb.title}:\n${wb.content}\n\n`;
+            }
+        });
+    }
+
+    // 添加绑定的面具
+    if (contact.boundMasks && contact.boundMasks.length > 0) {
+        contact.boundMasks.forEach(maskId => {
+            const mask = masksData.find(m => m.id === maskId);
+            if (mask) {
+                systemPrompt += `人设 - ${mask.name}:\n${mask.content}\n\n`;
+            }
+        });
+    }
+
+    // 添加用户设定
+    if (userProfile.persona) {
+        systemPrompt += `用户设定:\n${userProfile.persona}\n\n`;
+    }
+
+    if (systemPrompt) {
+        messages.push({
+            role: 'system',
+            content: systemPrompt.trim()
+        });
+    }
+
+    // 2. 添加历史对话（记忆轮数）
+    const memoryRounds = contact.memoryRounds || 10;
+    const chatHistory = JSON.parse(localStorage.getItem(`chat_${contactId}`) || '[]');
+    const recentMessages = chatHistory.slice(-memoryRounds * 2);
+
+    recentMessages.forEach(msg => {
+        messages.push({
+            role: msg.sender === 'user' ? 'user' : 'assistant',
+            content: msg.text
+        });
+    });
+
+    // 3. 添加当前用户消息
+    messages.push({
+        role: 'user',
+        content: userMessage
+    });
+
+    return messages;
+}
+
+
+// ========== 在总结知识点后更新测试按钮状态 ==========
+// 修改原有的 summarizeKnowledge 函数，在保存知识点后调用
+// 在 summarizeKnowledge 函数的最后，localStorage.setItem 之后添加：
+// updateTestButtonState();
+
 // ========== 记忆存储中心功能 ==========
 
 /**
@@ -11326,6 +11989,9 @@ function initializeApp() {
     loadMasksData();
     updateChatModeButton();
     setupSummarizeButton();
+    setupTestButton();
+    updateTestButtonState(); // 初始化测试按钮状态
+
     // ===== 第六步：加载联系人数据 =====
     const savedContacts = localStorage.getItem('phoneContactsData');
     if (savedContacts) {

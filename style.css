@@ -11,46 +11,6 @@
 }
 
 /* ========== 开始：粘贴这段全新的、修正后的代码块CSS ========== */
-
-.code-block-wrapper pre {
-    background-color: #1e1e1e;
-    color: #d4d4d4;
-    padding: 36px 12px 12px 12px;
-    border-radius: 8px;
-    font-family: 'Consolas', 'Monaco', 'Menlo', monospace;
-    font-size: 13px;
-    line-height: 1.5;
-    margin: 0;
-    white-space: pre-wrap;
-    word-break: break-all;
-    box-sizing: border-box;
-
-    /* ========== 新增：确保 pre 也受宽度约束 ========== */
-    max-width: 100%;
-    width: 100%; /* 填满父容器 */
-    /* ========== 新增结束 ========== */
-}
-
-
-/* 3. 开启滚动条模式时，修改包裹容器和<pre>的行为 */
-
-/* --- 用下面这个新版本替换它 --- */
-body.code-scrolling-enabled .code-block-wrapper pre {
-    white-space: pre;
-    word-break: normal;
-    overflow-x: auto; /* <<< --- 核心修改：滚动条在这里！--- <<< */
-    flex: 1; /* <<< --- 新增：让pre元素占据所有可用空间 --- <<< */
-    min-width: 0; /* <<< --- 新增：允许pre元素收缩 --- <<< */
-}
-
-
-.chat-bubble code {
-    padding: 0;
-    background: transparent;
-    border-radius: 0;
-    font-family: inherit;
-}
-
 * {
     margin: 0;
     padding: 0;
@@ -2457,80 +2417,234 @@ input:checked + .slider:before {
 
 /* ========== 结束：粘贴全新的 CSS 代码 ========== */
 
+/* style.css */
 
-/* ========== 开始：为代码块复制功能添加新样式 ========== */
+/* ========== 代码块与复制按钮样式 (按钮在pre内部版) ========== */
 
-/* ========== 找到并修改这个规则 ========== */
-
+/* 1. 代码块包装器 */
 .code-block-wrapper {
     position: relative;
-    display: flex;
-    margin: 8px 0;
-    min-width: 0;
-
-    /* ========== 核心修改：限制代码块最大宽度 ========== */
-    max-width: 280px; /* 与气泡的最大宽度保持一致或略小 */
-    /* ========== 修改结束 ========== */
-}
-
-
-/* 2. 微调一下 pre 标签的样式 */
-/* 将 margin 移除，因为它已经在父容器上了 */
-
-.code-block-wrapper pre {
+    display: block;
     margin: 0;
-    /* 增加上方的内边距，给按钮留出空间 */
-    padding-top: 36px;
+    width: 100%;
+    max-width: 100%;
 }
 
+/* 2. pre 元素样式 - 作为按钮的定位容器 */
+.code-block-wrapper pre {
+    /* 重要：pre 需要作为定位容器 */
+    position: relative;
 
-/* 3. 复制按钮的样式 */
+    /* 基础样式 */
+    background-color: #1e1e1e;
+    color: #d4d4d4;
+    /* 增加顶部内边距，为按钮留出空间 */
+    padding: 45px 12px 12px 12px; /* 从36px增加到45px */
+    border-radius: 8px;
+    font-family: 'Consolas', 'Monaco', 'Menlo', monospace;
+    font-size: 13px;
+    line-height: 1.5;
 
+    /* 布局样式 */
+    margin: 0;
+    width: 100%;
+    box-sizing: border-box;
+
+    /* 文本处理 */
+    white-space: pre-wrap;
+    word-break: break-all;
+    overflow-x: auto;
+
+    /* 确保 pre 是块级元素 */
+    display: block;
+}
+
+/* 3. 复制按钮 - 定位在pre内部顶部 */
 .copy-code-btn {
+    /* 绝对定位在 pre 内部的右上角 */
     position: absolute;
-    top: 8px;
-    right: 8px;
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    color: #a0a0a0;
-    padding: 5px 8px;
-    border-radius: 6px;
-    font-size: 12px;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    cursor: pointer;
-    opacity: 0; /* 默认隐藏 */
-    transition: opacity 0.2s ease-in-out, background-color 0.2s ease-in-out;
+    top: 10px;  /* 距离顶部的距离 */
+    right: 12px; /* 距离右边的距离，与pre的padding对齐 */
+    z-index: 10;
+
+    /* 调大按钮尺寸 */
+    min-width: auto;
+    height: auto;
+    padding: 8px 14px; /* 从 6px 10px 增加到 8px 14px */
+
+    /* 外观样式 */
+    background: rgba(255, 255, 255, 0.12); /* 稍微提高不透明度 */
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 8px; /* 稍微增大圆角 */
+    color: #b0b0b0; /* 稍微提亮颜色 */
+
+    /* 使用 flexbox 确保内容完美居中 */
     display: flex;
     align-items: center;
-    gap: 4px; /* 图标和文字的间距 */
+    justify-content: center;
+    gap: 8px; /* 增加图标和文字的间距 */
+
+    /* 调大字体 */
+    font-size: 14px !important; /* 从12px增加到14px */
+    font-weight: 500; /* 稍微加粗 */
+    line-height: 1;
+    white-space: nowrap;
+
+    /* 交互样式 */
+    cursor: pointer;
+    opacity: 0;
+    transition: all 0.2s ease-in-out;
+
+    /* 添加轻微阴影，增加层次感 */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
-/* 4. 当鼠标悬停在整个代码块上时，显示按钮 */
+/* 4. SVG 图标样式 - 调大尺寸 */
+.copy-code-btn svg {
+    /* 增大图标尺寸 */
+    width: 16px; /* 从14px增加到16px */
+    height: 16px;
 
-.code-block-wrapper:hover .copy-code-btn {
+    /* 确保不会被压缩或拉伸 */
+    flex-shrink: 0;
+    flex-grow: 0;
+
+    /* 颜色继承 */
+    fill: currentColor;
+
+    /* 垂直对齐 */
+    vertical-align: middle;
+    display: block;
+}
+
+/* 5. 按钮文本样式 */
+.copy-code-btn span {
+    font-size: inherit;
+    line-height: 1;
+    vertical-align: middle;
+    font-weight: inherit;
+}
+
+/* 6. 鼠标悬停显示按钮 */
+.code-block-wrapper:hover .copy-code-btn,
+.code-block-wrapper pre:hover .copy-code-btn {
     opacity: 1;
 }
 
-/* 5. 按钮悬停时的效果 */
-
+/* 7. 按钮悬停效果 */
 .copy-code-btn:hover {
-    background: rgba(255, 255, 255, 0.2);
-    color: #d4d4d4;
+    background: rgba(255, 255, 255, 0.18);
+    color: #e0e0e0;
+    border-color: rgba(255, 255, 255, 0.3);
+    /* 悬停时稍微放大 */
+    transform: scale(1.05);
 }
 
-/* 6. 按钮点击后的“已复制”状态 */
+/* 8. 按钮按下效果 */
+.copy-code-btn:active {
+    transform: scale(0.98);
+}
 
+/* 9. 复制成功状态 */
 .copy-code-btn.copied {
-    background-color: #28a745; /* 绿色背景表示成功 */
+    background-color: #28a745;
     color: white;
+    border-color: #28a745;
+    opacity: 1;
 }
 
-/* 7. SVG 图标样式 */
+/* 10. 特殊情况：当代码块在聊天气泡中时 */
+.chat-bubble .code-block-wrapper {
+    margin: -12px;
+    width: calc(100% + 24px);
+}
 
-.copy-code-btn svg {
-    width: 14px;
-    height: 14px;
-    fill: currentColor;
+/* 11. 确保气泡只包含代码块时的样式正确 */
+.chat-bubble:has(.code-block-wrapper) {
+    padding: 0;
+    background: transparent;
+}
+
+/* 12. 代码滚动模式的特殊处理 */
+body.code-scrolling-enabled .code-block-wrapper pre {
+    white-space: pre;
+    word-break: normal;
+    overflow-x: auto;
+    /* 滚动模式下可能需要更多顶部空间 */
+    padding-top: 50px;
+}
+
+/* 13. 确保按钮不会影响代码内容的布局 */
+.code-block-wrapper pre code {
+    display: block;
+    /* 确保代码内容不会与按钮重叠 */
+    position: relative;
+    z-index: 1;
+}
+
+/* ========== 代码块气泡对齐修复 ========== */
+
+/* 1. 当气泡内只包含代码块时，移除气泡的默认样式 */
+.chat-bubble:has(.code-block-wrapper:only-child) {
+    padding: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    max-width: 100%; /* 允许代码块使用全部可用宽度 */
+}
+
+/* 2. 确保代码块本身有正确的圆角和阴影 */
+.chat-bubble .code-block-wrapper:only-child pre {
+    border-radius: 12px; /* 与普通气泡一致的圆角 */
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05); /* 与普通气泡一致的阴影 */
+}
+
+/* 3. 修复代码块的宽度，确保与普通气泡一致 */
+.message-row .code-block-wrapper {
+    max-width: calc(100vw - 120px); /* 与普通气泡的 max-width 保持一致 */
+    width: fit-content;
+}
+
+/* 4. 确保代码块在发送/接收时的对齐正确 */
+.message-row.sent .code-block-wrapper {
+    margin-left: auto; /* 发送的代码块右对齐 */
+}
+
+.message-row.received .code-block-wrapper {
+    margin-right: auto; /* 接收的代码块左对齐 */
+}
+
+/* 5. 移除之前可能导致问题的负边距 */
+.chat-bubble .code-block-wrapper {
+    margin: 0 !important; /* 覆盖之前的 margin: -12px */
+    width: 100% !important; /* 覆盖之前的 calc(100% + 24px) */
+}
+
+/* 6. 如果浏览器不支持 :has 选择器，使用备用方案 */
+@supports not selector(:has(*)) {
+    /* 为只包含代码块的气泡添加特殊类（需要在 JS 中配合添加） */
+    .chat-bubble.code-only {
+        padding: 0 !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        border-radius: 0 !important;
+    }
+
+    .chat-bubble.code-only .code-block-wrapper pre {
+        border-radius: 12px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    }
+}
+
+/* 7. 确保简洁模式下代码块也能正确显示 */
+.chat-page.simple-style .code-block-wrapper pre {
+    background-color: #1e1e1e; /* 保持深色背景 */
+    padding: 45px 12px 12px 12px; /* 保持原有内边距 */
+}
+
+/* 8. 调整代码滚动模式的特殊处理 */
+body.code-scrolling-enabled .code-block-wrapper {
+    max-width: calc(100vw - 120px);
 }
 
 
@@ -6304,14 +6418,12 @@ input:checked + .slider:before {
     transform: scale(1);
 }
 
-/* 5. 弹窗头部 */
+/* 1. 增加头部的上下内边距，把分割线推下去 */
 .status-popup-header {
-    padding: 16px;
-    font-size: 16px;
-    font-weight: 700;
-    color: #8D6E63; /* 棕色文字 */
+    padding: 20px; /* 原来是 padding: 16px; */
     text-align: center;
     border-bottom: 2px dashed #FFD1DC;
+    justify-content: center; /* 保持标题居中 */
     position: relative;
 }
 
@@ -6320,8 +6432,8 @@ input:checked + .slider:before {
     top: 50%;
     right: 16px;
     transform: translateY(-50%);
-    width: 28px;
-    height: 28px;
+    width: 32px;
+    height: 32px;
     border-radius: 50%;
     background: #FFF0F5;
     color: #D4A5A5;
@@ -6400,18 +6512,25 @@ input:checked + .slider:before {
 }
 /* ========== HTML渲染气泡样式 - 开始 ========== */
 
-/* 1. 渲染气泡的容器样式 */
+/* style.css (修正后的代码) */
+
+/* 新的、更灵活的规则 */
 .render-bubble {
     padding: 0;
-    overflow: hidden;
+    overflow: hidden; /* 继续隐藏溢出，防止调整大小时内容露出 */
     background: #fff;
-    width: 300px;
-    height: 250px; /* 稍微增加默认高度 */
-    resize: both;
-    /* 调整最小尺寸，给JS内容更多空间 */
+    width: 300px; /* 保持默认宽度 */
+
+    /* 移除固定的 height 属性！这是最关键的一步。 */
+    /* height: 250px; */
+
+    resize: both; /* 保持允许用户手动调整大小的功能，这很棒！ */
     min-width: 200px;
-    min-height: 150px;
+    min-height: 150px; /* 保留最小高度，避免内容太少时塌陷 */
+    max-height: 60vh; /* 新增最大高度，防止内容过长撑满整个屏幕 (60%的视口高度) */
+    display: flex; /* 新增：让内部的 iframe 能更好地填充 */
 }
+
 
 
 /* 2. iframe样式，用于显示渲染结果 */
@@ -7712,6 +7831,7 @@ input:checked + .slider:before {
     background: linear-gradient(135deg, #FFB6C1, #FFC0D9);
     transition: all 0.3s ease;
     box-shadow: 0 2px 8px rgba(255, 182, 193, 0.3);
+    margin-right: 28px;
 }
 
 .mode-toggle-btn:hover {
@@ -7976,4 +8096,701 @@ input:checked + .slider:before {
 }
 #newWorldModal {
     z-index: 2001; /* 确保这个值高于 #worldSelectPage 的 2000 */
+}
+
+/*
+====================================
+状态弹窗 - 右上角编辑按钮样式
+====================================
+*/
+
+/* 2. 编辑按钮容器 */
+.status-popup-edit {
+    position: absolute;      /* 绝对定位 */
+    top: 50%;                /* 垂直居中 */
+    transform: translateY(-50%); /* 精确垂直居中 */
+    right: 58px;             /* 关键：定位在关闭按钮的左边 (28px的关闭按钮宽度 + 28px的自身宽度) */
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #FFF0F5;     /* 使用主题色 */
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+/* 3. 悬停效果 */
+.status-popup-edit:hover {
+    background: #FFE4E9;
+    transform: translateY(-50%) scale(1.1); /* 增加一个轻微的放大效果 */
+}
+
+/* 4. SVG图标样式 */
+.status-popup-edit svg {
+    width: 18px;
+    height: 18px;
+    fill: #D4A5A5; /* 使用主题色 */
+}
+/*
+====================================
+状态弹窗 - 就地编辑模式样式
+====================================
+*/
+
+/* 1. 默认状态下的样式 */
+.status-popup-modal .status-input,
+.status-popup-modal .status-popup-save,
+.status-popup-modal .header-title-editing {
+    display: none; /* 默认隐藏所有输入框、保存按钮和编辑标题 */
+}
+
+/* 2. 编辑模式下的样式 (当 .is-editing 类被添加到弹窗上时) */
+.status-popup-modal.is-editing .status-value,
+.status-popup-modal.is-editing .status-popup-edit,
+.status-popup-modal.is-editing .header-title-static {
+    display: none; /* 隐藏所有只读文本、编辑按钮和静态标题 */
+}
+
+.status-popup-modal.is-editing .status-input,
+.status-popup-modal.is-editing .status-popup-save,
+.status-popup-modal.is-editing .header-title-editing {
+    display: flex; /* 显示所有输入框、保存按钮和编辑标题 */
+}
+
+/* 3. 输入框的具体样式 */
+.status-input {
+    width: 100%;
+    padding: 8px 10px;
+    font-size: 14px;
+    font-family: inherit;
+    color: #8D6E63;
+    border: 2px solid #FFD1DC; /* 使用主题粉色作为边框 */
+    border-radius: 8px;
+    background: white;
+    transition: all 0.2s;
+}
+
+.status-input:focus {
+    outline: none;
+    border-color: #FF9AAD;
+    box-shadow: 0 0 0 3px rgba(255, 182, 193, 0.3); /* 聚焦时发光效果 */
+}
+
+/* 4. 修改头部样式以适应新按钮 */
+.status-popup-header .header-title-static,
+.status-popup-header .header-title-editing {
+    left: 50%;
+    transform: translateX(-50%) translateY(-10px);
+    font-size: 16px;
+    font-weight: 700;
+    color: #8D6E63;
+    position: absolute; /* 1. 开启相对定位 */
+}
+
+.status-popup-save {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    right: 58px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #e8f5e9; /* 保存按钮用绿色 */
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.status-popup-save:hover {
+    background: #c8e6c9;
+    transform: translateY(-50%) scale(1.1);
+}
+
+.status-popup-save svg {
+    width: 22px;
+    height: 22px;
+    fill: #4caf50;
+}
+/* style.css */
+/* 1. 基础图标容器样式（最终无背景版） */
+.settings-icon {
+    width: 32px;
+    height: 32px;
+    margin-right: 14px;
+
+    /* 核心修改：让背景完全透明 */
+    background-color: transparent;
+    /* 移除为背景板设计的圆角 */
+    border-radius: 0;
+    /* 背景图片通用属性 */
+    background-size: contain;   /* contain能确保图标完整显示 */
+    background-position: center;
+    background-repeat: no-repeat;
+}
+/* 2. 为每个图标单独设置 `background-image` */
+/* 和上次一样，这里只设置图片 URL */
+.icon-api {
+    background-image: url('https://chatbotcos.weixin.qq.com/chatbot/30-openaiassets_68f3834db21084aab1644317b57b1737_469401762089707973.png');
+}
+.icon-database {
+    background-image: url('https://cdn-icons-png.flaticon.com/512/1265/1265492.png');
+}
+.icon-fullscreen {
+    background-image: url('https://cdn-icons-png.flaticon.com/512/9348/9348106.png');
+}
+.icon-storage {
+    background-image: url('https://cdn-icons-png.flaticon.com/512/1198/1198369.png');
+}
+.icon-contacts {
+    background-image: url('https://cdn-icons-png.flaticon.com/512/3781/3781907.png');
+}
+.icon-mask {
+    background-image: url('https://cdn-icons-png.flaticon.com/512/3233/3233488.png');
+}
+.icon-memory {
+    background-image: url('https://cdn-icons-png.flaticon.com/512/2641/2641261.png');
+}
+.icon-beautify {
+    background-image: url('https://cdn-icons-png.flaticon.com/512/1214/1214310.png');
+}
+.icon-bubble {
+    background-image: url('https://cdn-icons-png.flaticon.com/512/134/134796.png');
+}
+.icon-widget {
+    background-image: url('https://cdn-icons-png.flaticon.com/512/2089/2089158.png');
+}
+.icon-floatball {
+    background-image: url('https://cdn-icons-png.flaticon.com/512/7798/7798822.png');
+}
+.icon-danger {
+    background-image: url('https://cdn-icons-png.flaticon.com/512/3221/3221803.png');
+}
+
+/*
+====================================
+聊天头部 - 标题与模式图标布局优化
+====================================
+*/
+
+/* 1. 让头部容器内的元素能更好地对齐 */
+.sweetheart-chat-header {
+    position: relative; /* 确保绝对定位的子元素有参考 */
+}
+
+/* 2. 将标题和模式图标组合在一起，并让它们居中 */
+.sweetheart-chat-title {
+    position: static; /* 移除绝对定位，让它参与flex布局 */
+    transform: none;  /* 移除transform */
+    margin: 0;        /* 移除外边距 */
+
+    /* 使用flex布局让标题和后面的图标对齐 */
+    display: flex;
+    align-items: center;
+    gap: 8px; /* 标题和图标之间的间距 */
+
+    /* 关键：将组合体移动到页面中心 */
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    padding-top: 30px; /* 适配状态栏高度 */
+}
+
+/* 3. 调整模式切换按钮的样式 */
+.mode-toggle-btn {
+    /* 移除原有的圆形背景和边框 */
+    background: none;
+    box-shadow: none;
+    width: auto;  /* 宽度自适应 */
+    height: auto; /* 高度自适应 */
+    border-radius: 0;
+
+    /* 让它在flex布局中垂直居中 */
+    display: flex;
+    align-items: center;
+}
+
+/* 4. 设置图标图片的大小 */
+.mode-toggle-btn img {
+    height: 1.2em;  /* 核心修改：让图标高度与文字大小关联 (1.2倍文字高度) */
+    width: auto;    /* 核心修改：宽度自动调整，以保持图片原始比例不失真 */
+    opacity: 0.7; /* 让图标柔和一点 */
+    transition: opacity 0.2s, transform 0.2s;
+}
+
+/* 5. 鼠标悬停时增加交互效果 */
+.mode-toggle-btn:hover img {
+    opacity: 1;
+    transform: scale(1.1);
+}
+/* ========== 测试功能样式 ========== */
+
+/* 测试配置弹窗 */
+.test-config-card {
+    background: white;
+    border-radius: 20px;
+    width: 90%;
+    max-width: 340px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    transform: scale(0.9);
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+#testConfigModal.show .test-config-card {
+    transform: scale(1);
+}
+
+.test-config-header {
+    padding: 20px;
+    border-bottom: 1px solid #f0f0f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.test-config-content {
+    padding: 20px;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.test-field {
+    margin-bottom: 20px;
+}
+
+.test-label {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 10px;
+}
+
+.knowledge-selector {
+    border: 2px solid #e0e0e0;
+    border-radius: 12px;
+    padding: 12px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.knowledge-checkbox-item {
+    display: flex;
+    align-items: flex-start;
+    padding: 10px;
+    border-bottom: 1px solid #f5f5f5;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.knowledge-checkbox-item:last-child {
+    border-bottom: none;
+}
+
+.knowledge-checkbox-item:hover {
+    background: #f8f9fa;
+}
+
+.knowledge-checkbox-item input[type="checkbox"] {
+    margin-right: 10px;
+    margin-top: 3px;
+    cursor: pointer;
+    accent-color: #667eea;
+}
+
+.knowledge-checkbox-label {
+    flex: 1;
+    font-size: 13px;
+    color: #555;
+    line-height: 1.4;
+}
+
+.test-config-footer {
+    display: flex;
+    gap: 12px;
+    padding: 16px 20px;
+    border-top: 1px solid #f0f0f0;
+}
+
+.test-btn {
+    flex: 1;
+    padding: 12px;
+    border: none;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.test-btn-cancel {
+    background: #f0f0f0;
+    color: #666;
+}
+
+.test-btn-generate {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+}
+
+.test-btn-generate:active {
+    transform: scale(0.97);
+}
+
+/* 测试确认弹窗 */
+.test-ready-card {
+    background: white;
+    border-radius: 20px;
+    padding: 40px 30px;
+    text-align: center;
+    max-width: 300px;
+    transform: scale(0.9);
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+#testReadyModal.show .test-ready-card {
+    transform: scale(1);
+}
+
+.test-ready-icon {
+    font-size: 64px;
+    margin-bottom: 20px;
+}
+
+.test-ready-card h3 {
+    font-size: 20px;
+    color: #333;
+    margin-bottom: 10px;
+}
+
+.test-ready-card p {
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 24px;
+}
+
+.test-ready-actions {
+    display: flex;
+    gap: 12px;
+}
+
+.test-btn-start {
+    background: linear-gradient(135deg, #43e97b, #38f9d7);
+    color: white;
+}
+
+/* 测试页面 */
+.test-page {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #f7f8fa;
+    z-index: 1006;
+    display: flex;
+    flex-direction: column;
+    transform: translateY(100%);
+    transition: transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.test-page.show {
+    transform: translateY(0);
+}
+
+.test-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 45px 12px 12px;
+    background: white;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.test-timer {
+    font-size: 16px;
+    font-weight: 600;
+    color: #667eea;
+    font-family: 'Courier New', monospace;
+}
+
+.test-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+}
+
+.test-question {
+    background: white;
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.question-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid #f0f0f0;
+}
+
+.question-number {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: bold;
+    flex-shrink: 0;
+}
+
+.question-type {
+    background: #e3f2fd;
+    color: #1976d2;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.question-text {
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+    line-height: 1.6;
+    margin-bottom: 16px;
+}
+
+.question-options {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.option-item {
+    display: flex;
+    align-items: center;
+    padding: 12px;
+    border: 2px solid #e0e0e0;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.option-item:hover {
+    background: #f8f9fa;
+    border-color: #667eea;
+}
+
+.option-item.selected {
+    background: #e8eaf6;
+    border-color: #667eea;
+}
+
+.option-item input[type="radio"] {
+    margin-right: 12px;
+    cursor: pointer;
+    accent-color: #667eea;
+}
+
+.option-label {
+    flex: 1;
+    font-size: 14px;
+    color: #555;
+}
+
+.answer-input {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid #e0e0e0;
+    border-radius: 12px;
+    font-size: 14px;
+    resize: vertical;
+    min-height: 60px;
+}
+
+.answer-input:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.test-footer {
+    padding: 16px 20px;
+    background: white;
+    border-top: 1px solid #e0e0e0;
+}
+
+.test-submit-btn {
+    width: 100%;
+    padding: 14px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.test-submit-btn:active {
+    transform: scale(0.98);
+}
+
+/* 测试结果弹窗 */
+.test-result-card {
+    background: white;
+    border-radius: 20px;
+    width: 90%;
+    max-width: 360px;
+    max-height: 80vh;
+    overflow: hidden;
+    transform: scale(0.9);
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+#testResultModal.show .test-result-card {
+    transform: scale(1);
+}
+
+.test-result-header {
+    padding: 20px;
+    border-bottom: 1px solid #f0f0f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.test-result-content {
+    padding: 30px 20px;
+}
+
+.score-display {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.score-number {
+    font-size: 72px;
+    font-weight: bold;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    line-height: 1;
+}
+
+.score-label {
+    font-size: 18px;
+    color: #666;
+    margin-top: 8px;
+}
+
+.score-details {
+    background: #f8f9fa;
+    border-radius: 12px;
+    padding: 16px;
+}
+
+.detail-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.detail-item:last-child {
+    border-bottom: none;
+}
+
+.detail-label {
+    font-size: 14px;
+    color: #666;
+}
+
+.detail-value {
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+}
+
+.test-result-footer {
+    padding: 16px 20px;
+    border-top: 1px solid #f0f0f0;
+}
+
+.test-btn-close {
+    width: 100%;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+}
+/* 错题解析区域 */
+.wrong-answers-section {
+    margin-top: 20px;
+}
+
+.wrong-answers-section .section-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #f0f0f0;
+}
+
+.wrong-answer-item {
+    background: #fff5f5;
+    border-left: 3px solid #ff3b30;
+    padding: 12px;
+    margin-bottom: 12px;
+    border-radius: 8px;
+}
+
+.wrong-q-number {
+    font-size: 12px;
+    color: #ff3b30;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+.wrong-q-text {
+    font-size: 13px;
+    color: #333;
+    margin-bottom: 8px;
+    line-height: 1.4;
+}
+
+.wrong-answer-row {
+    display: flex;
+    align-items: baseline;
+    margin: 4px 0;
+    font-size: 12px;
+}
+
+.answer-label {
+    font-weight: 600;
+    margin-right: 6px;
+    min-width: 80px;
+}
+
+.answer-label.wrong {
+    color: #ff3b30;
+}
+
+.answer-label.correct {
+    color: #34c759;
+}
+
+.answer-text {
+    flex: 1;
+    color: #555;
 }
