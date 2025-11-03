@@ -4416,6 +4416,10 @@ ${formattedDialog}
  * 普通聊天 - 获取AI回复（完整版）
  */
 async function getAiReply() {
+    if (globalConfig.activeApiConfig === null || !globalConfig.apiConfigs[globalConfig.activeApiConfig]) {
+        alert('请先在“设置 > API设置”中配置并激活一个API！');
+        return; // 终止函数执行
+    }
     if (!currentChatContact) return;
 
     const contactId = currentChatContact.id;
@@ -6864,11 +6868,51 @@ function parseAiJsonResponse(rawMessage) {
 
 
 /**
+ * [修改后] 格式化状态历史，明确区分“当前实时状态”和“历史参考”
+ * @param {object} currentStatus - 从DOM实时读取的当前状态
+ * @param {Array} history - 从localStorage读取的历史状态数组
+ * @returns {string} 格式化后的完整系统提示字符串
+ */
+function formatStatusHistoryForAI(currentStatus, history) {
+    let prompt = "";
+
+    // 辅助函数，用于格式化单个状态条目
+    const formatSingleEntry = (entry) => {
+        if (!entry) return '';
+        const characterStatus = entry.character ? `[TA的状态]\n- 所在: ${entry.character.location || '未知'}\n- 穿着: ${entry.character.appearance || '未知'}\n- 行为: ${entry.character.action || '未知'}\n- 心声: ${entry.character.thoughts || '未知'}\n- 私密心绪: ${entry.character.private_thoughts || '未知'}` : '[TA的状态] 未知';
+        const userStatus = entry.user ? `[我的状态]\n- 所在: ${entry.user.location || '未知'}\n- 穿着: ${entry.user.appearance || '未知'}\n- 行为: ${entry.user.action || '未知'}\n- 身上特点: ${entry.user.features || '未知'}` : '[我的状态] 未知';
+        return `${characterStatus}\n\n${userStatus}`;
+    };
+
+    // 1. 添加当前实时状态，并标记为最高优先级
+    prompt += "[当前实时状态 (最高优先级)]\n" + formatSingleEntry(currentStatus);
+
+    // 2. 添加历史状态作为参考
+    if (history && history.length > 0) {
+        // 我们只需要历史记录，不需要再把最新的也加进去
+        const historicalEntries = history.map((entry, index) => {
+            return `--- 历史状态回顾 ${index + 1} ---\n${formatSingleEntry(entry)}`;
+        }).join('\n\n');
+
+        prompt += "\n\n[最近的状态变化回顾 (用于参考，按时间从新到旧)]\n" + historicalEntries;
+    }
+
+    // 3. 返回完整的、带有引导语的提示词
+    return `[重要记忆：这是实时状态和最近的状态变化。请将此作为优先参考信息来理解当前情景，但不要直接复述这些内容。]\n\n${prompt}`;
+}
+
+/**
  * 密友聊天 - 获取AI回复（【功能完整且未经省略的最终修复版】）
  * 该版本整合了稳定的逻辑与完整的功能（包括图片识别），可以直接替换使用。
  */
 async function getSweetheartAiReply() {
     console.log("✅ getSweetheartAiReply 函数已触发");
+
+    // 前置检查：API配置
+    if (globalConfig.activeApiConfig === null || !globalConfig.apiConfigs[globalConfig.activeApiConfig]) {
+        alert('请先在“设置 > API设置”中配置并激活一个API！');
+        return;
+    }
 
     if (!currentSweetheartChatContact) {
         console.error("❌ 函数中止：currentSweetheartChatContact 为空！");
@@ -6893,12 +6937,13 @@ async function getSweetheartAiReply() {
     const systemPrompt = currentChatMode === 'offline' ? OFFLINE_MODE_PROMPT : ENHANCED_PROMPT;
     messages.push({ role: "system", content: systemPrompt });
 
-    // 添加世界书、角色设定、用户设定等上下文
+    // 添加世界书上下文
     const worldbookContext = gatherWorldbookContext();
     if (worldbookContext) {
         messages.push({ role: "system", content: worldbookContext });
     }
 
+    // 添加世界设定
     if (currentWorldId) {
         const world = worldsData.find(w => w.id === currentWorldId);
         if (world) {
@@ -6910,6 +6955,7 @@ async function getSweetheartAiReply() {
         }
     }
 
+    // 添加角色设定
     let characterSetting = `[角色设定]\n姓名：${currentSweetheartChatContact.name}\n`;
     if (currentSweetheartChatContact.status) characterSetting += `基础设定：${currentSweetheartChatContact.status}\n`;
     if (currentSweetheartChatContact.personality) characterSetting += `性格：${currentSweetheartChatContact.personality}\n`;
@@ -6918,19 +6964,31 @@ async function getSweetheartAiReply() {
     if (currentSweetheartChatContact.relationship) characterSetting += `与用户的关系：${currentSweetheartChatContact.relationship}\n`;
     messages.push({ role: "system", content: characterSetting });
 
+    // 添加用户设定
     if (userProfile.persona) {
         messages.push({ role: "system", content: `[用户设定]\n昵称：${userProfile.name}\n${userProfile.persona}` });
     }
 
+    // 添加绑定的面具
     if (currentSweetheartChatContact.boundMasks && currentSweetheartChatContact.boundMasks.length > 0) {
         let maskContent = '[用户人设]\n';
         currentSweetheartChatContact.boundMasks.forEach(maskId => {
             const mask = masksData.find(m => m.id === maskId);
             if (mask) maskContent += `${mask.name}: ${mask.content}\n\n`;
         });
-        messages.push({ role: "system", content: maskContent });
+        messages.push({role: "system", content: maskContent});
     }
 
+    // 添加实时状态和历史状态
+    const liveStatus = getCurrentLiveStatus();
+    const allStatusHistories = JSON.parse(localStorage.getItem('sweetheartStatusHistory') || '{}');
+    const contactStatusHistory = allStatusHistories[contactId] || [];
+    const statusContext = formatStatusHistoryForAI(liveStatus, contactStatusHistory);
+    if (statusContext) {
+        messages.push({role: "system", content: statusContext});
+    }
+
+    // 添加普通聊天的历史作为背景记忆
     const normalChatHistory = JSON.parse(localStorage.getItem('phoneChatHistory') || '{}')[contactId] || [];
     if (normalChatHistory.length > 0) {
         const recentNormalChat = normalChatHistory.slice(-10);
@@ -6943,7 +7001,7 @@ async function getSweetheartAiReply() {
         messages.push({ role: "system", content: backgroundInfo });
     }
 
-    // --- 步骤 2: 【核心修复逻辑】处理聊天历史、图片和当前输入 ---
+    // --- 步骤 2: 处理聊天历史、图片和当前输入 ---
     const chatHistory = JSON.parse(localStorage.getItem('phoneSweetheartChatHistory') || '{}');
     const contactMessages = chatHistory[contactId] || [];
     const memoryRounds = currentSweetheartChatContact.memoryRounds || 10;
@@ -6953,9 +7011,8 @@ async function getSweetheartAiReply() {
 
     // 2.1 添加历史记录到上下文
     recentMessages.forEach(msg => {
-        // 跳过未处理的图片，它们将在下一步被专门处理
         if (msg.sender === 'user' && msg.imageUrl && !msg.isProcessed) {
-            return;
+            return; // 跳过未处理的图片，它们将在下一步被专门处理
         }
         if (msg.type === 'location') {
              messages.push({ role: 'system', content: `[场景变化] 你们来到了【${msg.locationName}】。描述：${msg.locationDesc}`});
@@ -6967,7 +7024,6 @@ async function getSweetheartAiReply() {
     });
 
     // 2.2 查找最近一条未处理的图片
-    // 逻辑调整：从全部历史记录中倒序查找，确保找到的是最新的那张
     let unprocessedImage = null;
     for (let i = contactMessages.length - 1; i >= 0; i--) {
         const msg = contactMessages[i];
@@ -7003,27 +7059,33 @@ async function getSweetheartAiReply() {
         }
     }
 
-    // 2.4 如果有新文本输入，先在UI上渲染出来
+    // 2.4 如果有新文本输入，先在UI上渲染出来并清空输入框
     if (currentUserInput) {
         const messageObj = { sender: 'user', text: currentUserInput };
         const newIndex = saveSweetheartMessage(contactId, messageObj);
         const messageRow = _createMessageDOM(contactId, messageObj, newIndex);
         messagesEl.appendChild(messageRow);
-        chatInput.value = '';
+        chatInput.value = ''; // 清空输入框
     }
 
-    // --- 步骤 3: 检查是否有内容可发送 ---
-    if (!userMessageForApi) {
-        console.warn("🤔 没有新的用户输入（文本或图片），不调用API。");
+    // ▼▼▼ 核心修复逻辑 ▼▼▼
+
+    // 步骤 3: 如果有新构建的用户消息，将其添加到待发送数组中
+    if (userMessageForApi) {
+        messages.push(userMessageForApi);
+    }
+
+    // 步骤 4: 检查最终的待发送数组中是否包含任何用户消息（无论是历史记录还是新输入）
+    if (messages.filter(m => m.role === 'user').length === 0) {
+        console.warn("🤔 没有任何用户消息（历史或新输入），不调用API。");
         getReplyBtn.disabled = false;
         chatInput.disabled = false;
-        return;
+        return; // 如果没有任何可回复的内容，则安全退出
     }
 
-    // 将最终的用户输入添加到请求中
-    messages.push(userMessageForApi);
+    // ▲▲▲ 修复结束 ▲▲▲
 
-    // --- 步骤 4: 调用API并处理回复 ---
+    // --- 步骤 5: 调用API并处理回复 ---
     console.log('🚀 准备调用API，最终发送结构:', messages);
     const thinkingBubble = _createMessageDOM(contactId, { sender: 'contact', text: '...' }, -1);
     messagesEl.appendChild(thinkingBubble);
@@ -7052,7 +7114,7 @@ async function getSweetheartAiReply() {
         }
     }
 
-    // --- 步骤 5: 收尾工作 ---
+    // --- 步骤 6: 收尾工作 ---
     renderSweetheartList();
     messagesEl.scrollTop = messagesEl.scrollHeight;
     getReplyBtn.disabled = false;
@@ -7060,8 +7122,39 @@ async function getSweetheartAiReply() {
     chatInput.focus();
 }
 
+/**
+ * [全新] 从DOM实时读取当前状态弹窗中显示的数据
+ * @returns {object} 一个包含实时角色和用户状态的对象
+ */
+function getCurrentLiveStatus() {
+    // 辅助函数，用于安全地获取元素文本
+    const getCleanValue = (id) => {
+        const element = document.getElementById(id);
+        if (!element) return '未知';
+        const text = element.textContent.trim();
+        // 如果文本是占位符 "..."，也视为未知
+        return (text && text !== '...') ? text : '未知';
+    };
 
-/* ▲▲▲ 替换到这里结束 ▲▲▲ */
+    const liveStatus = {
+        character: {
+            location: getCleanValue('status-char-location'),
+            appearance: getCleanValue('status-char-appearance'),
+            action: getCleanValue('status-char-action'),
+            thoughts: getCleanValue('status-char-thoughts'),
+            private_thoughts: getCleanValue('status-char-private-thoughts')
+        },
+        user: {
+            location: getCleanValue('status-my-location'),
+            appearance: getCleanValue('status-my-appearance'),
+            action: getCleanValue('status-my-action'),
+            features: getCleanValue('status-my-features')
+        }
+    };
+
+    return liveStatus;
+}
+
 
 /**
  * [新增] 获取统一的聊天历史（普通+密友）
@@ -7115,36 +7208,58 @@ function updateStatusPopup(statusData) {
 }
 
 /**
- * 将最新的状态数据保存到 localStorage
+ * [修改后] 将最新的状态数据保存到 localStorage，并保留最近5条历史记录
  * @param {string} contactId - 当前密友的ID
  * @param {object} statusData - 要保存的状态对象
  */
 function saveStatusData(contactId, statusData) {
     try {
-        const allStatuses = JSON.parse(localStorage.getItem('sweetheartStatuses') || '{}');
-        allStatuses[contactId] = statusData;
-        localStorage.setItem('sweetheartStatuses', JSON.stringify(allStatuses));
+        const allStatusHistories = JSON.parse(localStorage.getItem('sweetheartStatusHistory') || '{}');
+        let contactHistory = allStatusHistories[contactId] || [];
+
+        // 为新状态添加时间戳
+        const newStatusEntry = {
+            ...statusData,
+            timestamp: Date.now()
+        };
+
+        // 将新状态添加到历史记录的开头
+        contactHistory.unshift(newStatusEntry);
+
+        // 只保留最近的5条记录
+        contactHistory = contactHistory.slice(0, 5);
+
+        // 更新该联系人的历史记录
+        allStatusHistories[contactId] = contactHistory;
+
+        // 保存回 localStorage
+        localStorage.setItem('sweetheartStatusHistory', JSON.stringify(allStatusHistories));
+        console.log(`✅ 已为 ${contactId} 更新状态历史，当前共 ${contactHistory.length} 条记录。`);
+
     } catch (e) {
-        console.error("保存状态数据失败:", e);
+        console.error("保存状态历史数据失败:", e);
     }
 }
 
 /**
- * 当打开聊天时，加载并应用最后一次保存的状态
+ * [修改后] 当打开聊天时，加载并应用最后一次保存的状态
  * @param {string} contactId - 当前密友的ID
  */
 function loadAndApplyStatusData(contactId) {
     try {
-        const allStatuses = JSON.parse(localStorage.getItem('sweetheartStatuses') || '{}');
-        const lastStatus = allStatuses[contactId];
-        if (lastStatus) {
-            updateStatusPopup(lastStatus);
+        // 从新的历史记录存储中读取
+        const allStatusHistories = JSON.parse(localStorage.getItem('sweetheartStatusHistory') || '{}');
+        const contactHistory = allStatusHistories[contactId];
+
+        // 如果有历史记录，则取第一条（最新的）来更新UI
+        if (contactHistory && contactHistory.length > 0) {
+            updateStatusPopup(contactHistory[0]);
         } else {
             // 如果没有历史状态，则清空弹窗的旧数据
             updateStatusPopup({ character: {}, user: {} });
         }
     } catch (e) {
-        console.error("加载状态数据失败:", e);
+        console.error("加载状态历史数据失败:", e);
     }
 }
 
@@ -10301,6 +10416,17 @@ async function triggerLocationPlot(event, pinId) {
         });
         messages.push({ role: "system", content: maskContent });
     }
+
+    // [全新添加] 获取实时状态和历史状态，并注入提示词
+    const liveStatus = getCurrentLiveStatus();
+    const allStatusHistories = JSON.parse(localStorage.getItem('sweetheartStatusHistory') || '{}');
+    const contactStatusHistory = allStatusHistories[contactId] || [];
+
+    const statusContext = formatStatusHistoryForAI(liveStatus, contactStatusHistory);
+    if (statusContext) {
+        messages.push({role: "system", content: statusContext});
+    }
+
 
     // ⭐ 3.3 背景信息：从"学习模式"提取历史记录
     if (normalChatHistory.length > 0) {
