@@ -1057,7 +1057,7 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
         let contentHTML = '';
 
         // 优先处理引用
-        if (messageObj.quotedMessage) {
+        if (messageObj.quote) {
             const senderName = messageObj.quotedMessage.sender === 'user' ? (userProfile.name || '我') : (contactData ? contactData.name : '联系人');
             let quotedText = messageObj.quotedMessage.text.substring(0, 50);
             if (messageObj.quotedMessage.text.length > 50) quotedText += '...';
@@ -4065,16 +4065,16 @@ function showPage(pageNum) {
     document.querySelectorAll('.dot').forEach((dot, i) =>
         dot.classList.toggle('active', i === pageNum - 1));
 
-    const hint1 = document.getElementById('editHint1');
-    const hint2 = document.getElementById('editHint2');
-
-    if (pageNum === 1) {
-        hint1.style.display = 'block';
-        hint2.style.display = 'none';
-    } else {
-        hint1.style.display = 'none';
-        hint2.style.display = 'block';
-    }
+    // const hint1 = document.getElementById('editHint1');
+    // const hint2 = document.getElementById('editHint2');
+    //
+    // if (pageNum === 1) {
+    //     hint1.style.display = 'block';
+    //     hint2.style.display = 'none';
+    // } else {
+    //     hint1.style.display = 'none';
+    //     hint2.style.display = 'block';
+    // }
 }
 
 
