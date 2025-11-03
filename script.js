@@ -2676,6 +2676,19 @@ function closeSettings() {
         console.log("设置页面DOM已从内存中移除。");
     }, 350); // 350ms 对应 CSS 中的 0.35s
 }
+function openApiConfig() {
+    // 确保先关闭其他可能打开的页面
+    document.querySelectorAll('.config-page.show').forEach(page => {
+        if (page.id !== 'apiConfig') page.classList.remove('show');
+    });
+
+    // 然后再显示API配置页面
+    const apiConfig = document.getElementById('apiConfig');
+    apiConfig.style.zIndex = '1010'; // 确保层级够高
+    apiConfig.classList.add('show');
+    renderApiConfigs(); // 确保渲染配置列表
+}
+
 
 
 function closeApiConfig() {
@@ -2908,12 +2921,23 @@ function saveConfig(type) {
 }
 
 function openBeautify() {
-    document.getElementById('beautifyPage').classList.add('show');
+    // 关闭其他页面
+    document.querySelectorAll('.beautify-page.show, .config-page.show').forEach(page => {
+        page.classList.remove('show');
+    });
+
+    // 显示美化页面
+    const beautifyPage = document.getElementById('beautifyPage');
+    beautifyPage.style.zIndex = '1010'; // 确保层级
+    beautifyPage.classList.add('show');
+
+    // 确保渲染相关内容
     renderAppPreviews();
     renderWallpaperThumbnails();
     const currentWallpaper = localStorage.getItem('phoneWallpaper');
     updateWallpaperActiveState(currentWallpaper);
 }
+
 
 
 function closeBeautify() {
