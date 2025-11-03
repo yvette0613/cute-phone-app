@@ -5015,14 +5015,29 @@ function applyFullscreenSetting(isEnabled) {
 
 /* ========== 开始：用这段全新的代码替换旧的 setupAttachmentMenu 函数 ========== */
 
+// script.js
+
+// ▼▼▼ 请用这个【最终修正版】函数完整替换旧的 setupAttachmentMenu 函数 ▼▼▼
+
+/**
+ * [最终修正版] 设置普通聊天界面的附件菜单功能
+ * - 修复了图片上传功能混淆聊天上下文的Bug。
+ * - 优化了代码结构，使其更清晰。
+ */
 function setupAttachmentMenu() {
     // 1. 获取所有相关的 DOM 元素
     const showMenuBtn = document.getElementById('showAttachmentMenuBtn');
     const menu = document.getElementById('attachmentMenu');
-    const fileInput = document.getElementById('fileInput');
-    const imageInput = document.getElementById('imageInput'); // 图片上传暂时只做前端预览
+    const fileInput = document.getElementById('fileInput'); // 用于上传文件（带AI分析）
+    const imageInput = document.getElementById('imageInput'); // 用于发送图片
     const uploadFileBtn = document.getElementById('uploadFileBtn');
     const uploadImageBtn = document.getElementById('uploadImageBtn');
+
+    // 安全检查，如果关键元素不存在则提前退出，防止后续代码报错
+    if (!showMenuBtn || !menu || !fileInput || !imageInput || !uploadFileBtn || !uploadImageBtn) {
+        console.error("附件菜单初始化失败：部分关键DOM元素未找到。");
+        return;
+    }
 
     // 2. 点击“+”按钮时，切换菜单的显示/隐藏
     showMenuBtn.addEventListener('click', (event) => {
@@ -5030,28 +5045,72 @@ function setupAttachmentMenu() {
         menu.classList.toggle('show');
     });
 
-    // 3. 点击“上传文件”菜单项时，触发隐藏的文件选择框
+    // 3. 点击“文件”菜单项时，触发隐藏的文件选择框
     uploadFileBtn.addEventListener('click', () => {
         fileInput.click();
         menu.classList.remove('show');
     });
 
-    // 4. 点击“上传图片”菜单项（暂时只做预览，不上传）
+    // 4. 点击“图片”菜单项时，触发隐藏的图片选择框
     uploadImageBtn.addEventListener('click', () => {
         imageInput.click();
         menu.classList.remove('show');
     });
 
-    // 5. 【核心改造】当用户选择了文件后，上传文件并获取AI回复
+    // 5. 【核心修复】当用户选择了图片后，为“普通聊天”模式正确处理
+    imageInput.addEventListener('change', (event) => {
+        const file = event.target.files[0];
+
+        // [FIX A]: 检查正确的聊天对象，确保是在普通聊天模式下
+        if (!file || !currentChatContact) {
+            event.target.value = ''; // 清空选择，以便下次能选择相同文件
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            const base64Image = e.target.result;
+
+            // a. 构建图片消息的HTML，使其在气泡中正确显示
+            const imageHtml = `<img src="${base64Image}" style="max-width: 150px; border-radius: 10px;" alt="用户发送的图片">`;
+
+            // b. 构建标准的消息对象
+            const messagePayload = {
+                sender: 'user',
+                text: imageHtml, // 直接将图片HTML作为消息文本
+            };
+
+            // c. [FIX B]: 调用普通聊天的消息保存函数
+            const newIndex = saveMessage(currentChatContact.id, messagePayload);
+
+            // d. [FIX C]: 获取普通聊天的消息容器
+            const messagesEl = document.getElementById('chatMessages');
+
+            // e. 创建并渲染消息的DOM元素
+            const messageRow = _createMessageDOM(currentChatContact.id, messagePayload, newIndex);
+            if (messagesEl) {
+                messagesEl.appendChild(messageRow);
+                messagesEl.scrollTop = messagesEl.scrollHeight; // 发送后自动滚动到底部
+            }
+
+            // f. [FIX D]: 更新普通联系人列表，显示最新的消息预览（如“[图片]”）
+            renderContacts(contactsData);
+        };
+
+        reader.readAsDataURL(file);
+        event.target.value = ''; // 每次发送后清空<input>的值
+    });
+
+    // 6. 文件上传并获取AI分析的逻辑 (这部分功能保持不变)
     fileInput.addEventListener('change', async (event) => {
         const file = event.target.files[0];
         if (!file) return;
 
-        // a. 先在界面上显示“文件已发送”
+        // ... 您原有的文件上传并获取AI分析的逻辑代码 ...
+        // 这部分逻辑是正确的，无需修改。
         const userMessageText = `📎 文件已发送: ${file.name}`;
         simulateSendingMessage(userMessageText);
 
-        // b. 显示一个“AI正在思考”的提示
         const messagesEl = document.getElementById('chatMessages');
         const thinkingBubble = _createMessageDOM(currentChatContact.id, {
             sender: 'contact',
@@ -5061,10 +5120,7 @@ function setupAttachmentMenu() {
         messagesEl.scrollTop = messagesEl.scrollHeight;
 
         try {
-            // c. 调用函数将文件发送到我们的后端（Edge Function）
             const aiResponse = await uploadFileAndGetAiResponse(file);
-
-            // d. 移除思考提示，显示AI的真实回复
             thinkingBubble.remove();
             const newIndex = saveMessage(currentChatContact.id, {
                 sender: 'contact',
@@ -5075,9 +5131,7 @@ function setupAttachmentMenu() {
                 text: aiResponse
             }, newIndex);
             messagesEl.appendChild(messageRow);
-
         } catch (error) {
-            // e. 如果出错，显示错误信息
             thinkingBubble.remove();
             const errorText = `处理文件失败: ${error.message}`;
             const newIndex = saveMessage(currentChatContact.id, {
@@ -5093,65 +5147,17 @@ function setupAttachmentMenu() {
             messagesEl.appendChild(messageRow);
         } finally {
             messagesEl.scrollTop = messagesEl.scrollHeight;
-            event.target.value = ''; // 重置input
-        }
-    });
-
-    // 图片选择的逻辑保持不变，仅作本地预览
-    // 5. 【核心修复】当用户选择了图片后，将文字和图片合并发送
-    imageInput.addEventListener('change', (event) => {
-        const file = event.target.files[0];
-        if (!file || !currentSweetheartChatContact) {
             event.target.value = '';
-            return;
         }
-        const reader = new FileReader();
-        reader.onload = function (e) {
-            const base64Image = e.target.result;
-            const chatInput = document.getElementById('sweetheartChatInput');
-            const chatInputArea = document.querySelector('.sweetheart-chat-input-area');
-
-            // 1. 构建图片消息的HTML内容
-            const imageHtml = `<img src="${base64Image}" style="max-width: 150px; border-radius: 10px;" alt="用户发送的图片">`;
-
-            // 2. 获取输入框中的文字
-            const userText = chatInput.value.trim();
-
-            // 3. 将文字和图片HTML组合成一条消息
-            const messageText = userText ? `${userText}<br>${imageHtml}` : imageHtml;
-
-            // 4. 构建一个简单的消息对象（与普通聊天一致）
-            const messagePayload = {
-                sender: 'user',
-                text: messageText,
-            };
-
-            // 5. 保存并渲染
-            const newIndex = saveSweetheartMessage(currentSweetheartChatContact.id, messagePayload);
-            const messagesEl = document.getElementById('sweetheartChatMessages');
-            const messageRow = _createMessageDOM(currentSweetheartChatContact.id, messagePayload, newIndex);
-            messagesEl.appendChild(messageRow);
-            messagesEl.scrollTop = messagesEl.scrollHeight;
-
-            // 6. 清空输入框并更新UI
-            chatInput.value = '';
-            chatInputArea.classList.remove('has-text');
-            renderSweetheartList();
-        };
-
-        reader.readAsDataURL(file);
-        event.target.value = '';
     });
 
-// ========== 结束：粘贴全新的 imageInput 事件监听器 ==========
-
-
-    // 7. 关闭菜单的逻辑
+    // 7. 点击页面其他任何地方，自动关闭附件菜单 (保持不变)
     document.addEventListener('click', () => {
         if (menu.classList.contains('show')) {
             menu.classList.remove('show');
         }
     });
+    // 阻止点击菜单本身时关闭菜单
     menu.addEventListener('click', (event) => event.stopPropagation());
 }
 

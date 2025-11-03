@@ -2059,6 +2059,12 @@
             <div class="status-popup-backdrop" onclick="closeStatusPopup()"></div>
             <div class="status-popup-modal">
                 <div class="status-popup-header">
+                    <!-- ▼▼▼ 这是新增的历史记录图标 ▼▼▼ -->
+                    <div class="status-history-btn" onclick="openStatusHistory()" title="查看历史状态">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm-.22-13h-.06c-.4 0-.72.32-.72.72v4.72c0 .35.18.68.49.86l4.15 2.51c.33.2.75.06.94-.26.2-.33.06-.75-.26-.94l-3.87-2.3V5.72c0-.4-.32-.72-.72-.72z"/>
+                        </svg>
+                    </div>
                     <span class="header-title-static" id="statusPopupTitleStatic">当前状态</span>
                     <span class="header-title-editing" id="statusPopupTitleEditing">编辑状态</span>
 
@@ -2141,7 +2147,23 @@
             </div>
         </div>
         <!-- ▲▲▲ 复制到这里结束 ▲▲▲ -->
-
+        <!-- ▼▼▼ 新增：状态历史记录弹窗 ▼▼▼ -->
+        <div class="status-popup-overlay" id="statusHistoryPopup">
+            <div class="status-popup-backdrop" onclick="closeStatusHistory()"></div>
+            <div class="status-history-modal">
+                <div class="status-history-header">
+                    <h3 class="status-history-title">状态历史</h3>
+                    <div class="status-popup-close" onclick="closeStatusHistory()">×</div>
+                </div>
+                <div class="status-history-content" id="statusHistoryContent">
+                    <!-- 历史记录将由JS动态生成到这里 -->
+                    <div class="history-empty">
+                        <div class="history-empty-icon">📂</div>
+                        <div class="history-empty-text">还没有历史状态哦</div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
