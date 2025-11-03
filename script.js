@@ -2911,6 +2911,7 @@ function renderContacts(contacts) {
     });
 }
 
+// 请用这个【最终修正版】的函数替换旧的 createNewContact 函数
 
 function createNewContact() {
     const menu = document.getElementById('contactMenu');
@@ -2929,20 +2930,30 @@ function createNewContact() {
         modal.removeAttribute('data-currentWorldId');
     }
 
-    // --- 重置表单 (逻辑不变) ---
+    // --- 核心修复：将重置和渲染逻辑移到这里 ---
+
+    // 1. 重置联系人表单
     document.getElementById('char-name').value = '';
     document.getElementById('char-persona').value = '';
-    // ... (其他重置代码保持不变) ...
     document.getElementById('avatar-preview').src = 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
     const maleRadio = document.querySelector('.character-gender-selection input[value="male"]');
     if (maleRadio) maleRadio.checked = true;
+    document.getElementById('char-instance-id').textContent = newId; // 显示新ID
 
+    // 2. 重置用户表单
     document.getElementById('user-name').value = userProfile.name || '我';
     document.getElementById('user-persona').value = userProfile.persona || '';
     const userAvatar = userProfile.avatar;
     const isUserUrl = userAvatar && (userAvatar.startsWith('http') || userAvatar.startsWith('data:'));
     document.getElementById('user-avatar-preview').src = isUserUrl ? userAvatar : 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
 
+    // 3. 在打开卡片前，直接渲染世界书和面具列表（传入空数组表示没有已绑定的项）
+    renderCharacterWorldbooksList([]);
+    renderCharacterMasksList([]);
+
+    // --- 修复结束 ---
+
+    // 最后再打开卡片
     openCharacterCardPage();
 }
 
@@ -4625,6 +4636,7 @@ function editCurrentContact() {
     document.getElementById('user-avatar-preview').src = isUserUrl ? userAvatar : 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
 
     renderCharacterWorldbooksList(currentChatContact.boundWorldbooks || []);
+    renderCharacterMasksList(currentChatContact.boundMasks || []);
     openCharacterCardPage();
 }
 
