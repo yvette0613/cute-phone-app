@@ -6902,7 +6902,56 @@ function formatStatusHistoryForAI(currentStatus, history) {
 }
 
 /**
- * 密友聊天 - 获取AI回复（【功能完整且未经省略的最终修复版】）
+ * [新增] 健壮的AI JSON响应解析器
+ * 它可以处理纯JSON、被文字包裹的JSON和被Markdown包裹的JSON
+ * @param {string} rawMessage - 从AI获取的原始字符串
+ * @returns {{chatReplyText: string, statusData: object|null}}
+ */
+function parseAiJsonResponse(rawMessage) {
+    if (!rawMessage) {
+        return { chatReplyText: '...', statusData: null };
+    }
+
+    // 1. 尝试直接解析，这是最理想的情况
+    try {
+        const parsed = JSON.parse(rawMessage);
+        // 如果解析成功，直接返回提取出的内容
+        return {
+            chatReplyText: parsed.reply || rawMessage, // 如果没有reply字段，就返回原始消息
+            statusData: parsed.status || null
+        };
+    } catch (e) {
+        // 直接解析失败，说明格式不纯，继续下一步
+        console.warn("直接解析JSON失败，尝试智能提取...");
+    }
+
+    // 2. 使用正则表达式提取被包裹的JSON
+    // 这个表达式会贪婪地匹配从第一个 "{" 到最后一个 "}" 的所有内容
+    try {
+        const jsonMatch = rawMessage.match(/\{[\s\S]*\}/);
+        if (jsonMatch && jsonMatch) {
+            const parsed = JSON.parse(jsonMatch);
+            console.log("✅ 智能提取JSON成功！");
+            return {
+                chatReplyText: parsed.reply || rawMessage,
+                statusData: parsed.status || null
+            };
+        }
+    } catch (e) {
+        // 提取后解析也失败，继续最后一步
+        console.error("❌ 提取JSON后解析失败:", e);
+    }
+
+    // 3. 如果以上都失败，说明AI可能返回了纯文本，直接返回纯文本
+    console.warn("⚠️ 未能解析出有效JSON，将作为纯文本处理。");
+    return {
+        chatReplyText: rawMessage,
+        statusData: null
+    };
+}
+
+/**
+ * 密友聊天 - 获取AI回复（【功能完整且无省略的最终修复版】）
  * 该版本整合了稳定的逻辑与完整的功能（包括图片识别），可以直接替换使用。
  */
 async function getSweetheartAiReply() {
@@ -7068,22 +7117,18 @@ async function getSweetheartAiReply() {
         chatInput.value = ''; // 清空输入框
     }
 
-    // ▼▼▼ 核心修复逻辑 ▼▼▼
-
     // 步骤 3: 如果有新构建的用户消息，将其添加到待发送数组中
     if (userMessageForApi) {
         messages.push(userMessageForApi);
     }
 
-    // 步骤 4: 检查最终的待发送数组中是否包含任何用户消息（无论是历史记录还是新输入）
+    // 步骤 4: 检查最终的待发送数组中是否包含任何用户消息
     if (messages.filter(m => m.role === 'user').length === 0) {
         console.warn("🤔 没有任何用户消息（历史或新输入），不调用API。");
         getReplyBtn.disabled = false;
         chatInput.disabled = false;
-        return; // 如果没有任何可回复的内容，则安全退出
+        return;
     }
-
-    // ▲▲▲ 修复结束 ▲▲▲
 
     // --- 步骤 5: 调用API并处理回复 ---
     console.log('🚀 准备调用API，最终发送结构:', messages);
@@ -7097,11 +7142,17 @@ async function getSweetheartAiReply() {
     if (!result.success) {
         alert('网络错误：' + result.message);
     } else {
+        // ▼▼▼▼▼ 核心修复点在这里 ▼▼▼▼▼
+        // 使用我们新的解析函数来处理回复
         const { chatReplyText, statusData } = parseAiJsonResponse(result.message);
+
+        // 如果解析出了状态数据，就更新UI并保存
         if (statusData) {
             updateStatusPopup(statusData);
             saveStatusData(contactId, statusData);
         }
+
+        // 使用解析出的聊天文本来显示气泡
         const segments = chatReplyText.split('---').filter(s => s.trim());
         if (segments.length === 0) segments.push(chatReplyText || '...');
 
@@ -7112,6 +7163,7 @@ async function getSweetheartAiReply() {
             messagesEl.appendChild(messageRow);
             await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 400));
         }
+        // ▲▲▲▲▲ 核心修复点结束 ▲▲▲▲▲
     }
 
     // --- 步骤 6: 收尾工作 ---
@@ -7121,6 +7173,7 @@ async function getSweetheartAiReply() {
     chatInput.disabled = false;
     chatInput.focus();
 }
+
 
 /**
  * [全新] 从DOM实时读取当前状态弹窗中显示的数据
@@ -12094,6 +12147,103 @@ function deleteKnowledge(knowledgeId) {
 
     renderKnowledgeList();
     showSuccessModal('删除成功', '知识点已移除');
+}
+
+/*
+====================================
+状态历史记录 - 功能逻辑
+====================================
+*/
+/**
+ * 打开状态历史记录弹窗
+ */
+function openStatusHistory() {
+    const popup = document.getElementById('statusHistoryPopup');
+    if (popup) {
+        popup.classList.add('show');
+        renderStatusHistory(); // 打开时渲染列表
+    }
+}
+/**
+ * 关闭状态历史记录弹窗
+ */
+function closeStatusHistory() {
+    const popup = document.getElementById('statusHistoryPopup');
+    if (popup) {
+        popup.classList.remove('show');
+    }
+}
+/**
+ * 渲染状态历史列表
+ */
+function renderStatusHistory() {
+    const container = document.getElementById('statusHistoryContent');
+    if (!container || !currentSweetheartChatContact) return;
+    const allHistories = JSON.parse(localStorage.getItem('sweetheartStatusHistory') || '{}');
+    const contactHistory = allHistories[currentSweetheartChatContact.id] || [];
+    if (contactHistory.length === 0) {
+        container.innerHTML = `
+            <div class="history-empty">
+                <div class="history-empty-icon">📂</div>
+                <div class="history-empty-text">还没有历史状态哦</div>
+            </div>`;
+        return;
+    }
+    container.innerHTML = ''; // 清空旧内容
+    contactHistory.forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'history-item';
+        const date = new Date(item.timestamp).toLocaleString('zh-CN', {
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+        // 安全地获取状态文本，如果不存在则显示 '...'
+        const charLocation = item.character?.location || '...';
+        const charAppearance = item.character?.appearance || '...';
+        const charAction = item.character?.action || '...';
+        const userLocation = item.user?.location || '...';
+        const userAppearance = item.user?.appearance || '...';
+        const userAction = item.user?.action || '...';
+        card.innerHTML = `
+            <div class="history-item-header">
+                <span class="history-item-date">${date}</span>
+                <button class="history-item-delete-btn" onclick="deleteStatusHistoryItem(${item.timestamp})">×</button>
+            </div>
+            <div class="history-status-section">
+                <h5>${currentSweetheartChatContact.name} 的状态</h5>
+                <p><strong>📍 所在:</strong> ${escapeHTML(charLocation)}</p>
+                <p><strong>👗 穿着:</strong> ${escapeHTML(charAppearance)}</p>
+                <p><strong>🏃‍♀️ 行为:</strong> ${escapeHTML(charAction)}</p>
+            </div>
+            <div class="history-status-section" style="margin-top: 10px;">
+                <h5>我的状态</h5>
+                <p><strong>📍 所在:</strong> ${escapeHTML(userLocation)}</p>
+                <p><strong>👔 穿着:</strong> ${escapeHTML(userAppearance)}</p>
+                <p><strong>🚶 行为:</strong> ${escapeHTML(userAction)}</p>
+            </div>
+        `;
+        container.appendChild(card);
+    });
+}
+/**
+ * 删除指定的一条历史记录
+ * @param {number} timestamp - 要删除的历史记录的时间戳
+ */
+function deleteStatusHistoryItem(timestamp) {
+    if (!currentSweetheartChatContact) return;
+    if (confirm('确定要删除这条历史状态吗？')) {
+        const allHistories = JSON.parse(localStorage.getItem('sweetheartStatusHistory') || '{}');
+        let contactHistory = allHistories[currentSweetheartChatContact.id] || [];
+        // 过滤掉要删除的项
+        contactHistory = contactHistory.filter(item => item.timestamp !== timestamp);
+        // 更新并保存
+        allHistories[currentSweetheartChatContact.id] = contactHistory;
+        localStorage.setItem('sweetheartStatusHistory', JSON.stringify(allHistories));
+        // 重新渲染列表
+        renderStatusHistory();
+    }
 }
 
 
