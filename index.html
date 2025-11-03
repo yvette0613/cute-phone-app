@@ -26,6 +26,16 @@
                 <div class="action-option cancel" onclick="closeLocationChooser()">取消</div>
             </div>
         </div>
+        <div class="avatar-action-sheet" id="avatarActionSheet">
+            <div class="action-sheet-backdrop" onclick="closeAvatarActions()"></div>
+            <div class="action-sheet-options">
+                <div class="action-option" onclick="promptForUrl()">从 URL 填写</div>
+                <div class="action-option" onclick="triggerFileUpload()">从文件选择</div>
+            </div>
+            <div class="action-sheet-options" style="margin-top: 0;">
+                <div class="action-option cancel" onclick="closeAvatarActions()">取消</div>
+            </div>
+        </div>
         <div class="pages-wrapper" id="pagesWrapper">
             <div class="page" id="page1">
                 <div class="status-bar">
@@ -115,16 +125,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="avatar-action-sheet" id="avatarActionSheet">
-                    <div class="action-sheet-backdrop" onclick="closeAvatarActions()"></div>
-                    <div class="action-sheet-options">
-                        <div class="action-option" onclick="promptForUrl()">从 URL 填写</div>
-                        <div class="action-option" onclick="triggerFileUpload()">从文件选择</div>
-                    </div>
-                    <div class="action-sheet-options" style="margin-top: 0;">
-                        <div class="action-option cancel" onclick="closeAvatarActions()">取消</div>
-                    </div>
-                </div>
+
 
                 <div class="grid-container" id="grid1"></div>
             </div>
