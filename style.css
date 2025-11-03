@@ -266,6 +266,9 @@ body {
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
     word-break: break-word;
     white-space: pre-wrap;
+    display: flex; /* 1. 声明为 Flex 容器 */
+    flex-direction: column; /* 2. 设置主轴为垂直方向 */
+    gap: 8px;
 }
 
 /* --- 6. 图片消息样式 --- */
@@ -477,7 +480,7 @@ body {
 .quoted-message-wrapper {
     background: rgba(0, 0, 0, 0.1);
     padding: 8px 12px;
-    margin-bottom: 8px;
+    /*margin-bottom: 8px;*/
     border-radius: 8px;
     border-left: 3px solid #0A84FF; /* 左侧的蓝色指示条 */
     display: flex;
@@ -1281,8 +1284,8 @@ body.fullscreen-enabled {
     flex-shrink: 0;
     margin-left: 12px;
     transition: background 0.2s ease,
-                color 0.2s ease,
-                transform 0.2s ease;
+    color 0.2s ease,
+    transform 0.2s ease;
 }
 
 .delete-config-btn:hover {
@@ -2466,7 +2469,7 @@ input:checked + .slider:before {
 .copy-code-btn {
     /* 绝对定位在 pre 内部的右上角 */
     position: absolute;
-    top: 10px;  /* 距离顶部的距离 */
+    top: 10px; /* 距离顶部的距离 */
     right: 12px; /* 距离右边的距离，与pre的padding对齐 */
     z-index: 10;
 
@@ -3084,6 +3087,7 @@ body.code-scrolling-enabled .code-block-wrapper {
 .avatar-action-sheet.show .action-sheet-options {
     transform: translateY(0);
 }
+
 /* ========== 普通聊天菜单样式 ========== */
 .chat-page .message-action-sheet .action-option {
     background: #fff;
@@ -4139,8 +4143,8 @@ body.code-scrolling-enabled .code-block-wrapper {
     box-shadow: 0 4px 12px rgba(44, 107, 143, 0.15);
     cursor: pointer;
     transition: transform 0.3s ease,
-                box-shadow 0.3s ease,
-                border-color 0.3s ease;
+    box-shadow 0.3s ease,
+    border-color 0.3s ease;
     border: 2px solid transparent;
 }
 
@@ -5846,6 +5850,7 @@ body.code-scrolling-enabled .code-block-wrapper {
     -webkit-appearance: none;
     margin: 0;
 }
+
 /* ========== 世界设定编辑页面样式 ========== */
 .world-settings-page {
     position: absolute;
@@ -5951,6 +5956,7 @@ body.code-scrolling-enabled .code-block-wrapper {
 .field-select {
     cursor: pointer;
 }
+
 /* ========== 开始：粘贴这段全新的CSS ========== */
 
 /* 让密友聊天输入区域也能成为附件菜单的定位参考点 */
@@ -6148,6 +6154,7 @@ body.code-scrolling-enabled .code-block-wrapper {
     color: #666;
     line-height: 1.6;
 }
+
 /* ========== 预览框样式 ========== */
 
 .bubble-preview-box {
@@ -6319,6 +6326,7 @@ body.code-scrolling-enabled .code-block-wrapper {
     background: linear-gradient(135deg, #f093fb, #f5576c);
     color: white;
 }
+
 .delete-btn {
     background: #ffe5e5;
     color: #ff4757;
@@ -6336,6 +6344,7 @@ body.code-scrolling-enabled .code-block-wrapper {
     color: #868e96;
     user-select: none; /* 不可选中 */
 }
+
 /* ▲▲▲ 粘贴结束 ▲▲▲ */
 /*
 ====================================
@@ -6465,9 +6474,11 @@ body.code-scrolling-enabled .code-block-wrapper {
 .status-popup-content::-webkit-scrollbar {
     width: 6px;
 }
+
 .status-popup-content::-webkit-scrollbar-track {
     background: #FFE8E8;
 }
+
 .status-popup-content::-webkit-scrollbar-thumb {
     background: #FFB6C1;
     border-radius: 3px;
@@ -6515,6 +6526,7 @@ body.code-scrolling-enabled .code-block-wrapper {
     background-color: #FFD1DC;
     margin: 20px 0;
 }
+
 /* ========== HTML渲染气泡样式 - 开始 ========== */
 
 /* style.css (修正后的代码) */
@@ -6535,7 +6547,6 @@ body.code-scrolling-enabled .code-block-wrapper {
     max-height: 60vh; /* 新增最大高度，防止内容过长撑满整个屏幕 (60%的视口高度) */
     display: flex; /* 新增：让内部的 iframe 能更好地填充 */
 }
-
 
 
 /* 2. iframe样式，用于显示渲染结果 */
@@ -6602,6 +6613,7 @@ body.code-scrolling-enabled .code-block-wrapper {
     font-size: 14px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
+
 .contact-library-search:focus {
     outline: none;
     box-shadow: 0 0 0 2px #cce4ff;
@@ -6679,6 +6691,7 @@ body.code-scrolling-enabled .code-block-wrapper {
     color: #ccc;
     font-weight: bold;
 }
+
 /* ========== 左滑删除功能 CSS (修正版) 开始 ========== */
 
 /* 1. 滑动项的通用外层包裹容器 */
@@ -6839,6 +6852,7 @@ body.code-scrolling-enabled .code-block-wrapper {
     font-family: 'Courier New', monospace;
     margin-top: 2px;
 }
+
 /* style.css */
 
 /* ========== 联系人库多选功能样式 (已修复点击问题) ========== */
@@ -6885,15 +6899,27 @@ body.code-scrolling-enabled .code-block-wrapper {
     transition: all 0.2s;
     white-space: nowrap;
 }
-.delete-btn { background: #FFE8E8; color: #FF5252; }
-.clone-btn { background: #E3F2FD; color: #2196F3; }
-.done-btn { background: linear-gradient(135deg, #66BB6A, #43A047); color: white; }
+
+.delete-btn {
+    background: #FFE8E8;
+    color: #FF5252;
+}
+
+.clone-btn {
+    background: #E3F2FD;
+    color: #2196F3;
+}
+
+.done-btn {
+    background: linear-gradient(135deg, #66BB6A, #43A047);
+    color: white;
+}
 
 
 /* 4. 🔥【核心修复】多选模式下的联系人项样式 */
 .contact-library-item.multi-select-mode {
     position: relative; /* 保持相对定位用于伪元素 */
-    cursor: pointer;   /* 确保整个项目都是可点击的 */
+    cursor: pointer; /* 确保整个项目都是可点击的 */
     /* 移除之前的 padding-left */
 }
 
@@ -7257,6 +7283,7 @@ body.code-scrolling-enabled .code-block-wrapper {
 .library-btn-save:hover {
     transform: scale(1.02);
 }
+
 /*
 ====================================
 密友聊天 - 世界地图弹窗样式
@@ -7386,6 +7413,7 @@ body.code-scrolling-enabled .code-block-wrapper {
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
     margin-top: 4px;
 }
+
 /* ========== HTML渲染气泡样式 - 开始 ========== */
 
 /* 1. 渲染气泡的容器样式 */
@@ -7403,7 +7431,6 @@ body.code-scrolling-enabled .code-block-wrapper {
     max-height: 60vh; /* 新增最大高度，防止内容过长撑满整个屏幕 */
     display: flex; /* 让内部的 iframe 能更好地填充 */
 }
-
 
 
 /* 2. iframe样式，用于显示渲染结果 */
@@ -7441,6 +7468,7 @@ body.code-scrolling-enabled .code-block-wrapper {
 .chat-bubble.render-bubble.selecting .iframe-event-overlay {
     pointer-events: auto;
 }
+
 /* ========== 消息多选功能样式 ========== */
 
 /* 多选工具栏 */
@@ -7525,6 +7553,7 @@ body.code-scrolling-enabled .code-block-wrapper {
     background: #FFB6C1;
     border-color: #FFB6C1;
 }
+
 /* ========== 面具管理功能样式 - 开始 ========== */
 
 /* 面具管理页面 */
@@ -7887,6 +7916,7 @@ body.code-scrolling-enabled .code-block-wrapper {
     margin: 0;
     line-height: 1.4;
 }
+
 /* ========== AI记忆轮数设置样式 ========== */
 .number-stepper {
     display: flex;
@@ -7930,6 +7960,7 @@ body.code-scrolling-enabled .code-block-wrapper {
     outline: none;
     border-color: #667eea;
 }
+
 /* ========== 记忆存储中心样式 ========== */
 .memory-center-page {
     position: absolute;
@@ -8099,6 +8130,7 @@ body.code-scrolling-enabled .code-block-wrapper {
     color: #999;
     line-height: 1.5;
 }
+
 #newWorldModal {
     z-index: 2001; /* 确保这个值高于 #worldSelectPage 的 2000 */
 }
@@ -8111,14 +8143,14 @@ body.code-scrolling-enabled .code-block-wrapper {
 
 /* 2. 编辑按钮容器 */
 .status-popup-edit {
-    position: absolute;      /* 绝对定位 */
-    top: 50%;                /* 垂直居中 */
+    position: absolute; /* 绝对定位 */
+    top: 50%; /* 垂直居中 */
     transform: translateY(-50%); /* 精确垂直居中 */
-    right: 58px;             /* 关键：定位在关闭按钮的左边 (28px的关闭按钮宽度 + 28px的自身宽度) */
+    right: 58px; /* 关键：定位在关闭按钮的左边 (28px的关闭按钮宽度 + 28px的自身宽度) */
     width: 32px;
     height: 32px;
     border-radius: 50%;
-    background: #FFF0F5;     /* 使用主题色 */
+    background: #FFF0F5; /* 使用主题色 */
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -8138,6 +8170,7 @@ body.code-scrolling-enabled .code-block-wrapper {
     height: 18px;
     fill: #D4A5A5; /* 使用主题色 */
 }
+
 /*
 ====================================
 状态弹窗 - 就地编辑模式样式
@@ -8219,6 +8252,7 @@ body.code-scrolling-enabled .code-block-wrapper {
     height: 22px;
     fill: #4caf50;
 }
+
 /* style.css */
 /* 1. 基础图标容器样式（最终无背景版） */
 .settings-icon {
@@ -8231,45 +8265,57 @@ body.code-scrolling-enabled .code-block-wrapper {
     /* 移除为背景板设计的圆角 */
     border-radius: 0;
     /* 背景图片通用属性 */
-    background-size: contain;   /* contain能确保图标完整显示 */
+    background-size: contain; /* contain能确保图标完整显示 */
     background-position: center;
     background-repeat: no-repeat;
 }
+
 /* 2. 为每个图标单独设置 `background-image` */
 /* 和上次一样，这里只设置图片 URL */
 .icon-api {
     background-image: url('https://chatbotcos.weixin.qq.com/chatbot/30-openaiassets_68f3834db21084aab1644317b57b1737_469401762089707973.png');
 }
+
 .icon-database {
     background-image: url('https://cdn-icons-png.flaticon.com/512/1265/1265492.png');
 }
+
 .icon-fullscreen {
     background-image: url('https://cdn-icons-png.flaticon.com/512/9348/9348106.png');
 }
+
 .icon-storage {
     background-image: url('https://cdn-icons-png.flaticon.com/512/1198/1198369.png');
 }
+
 .icon-contacts {
     background-image: url('https://cdn-icons-png.flaticon.com/512/3781/3781907.png');
 }
+
 .icon-mask {
     background-image: url('https://cdn-icons-png.flaticon.com/512/3233/3233488.png');
 }
+
 .icon-memory {
     background-image: url('https://cdn-icons-png.flaticon.com/512/2641/2641261.png');
 }
+
 .icon-beautify {
     background-image: url('https://cdn-icons-png.flaticon.com/512/1214/1214310.png');
 }
+
 .icon-bubble {
     background-image: url('https://cdn-icons-png.flaticon.com/512/134/134796.png');
 }
+
 .icon-widget {
     background-image: url('https://cdn-icons-png.flaticon.com/512/2089/2089158.png');
 }
+
 .icon-floatball {
     background-image: url('https://cdn-icons-png.flaticon.com/512/7798/7798822.png');
 }
+
 .icon-danger {
     background-image: url('https://cdn-icons-png.flaticon.com/512/3221/3221803.png');
 }
@@ -8288,8 +8334,8 @@ body.code-scrolling-enabled .code-block-wrapper {
 /* 2. 将标题和模式图标组合在一起，并让它们居中 */
 .sweetheart-chat-title {
     position: static; /* 移除绝对定位，让它参与flex布局 */
-    transform: none;  /* 移除transform */
-    margin: 0;        /* 移除外边距 */
+    transform: none; /* 移除transform */
+    margin: 0; /* 移除外边距 */
 
     /* 使用flex布局让标题和后面的图标对齐 */
     display: flex;
@@ -8309,7 +8355,7 @@ body.code-scrolling-enabled .code-block-wrapper {
     /* 移除原有的圆形背景和边框 */
     background: none;
     box-shadow: none;
-    width: auto;  /* 宽度自适应 */
+    width: auto; /* 宽度自适应 */
     height: auto; /* 高度自适应 */
     border-radius: 0;
 
@@ -8320,8 +8366,8 @@ body.code-scrolling-enabled .code-block-wrapper {
 
 /* 4. 设置图标图片的大小 */
 .mode-toggle-btn img {
-    height: 1.2em;  /* 核心修改：让图标高度与文字大小关联 (1.2倍文字高度) */
-    width: auto;    /* 核心修改：宽度自动调整，以保持图片原始比例不失真 */
+    height: 1.2em; /* 核心修改：让图标高度与文字大小关联 (1.2倍文字高度) */
+    width: auto; /* 核心修改：宽度自动调整，以保持图片原始比例不失真 */
     opacity: 0.7; /* 让图标柔和一点 */
     transition: opacity 0.2s, transform 0.2s;
 }
@@ -8331,6 +8377,7 @@ body.code-scrolling-enabled .code-block-wrapper {
     opacity: 1;
     transform: scale(1.1);
 }
+
 /* ========== 测试功能样式 ========== */
 
 /* 测试配置弹窗 */
@@ -8742,6 +8789,7 @@ body.code-scrolling-enabled .code-block-wrapper {
     background: linear-gradient(135deg, #667eea, #764ba2);
     color: white;
 }
+
 /* 错题解析区域 */
 .wrong-answers-section {
     margin-top: 20px;
@@ -8803,6 +8851,7 @@ body.code-scrolling-enabled .code-block-wrapper {
     flex: 1;
     color: #555;
 }
+
 /*
 ====================================
 状态历史记录功能 - 样式
@@ -8882,9 +8931,11 @@ body.code-scrolling-enabled .code-block-wrapper {
 .status-history-content::-webkit-scrollbar {
     width: 6px;
 }
+
 .status-history-content::-webkit-scrollbar-track {
     background: #FFE8E8;
 }
+
 .status-history-content::-webkit-scrollbar-thumb {
     background: #FFB6C1;
     border-radius: 3px;
@@ -8977,6 +9028,7 @@ body.code-scrolling-enabled .code-block-wrapper {
     -webkit-backdrop-filter: none;
     background: rgba(255, 255, 255, 0.8); /* 提供一个降级背景 */
 }
+
 #widgetManager .settings-content {
     overflow-y: auto !important;
     max-height: 75vh !important; /* 限制最大高度，强制显示滚动条 */

@@ -1052,29 +1052,35 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
         };
         bubble.appendChild(iframe);
 
-    // 5c. 【最终修复】处理普通文本、代码块和引用
+        // 【最终修复】处理普通文本、代码块和引用
     } else {
         let contentHTML = '';
 
         // 优先处理引用
-        if (messageObj.quote) {
-            const senderName = messageObj.quotedMessage.sender === 'user' ? (userProfile.name || '我') : (contactData ? contactData.name : '联系人');
-            let quotedText = messageObj.quotedMessage.text.substring(0, 50);
-            if (messageObj.quotedMessage.text.length > 50) quotedText += '...';
+        if (messageObj.quote && messageObj.quote.senderName) {
+            const senderName = messageObj.quote.senderName;
+            let quotedText = messageObj.quote.text.substring(0, 50);
+            if (messageObj.quote.text.length > 50) quotedText += '...';
 
             contentHTML += `
-                <div class="quoted-message-wrapper">
-                    <div class="quoted-sender">${escapeHTML(senderName)}</div>
-                    <div class="quoted-text">${escapeHTML(quotedText)}</div>
-                </div>
-            `;
+            <div class="quoted-message-wrapper">
+                <div class="quoted-sender">${escapeHTML(senderName)}</div>
+                <div class="quoted-text">${escapeHTML(quotedText)}</div>
+            </div>
+        `;
         }
 
-        // 然后处理主消息文本（包含代码块等）
-        contentHTML += formatMessageText(text);
+        // ▼▼▼ 核心修改在这里 ▼▼▼
+        // 只有当新消息文本存在时，才创建并添加包裹它的 div
+        const formattedText = formatMessageText(text);
+        if (formattedText) {
+            contentHTML += `<div class="main-message-text">${formattedText}</div>`;
+        }
+        // ▲▲▲ 修改结束 ▲▲▲
 
         bubble.innerHTML = contentHTML;
     }
+
 
     // ▲▲▲ 核心改造结束 ▲▲▲
 
