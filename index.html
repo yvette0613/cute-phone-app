@@ -2,10 +2,25 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Yetta以她小手机</title>
     <!-- 1. 引入外部的CSS样式文件 -->
     <link rel="stylesheet" href="style.css">
+    <style>
+        /* 图片加载占位 */
+        img:not([src]) {
+            visibility: hidden;
+        }
+
+        img {
+            background: linear-gradient(135deg, #f0f0f0 25%, transparent 25%),
+            linear-gradient(225deg, #f0f0f0 25%, transparent 25%),
+            linear-gradient(45deg, #f0f0f0 25%, transparent 25%),
+            linear-gradient(315deg, #f0f0f0 25%, #e0e0e0 25%);
+            background-size: 20px 20px;
+            background-position: 0 0, 10px 0, 10px -10px, 0px 10px;
+        }
+    </style>
 </head>
 <body>
 <div class="phone">
@@ -15,6 +30,15 @@
             <p id="successModalMessage">你的设置已保存。</p>
         </div>
     </div>
+    <!-- ========== 新增：报错提示弹窗 开始 ========== -->
+    <div class="error-modal" id="errorModal">
+        <div class="error-modal-content">
+            <div class="error-icon">⚠️</div>
+            <h3 id="errorModalTitle">操作失败</h3>
+            <p id="errorModalMessage">出现未知错误。</p>
+        </div>
+    </div>
+    <!-- ========== 新增：报错提示弹窗 结束 ========== -->
     <div class="screen" id="screen">
         <div class="avatar-action-sheet" id="locationActionSheet">
             <div class="action-sheet-backdrop" onclick="closeLocationChooser()"></div>

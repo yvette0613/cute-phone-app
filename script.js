@@ -1,4 +1,58 @@
 // ▼▼▼ 步骤3：将下面所有JS代码粘贴到 <script> 标签的最顶部 ▼▼▼
+/**
+ * [新增] 健壮的AI JSON响应解析器
+ * 它可以处理纯JSON、被文字包裹的JSON和被Markdown包裹的JSON
+ * @param {string} rawMessage - 从AI获取的原始字符串
+ * @returns {{chatReplyText: string, statusData: object|null}}
+ */
+function parseAiJsonResponse(rawMessage) {
+    if (!rawMessage) {
+        return { chatReplyText: '...', statusData: null };
+    }
+
+    // 1. 尝试清理可能的markdown代码块标记
+    let cleanedMessage = rawMessage.trim();
+    if (cleanedMessage.startsWith('```json')) {
+        cleanedMessage = cleanedMessage.substring(7);
+    }
+    if (cleanedMessage.endsWith('```')) {
+        cleanedMessage = cleanedMessage.substring(0, cleanedMessage.length - 3);
+    }
+    cleanedMessage = cleanedMessage.trim();
+
+    // 2. 尝试直接解析，这是最理想的情况
+    try {
+        const parsed = JSON.parse(cleanedMessage);
+        return {
+            chatReplyText: parsed.reply || cleanedMessage,
+            statusData: parsed.status || null
+        };
+    } catch (e) {
+        // 直接解析失败，继续下一步
+    }
+
+    // 3. 使用正则表达式提取被包裹的JSON
+    try {
+        const jsonMatch = cleanedMessage.match(/\{[\s\S]*\}/);
+        if (jsonMatch && jsonMatch[0]) {
+            const parsed = JSON.parse(jsonMatch[0]);
+            console.log("✅ 智能提取JSON成功！");
+            return {
+                chatReplyText: parsed.reply || cleanedMessage,
+                statusData: parsed.status || null
+            };
+        }
+    } catch (e) {
+        console.error("❌ 提取JSON后解析失败:", e);
+    }
+
+    // 4. 彻底失败，返回纯文本内容，状态为null
+    console.warn("⚠️ 未能解析出有效JSON，将作为纯文本处理。");
+    return {
+        chatReplyText: rawMessage,
+        statusData: null
+    };
+}
 
 // ================== 地址选择与持久化功能 ==================
 
@@ -360,30 +414,30 @@ function saveSweetheartCardData() {
         return;
     }
 
-    // 2. 获取可选字段 (这部分不变)
+    // 2. 获取可选字段
     const personality = document.getElementById('sweetheart-personality').value.trim();
     const occupation = document.getElementById('sweetheart-occupation').value.trim();
     const catchphrase = document.getElementById('sweetheart-catchphrase').value.trim();
     const history = document.getElementById('sweetheart-history').value.trim();
     const relationship = document.getElementById('sweetheart-relationship').value.trim();
 
-    // 3. 获取头像 (这部分不变)
+    // 3. 获取头像
     const avatar = document.getElementById('sweetheart-avatar-preview').src;
     const finalAvatar = (avatar && !avatar.includes('data:image/gif')) ? avatar : '💖';
 
-    // 4. 获取绑定的世界书 (这部分不变)
+    // 4. 获取绑定的世界书
     const boundWorldbooks = [];
     document.querySelectorAll('.sweetheart-wb-item input[type="checkbox"]:checked').forEach(cb => {
         boundWorldbooks.push(cb.value);
     });
 
-    // 在获取绑定的世界书后添加
+    // 获取绑定的面具
     const boundMasks = [];
     document.querySelectorAll('#sweetheartMasksList input[type="checkbox"]:checked').forEach(cb => {
         boundMasks.push(cb.value);
     });
 
-    // 5. 生成ID并组装数据 (这部分不变)
+    // 5. 生成ID并组装数据
     const contactId = currentEditingSweetheartId || 'SH' + Date.now();
     const contactData = {
         id: contactId,
@@ -399,7 +453,7 @@ function saveSweetheartCardData() {
         boundMasks
     };
 
-    // 6. 判断是新建还是编辑, 更新 sweetheartContactsData (这部分不变)
+    // 6. 判断是新建还是编辑, 更新 sweetheartContactsData
     const existingIndex = sweetheartContactsData.findIndex(c => c.id === contactId);
     if (existingIndex !== -1) {
         sweetheartContactsData[existingIndex] = contactData;
@@ -408,29 +462,26 @@ function saveSweetheartCardData() {
     }
     saveSweetheartContacts(); // 保存密友列表
 
-    // ▼ ▼ ▼【核心修复】▼ ▼ ▼
-    // 7. 检查是否存在当前世界ID，如果存在，则将新联系人ID添加到该世界的联系人列表中
+    // ▼▼▼【核心修复】确保联系人关联到当前世界 ▼▼▼
     if (currentWorldId) {
         const world = worldsData.find(w => w.id === currentWorldId);
         if (world) {
             // 确保不重复添加
             if (!world.contacts.includes(contactId)) {
                 world.contacts.push(contactId);
-                // 保存世界数据的更改！
-                saveWorldsData();
-                // ✅ 新增:更新世界列表显示
-                renderWorldList();
-                console.log(`已将新联系人 ${name} (ID: ${contactId}) 添加到世界 "${world.name}"`);
+                saveWorldsData(); // 保存世界数据
+                console.log(`✅ 已将新联系人 "${name}" (ID: ${contactId}) 添加到世界 "${world.name}"`);
             }
         }
     }
-    // ▲ ▲ ▲【修复结束】▲ ▲ ▲
+    // ▲▲▲【修复结束】▲▲▲
 
-    // 8. 刷新列表并关闭弹窗 (这部分不变)
+    // 7. 刷新列表并关闭弹窗
     renderSweetheartList();
     closeSweetheartCardModal();
     showSuccessModal('保存成功', `${name} 已成功添加！💖`);
 }
+
 
 // ▼▼▼ 第3步：在这里粘贴新增的JS代码 ▼▼▼
 
@@ -1019,48 +1070,68 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
 
     const text = messageObj.text || '';
     const renderMatch = text.match(/<render>([\s\S]*?)<\/render>/);
+
+    // 5a. ▼▼▼ 【最终优化版】处理 <render> 标签的HTML/CSS渲染 ▼▼▼
+    if (renderMatch && renderMatch[1]) {
+        bubble.classList.add('render-bubble');
+        const iframe = document.createElement('iframe');
+        iframe.className = 'render-iframe';
+
+        // 出于安全考虑，使用沙箱模式，但允许脚本执行
+        iframe.sandbox = 'allow-scripts allow-same-origin';
+        // 将AI生成的内容包装在一个标准化的HTML模板中，确保有基本的样式和滚动能力
+        iframe.srcdoc = `
+            <html>
+                <head>
+                    <style>
+                        /* 1. 基础重置，确保干净的渲染环境 */
+                        body { 
+                            margin: 0; 
+                            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+                            overscroll-behavior: contain; /* 防止iframe内滚动影响到父页面 */
+                        }
+                        
+                        /* 2. 为AI内容创建一个居中的容器，增加呼吸空间 */
+                        .content-wrapper {
+                            display: flex;
+                            justify-content: center;
+                            align-items: center;
+                            min-height: 100%;
+                            padding: 16px;
+                            box-sizing: border-box;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="content-wrapper">
+                        ${renderMatch[1]}
+                    </div>
+                </body>
+            </html>
+        `;
+        bubble.appendChild(iframe);
+
     // 5b. 处理图片消息
-    if (messageObj.imageUrl) {
+    } else if (messageObj.imageUrl) {
         bubble.classList.add('image-only');
         const img = document.createElement('img');
         img.src = messageObj.imageUrl;
         img.alt = '图片';
+        img.style.maxWidth = '150px'; // 适当限制图片大小
+        img.style.borderRadius = '10px';
         bubble.appendChild(img);
-    // 5a. 处理 <render> 标签的HTML/CSS渲染
-    } else if (renderMatch && renderMatch[1]) {
-        bubble.classList.add('render-bubble');
-        const iframe = document.createElement('iframe');
-        iframe.className = 'render-iframe';
-        iframe.sandbox = 'allow-scripts allow-same-origin';
-        iframe.srcdoc = renderMatch[1];
 
-        iframe.onload = function() {
-            // (此处为您原有的 iframe 高度自适应逻辑，保持不变)
-            setTimeout(() => {
-                try {
-                    const iframeBody = iframe.contentWindow.document.body;
-                    if (iframeBody) {
-                        iframe.style.height = (iframeBody.scrollHeight + 4) + 'px';
-                        if (window.ResizeObserver) {
-                            new ResizeObserver(() => {
-                                iframe.style.height = (iframeBody.scrollHeight + 4) + 'px';
-                            }).observe(iframeBody);
-                        }
-                    }
-                } catch (e) { console.warn('无法访问 iframe 内容:', e.message); iframe.style.height = '250px'; }
-            }, 100);
-        };
-        bubble.appendChild(iframe);
-
-        // 【最终修复】处理普通文本、代码块和引用
+    // 5c. 【最终修复】处理普通文本、代码块和引用
     } else {
         let contentHTML = '';
 
         // 优先处理引用
         if (messageObj.quote && messageObj.quote.senderName) {
             const senderName = messageObj.quote.senderName;
-            let quotedText = messageObj.quote.text.substring(0, 50);
-            if (messageObj.quote.text.length > 50) quotedText += '...';
+            // 修正：安全地处理可能不存在的 qoute.text
+            const rawQuotedText = messageObj.quote.text || '';
+            let quotedText = rawQuotedText.substring(0, 50);
+            if (rawQuotedText.length > 50) quotedText += '...';
 
             contentHTML += `
             <div class="quoted-message-wrapper">
@@ -1091,21 +1162,28 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
     messageRow.appendChild(messageContent);
 
     // 7. ✅ 统一绑定消息操作事件（长按和右键）
-    if (bubble.addEventListener) {
+    if (bubble.addEventListener) { // 检查浏览器兼容性
         let longPressTimer = null;
         let startPos = { x: 0, y: 0 };
+        // 检查是普通聊天还是密友聊天
+        const isSweetheart = document.getElementById('sweetheartChatPage').classList.contains('show');
 
         const handleStart = (e) => {
             const touch = e.touches ? e.touches[0] : e;
             startPos = { x: touch.clientX, y: touch.clientY };
             longPressTimer = setTimeout(() => {
-                showMessageMenu(contactId, messageIndex, messageRow);
-            }, 500);
+                if (isSweetheart) {
+                    showSweetheartMessageActionSheet(contactId, messageIndex);
+                } else {
+                    showNormalMessageActionSheet(contactId, messageIndex);
+                }
+            }, 500); // 500ms 长按
         };
 
         const handleMove = (e) => {
             if (!longPressTimer) return;
             const touch = e.touches ? e.touches[0] : e;
+            // 如果移动超过10像素，则取消长按
             if (Math.sqrt(Math.pow(touch.clientX - startPos.x, 2) + Math.pow(touch.clientY - startPos.y, 2)) > 10) {
                 clearTimeout(longPressTimer);
                 longPressTimer = null;
@@ -1118,9 +1196,14 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
 
         const handleContextMenu = (e) => {
             e.preventDefault();
-            showMessageMenu(contactId, messageIndex, messageRow);
+            if (isSweetheart) {
+                showSweetheartMessageActionSheet(contactId, messageIndex);
+            } else {
+                showNormalMessageActionSheet(contactId, messageIndex);
+            }
         };
 
+        // 为触摸和鼠标事件都绑定处理器
         bubble.addEventListener('touchstart', handleStart, { passive: true });
         bubble.addEventListener('mousedown', handleStart);
         bubble.addEventListener('touchmove', handleMove, { passive: true });
@@ -1129,7 +1212,6 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
         bubble.addEventListener('mouseup', handleEnd);
         bubble.addEventListener('contextmenu', handleContextMenu);
     }
-
     return messageRow;
 }
 
@@ -4675,7 +4757,7 @@ ${formattedDialog}
  */
 async function getAiReply() {
     if (globalConfig.activeApiConfig === null || !globalConfig.apiConfigs[globalConfig.activeApiConfig]) {
-        alert('请先在“设置 > API设置”中配置并激活一个API！');
+        showErrorModal('配置错误', '请先在“设置 > API设置”中配置并激活一个API！', 3000);
         return; // 终止函数执行
     }
     if (!currentChatContact) return;
@@ -4814,7 +4896,7 @@ async function getAiReply() {
     thinkingBubble.remove();
     // 6. 处理和显示AI回复
     if (!result.success) {
-        alert('网络错误：' + result.message);
+        showErrorModal('API 响应错误', result.message);
     } else {
         // ✅ [功能已恢复] 分段显示AI回复
         const segments = result.message.split('---').filter(s => s.trim());
@@ -5027,6 +5109,40 @@ function showSuccessModal(title = '操作成功', message = '你的设置已保�
         setTimeout(() => modal.style.display = 'none', 300);
     }, duration);
 }
+
+/**
+ * 显示一个不可回复的错误提示弹窗
+ * @param {string} [title='操作失败'] - 弹窗的主标题
+ * @param {string} [message='出现未知错误。'] - 弹窗的详细信息
+ * @param {number} [duration=2500] - 弹窗显示的毫秒数
+ */
+function showErrorModal(title = '操作失败', message = '出现未知错误。', duration = 2500) {
+    const modal = document.getElementById('errorModal');
+    const modalTitle = document.getElementById('errorModalTitle');
+    const modalMessage = document.getElementById('errorModalMessage');
+
+    // 如果找不到必要的元素，就直接退出，防止报错
+    if (!modal || !modalTitle || !modalMessage) {
+        console.error('错误提示框的HTML元素未找到！');
+        return;
+    }
+
+    // 1. 更新标题和信息
+    modalTitle.textContent = title;
+    modalMessage.textContent = message;
+
+    // 2. 显示弹窗并触发动画
+    modal.style.display = 'flex';
+    setTimeout(() => modal.classList.add('show'), 10); // 延迟一点点以确保CSS过渡生效
+
+    // 3. 在指定时间后自动隐藏
+    setTimeout(() => {
+        modal.classList.remove('show');
+        // 在动画结束后再彻底隐藏，防止突然消失
+        setTimeout(() => modal.style.display = 'none', 300);
+    }, duration);
+}
+
 
 function deleteApiConfig(index) {
     const configToDelete = globalConfig.apiConfigs[index];
@@ -7084,52 +7200,6 @@ function updateChatModeButton() {
     }
 }
 
-/**
- * [新增] 健壮的AI JSON响应解析器
- * 它可以处理纯JSON、被文字包裹的JSON和被Markdown包裹的JSON
- * @param {string} rawMessage - 从AI获取的原始字符串
- * @returns {{chatReplyText: string, statusData: object|null}}
- */
-function parseAiJsonResponse(rawMessage) {
-    if (!rawMessage) {
-        return { chatReplyText: '...', statusData: null };
-    }
-
-    // 1. 尝试直接解析，这是最理想的情况
-    try {
-        const parsed = JSON.parse(rawMessage);
-        return {
-            chatReplyText: parsed.reply || rawMessage,
-            statusData: parsed.status || null
-        };
-    } catch (e) {
-        // 直接解析失败，继续下一步
-    }
-
-    // 2. 使用正则表达式提取被包裹的JSON
-    try {
-        const jsonMatch = rawMessage.match(/\{[\s\S]*\}/);
-        if (jsonMatch && jsonMatch) {
-            const parsed = JSON.parse(jsonMatch);
-            console.log("✅ 智能提取JSON成功！");
-            return {
-                chatReplyText: parsed.reply || rawMessage,
-                statusData: parsed.status || null
-            };
-        }
-    } catch (e) {
-        // 提取后解析也失败，继续最后一步
-        console.error("❌ 提取JSON后解析失败:", e);
-    }
-
-    // 3. 彻底失败，返回纯文本内容，状态为null
-    console.warn("⚠️ 未能解析出有效JSON，将作为纯文本处理。");
-    return {
-        chatReplyText: rawMessage,
-        statusData: null
-    };
-}
-
 
 /**
  * [修改后] 格式化状态历史，明确区分“当前实时状态”和“历史参考”
@@ -7166,55 +7236,6 @@ function formatStatusHistoryForAI(currentStatus, history) {
 }
 
 /**
- * [新增] 健壮的AI JSON响应解析器
- * 它可以处理纯JSON、被文字包裹的JSON和被Markdown包裹的JSON
- * @param {string} rawMessage - 从AI获取的原始字符串
- * @returns {{chatReplyText: string, statusData: object|null}}
- */
-function parseAiJsonResponse(rawMessage) {
-    if (!rawMessage) {
-        return { chatReplyText: '...', statusData: null };
-    }
-
-    // 1. 尝试直接解析，这是最理想的情况
-    try {
-        const parsed = JSON.parse(rawMessage);
-        // 如果解析成功，直接返回提取出的内容
-        return {
-            chatReplyText: parsed.reply || rawMessage, // 如果没有reply字段，就返回原始消息
-            statusData: parsed.status || null
-        };
-    } catch (e) {
-        // 直接解析失败，说明格式不纯，继续下一步
-        console.warn("直接解析JSON失败，尝试智能提取...");
-    }
-
-    // 2. 使用正则表达式提取被包裹的JSON
-    // 这个表达式会贪婪地匹配从第一个 "{" 到最后一个 "}" 的所有内容
-    try {
-        const jsonMatch = rawMessage.match(/\{[\s\S]*\}/);
-        if (jsonMatch && jsonMatch) {
-            const parsed = JSON.parse(jsonMatch);
-            console.log("✅ 智能提取JSON成功！");
-            return {
-                chatReplyText: parsed.reply || rawMessage,
-                statusData: parsed.status || null
-            };
-        }
-    } catch (e) {
-        // 提取后解析也失败，继续最后一步
-        console.error("❌ 提取JSON后解析失败:", e);
-    }
-
-    // 3. 如果以上都失败，说明AI可能返回了纯文本，直接返回纯文本
-    console.warn("⚠️ 未能解析出有效JSON，将作为纯文本处理。");
-    return {
-        chatReplyText: rawMessage,
-        statusData: null
-    };
-}
-
-/**
  * 密友聊天 - 获取AI回复（【功能完整且无省略的最终修复版】）
  * 该版本整合了稳定的逻辑与完整的功能（包括图片识别），可以直接替换使用。
  */
@@ -7223,7 +7244,7 @@ async function getSweetheartAiReply() {
 
     // 前置检查：API配置
     if (globalConfig.activeApiConfig === null || !globalConfig.apiConfigs[globalConfig.activeApiConfig]) {
-        alert('请先在“设置 > API设置”中配置并激活一个API！');
+        showErrorModal('配置错误', '请先在“设置 > API设置”中配置并激活一个API！', 3000);
         return;
     }
 
@@ -7314,81 +7335,74 @@ async function getSweetheartAiReply() {
         messages.push({ role: "system", content: backgroundInfo });
     }
 
-    // --- 步骤 2: 处理聊天历史、图片和当前输入 ---
     const chatHistory = JSON.parse(localStorage.getItem('phoneSweetheartChatHistory') || '{}');
     const contactMessages = chatHistory[contactId] || [];
     const memoryRounds = currentSweetheartChatContact.memoryRounds || 10;
     const recentMessages = contactMessages.slice(-(memoryRounds * 2));
-    const currentUserInput = chatInput.value.trim();
-    let userMessageForApi = null;
 
-    // 2.1 添加历史记录到上下文
-    recentMessages.forEach(msg => {
-        if (msg.sender === 'user' && msg.imageUrl && !msg.isProcessed) {
-            return; // 跳过未处理的图片，它们将在下一步被专门处理
-        }
-        if (msg.type === 'location') {
-             messages.push({ role: 'system', content: `[场景变化] 你们来到了【${msg.locationName}】。描述：${msg.locationDesc}`});
-        } else if (msg.text) {
-             const role = msg.sender === 'user' ? 'user' : 'assistant';
-             const content = (msg.text || '').replace(/<render>[\s\S]*?<\/render>/, '[特殊渲染内容]');
-             messages.push({ role, content });
-        }
-    });
-
-    // 2.2 查找最近一条未处理的图片
-    let unprocessedImage = null;
-    for (let i = contactMessages.length - 1; i >= 0; i--) {
-        const msg = contactMessages[i];
-        if (msg.sender === 'user' && msg.imageUrl && !msg.isProcessed) {
-            unprocessedImage = msg;
-            break;
-        }
-    }
-
-    // 2.3 构建当前用户的最终输入 (文本 + 图片 或 纯文本)
-    if (currentUserInput || unprocessedImage) {
-        if (unprocessedImage) {
-            console.log("🖼️ 检测到未处理的图片，构建多模态消息。");
-            const contentArray = [];
-            if (currentUserInput) {
-                contentArray.push({ type: 'text', text: currentUserInput });
-            }
-            contentArray.push({
-                type: 'image_url',
-                image_url: { url: unprocessedImage.imageUrl }
-            });
-            userMessageForApi = { role: 'user', content: contentArray };
-
-            // 标记图片为“已处理”
-            const msgIndex = contactMessages.findIndex(m => m.timestamp === unprocessedImage.timestamp);
-            if (msgIndex !== -1) {
-                chatHistory[contactId][msgIndex].isProcessed = true;
-                localStorage.setItem('phoneSweetheartChatHistory', JSON.stringify(chatHistory));
+    let userTextBuffer = []; // 1. 创建文本缓冲区
+    for (const msg of recentMessages) {
+        if (msg.sender === 'user') {
+            // 当消息是用户发送时
+            if (msg.imageUrl && !msg.isProcessed) {
+                // 2. 遇到未处理的图片，打包缓冲区和图片
+                console.log("🖼️ 顺序处理到一张图片，打包发送...");
+                const contentArray = [];
+                if (userTextBuffer.length > 0) {
+                    contentArray.push({ type: 'text', text: userTextBuffer.join('\n') });
+                }
+                contentArray.push({ type: 'image_url', image_url: { url: msg.imageUrl } });
+                messages.push({ role: 'user', content: contentArray });
+                userTextBuffer = []; // 3. 清空缓冲区
+                // 标记图片为“已处理”并立即保存
+                const msgIndex = contactMessages.findIndex(m => m.timestamp === msg.timestamp);
+                if (msgIndex !== -1) {
+                    chatHistory[contactId][msgIndex].isProcessed = true;
+                }
+            } else if (msg.text) {
+                // 4. 遇到文本，存入缓冲区
+                userTextBuffer.push(msg.text);
             }
         } else {
-            console.log("💬 仅检测到文本输入。");
-            userMessageForApi = { role: 'user', content: currentUserInput };
+            // 当消息是AI发送时
+            // 5. 先“冲刷”缓冲区里用户的文本
+            if (userTextBuffer.length > 0) {
+                messages.push({ role: 'user', content: userTextBuffer.join('\n') });
+                userTextBuffer = [];
+            }
+            // 6. 再添加AI的回复
+            if (msg.type === 'location') {
+                messages.push({ role: 'system', content: `[场景变化] 你们来到了【${msg.locationName}】。描述：${msg.locationDesc}`});
+            } else if (msg.text) {
+                messages.push({
+                    role: 'assistant',
+                    content: msg.text.replace(/<render>[\s\S]*?<\/render>/, '[特殊渲染内容]')
+                });
+            }
         }
     }
-
-    // 2.4 如果有新文本输入，先在UI上渲染出来并清空输入框
+    // 7. 循环结束后，冲刷最后剩余的用户文本
+    if (userTextBuffer.length > 0) {
+        messages.push({ role: 'user', content: userTextBuffer.join('\n') });
+    }
+    // 保存对 isProcessed 标志的修改
+    localStorage.setItem('phoneSweetheartChatHistory', JSON.stringify(chatHistory));
+    // --- 步骤 3: 处理当前输入框的新消息 (与旧版类似) ---
+    const currentUserInput = chatInput.value.trim();
     if (currentUserInput) {
+        // 先在UI上渲染出来
         const messageObj = { sender: 'user', text: currentUserInput };
         const newIndex = saveSweetheartMessage(contactId, messageObj);
         const messageRow = _createMessageDOM(contactId, messageObj, newIndex);
         messagesEl.appendChild(messageRow);
-        chatInput.value = ''; // 清空输入框
+        chatInput.value = '';
+        // 再添加到API请求的末尾
+        messages.push({ role: 'user', content: currentUserInput });
     }
 
-    // 步骤 3: 如果有新构建的用户消息，将其添加到待发送数组中
-    if (userMessageForApi) {
-        messages.push(userMessageForApi);
-    }
-
-    // 步骤 4: 检查最终的待发送数组中是否包含任何用户消息
+    // --- 步骤 4: 检查并调用API (与旧版相同) ---
     if (messages.filter(m => m.role === 'user').length === 0) {
-        console.warn("🤔 没有任何用户消息（历史或新输入），不调用API。");
+        console.warn("🤔 没有任何用户消息，不调用API。");
         getReplyBtn.disabled = false;
         chatInput.disabled = false;
         return;
@@ -7404,7 +7418,7 @@ async function getSweetheartAiReply() {
     thinkingBubble.remove();
 
     if (!result.success) {
-        alert('网络错误：' + result.message);
+        showErrorModal('API 响应错误', result.message);
     } else {
         // ▼▼▼▼▼ 核心修复点在这里 ▼▼▼▼▼
         // 使用我们新的解析函数来处理回复
@@ -7418,7 +7432,11 @@ async function getSweetheartAiReply() {
 
         // 使用解析出的聊天文本来显示气泡
         const segments = chatReplyText.split('---').filter(s => s.trim());
-        if (segments.length === 0) segments.push(chatReplyText || '...');
+        if (segments.length === 0 && chatReplyText.trim()) {
+            segments.push(chatReplyText);
+        } else if (segments.length === 0) {
+            segments.push('...');
+        }
 
         for (const segmentText of segments) {
             const messageObj = { sender: 'contact', text: segmentText.trim() };
@@ -7437,6 +7455,7 @@ async function getSweetheartAiReply() {
     chatInput.disabled = false;
     chatInput.focus();
 }
+
 
 
 /**
@@ -10053,8 +10072,8 @@ function renderContactLibrary() {
 
 
 /**
- * [最终版] 从联系人库选择联系人
- * 取消实例逻辑，直接检查是否已存在
+ * [最终修复版] 从联系人库选择联系人
+ * 修复了无法关联到当前世界的Bug
  */
 function selectContactFromLibrary(sourceContact) {
     const contactId = sourceContact.id;
@@ -10074,27 +10093,52 @@ function selectContactFromLibrary(sourceContact) {
         renderFunc = () => renderContacts(contactsData);
     }
 
-    // 🔥 核心修改：检查是否已存在（不再创建实例）
+    // 检查是否已存在
     const alreadyExists = targetList.some(c => c.id === contactId);
 
     if (alreadyExists) {
         showSuccessModal(
-            '已有聊天',
+            '已存在',
             `"${sourceContact.name}" 已在${targetName}中。`,
             2000
         );
         closeContactLibrary();
+
+        // 如果是密友模式，返回到密友列表
+        if (contactLibraryMode === 'selectForSweetheart') {
+            setTimeout(openSweetheartList, 350);
+        }
         return;
     }
 
-    // 如果不存在，直接添加（共享同一个ID）
+    // 如果不存在，直接添加
     targetList.push(sourceContact);
     saveFunc();
-    renderFunc();
 
+    // ▼▼▼【核心Bug修复】将选择的联系人也关联到当前世界 ▼▼▼
+    if (currentWorldId && contactLibraryMode === 'selectForSweetheart') {
+        const world = worldsData.find(w => w.id === currentWorldId);
+        if (world && !world.contacts.includes(contactId)) {
+            world.contacts.push(contactId);
+            saveWorldsData();
+            console.log(`✅ 已将现有联系人 "${sourceContact.name}" (ID: ${contactId}) 关联到世界 "${world.name}"`);
+        }
+    }
+    // ▲▲▲【修复结束】▲▲▲
+
+    renderFunc();
     showSuccessModal('添加成功', `已将"${sourceContact.name}"添加到${targetName}。`);
     closeContactLibrary();
+
+    // 平滑过渡：等待关闭动画结束后再打开密友列表
+    if (contactLibraryMode === 'selectForSweetheart') {
+        setTimeout(() => {
+            openSweetheartList();
+            renderSweetheartList(); // 确保列表更新
+        }, 350);
+    }
 }
+
 
 // ========== 联系人库多选模式功能 ==========
 
@@ -11633,8 +11677,7 @@ ${conversationText}
         loadingMsg.remove();
 
         if (!result.success) {
-            alert('总结失败：' + result.message);
-            return;
+            throw new Error(result.message);
         }
 
         // 保存总结到知识库
@@ -11670,7 +11713,7 @@ ${conversationText}
     } catch (error) {
         loadingMsg.remove();
         console.error('总结失败:', error);
-        alert('总结失败，请重试');
+        showErrorModal('总结失败', error.message || '请检查网络或API配置。');
     }
 }
 
@@ -11928,7 +11971,7 @@ async function startGenerateTest() {
     } catch (error) {
         document.getElementById('successModal').classList.remove('show');
         console.error('生成测试失败:', error);
-        alert('生成测试失败：' + error.message);
+        showErrorModal('生成测试失败', error.message);
     }
 }
 
