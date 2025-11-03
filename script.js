@@ -396,7 +396,7 @@ function saveSweetheartCardData() {
         history,
         relationship,
         boundWorldbooks,
-        oundMasks
+        boundMasks
     };
 
     // 6. 判断是新建还是编辑, 更新 sweetheartContactsData (这部分不变)
