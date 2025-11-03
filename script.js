@@ -2388,7 +2388,8 @@ const state = {
         page2: appsPage2
     },
     lastDragEndTime: 0, // ✅ 新增：记录最后一次拖动结束的时间
-    isDraggingFromDock: false  // 🔧 新增这一行
+    isDraggingFromDock: false,  // 🔧 新增这一行
+    dragMoveScheduled: false // <--- 新增
 };
 
 
@@ -2445,18 +2446,237 @@ function exitEditMode() {
     }
 }
 
+/**
+ *  helper function: 创建设置页面的完整HTML结构
+ * @returns {string} - 包含设置页面所有内容的HTML字符串
+ */
+function createSettingsPageHTML() {
+    // 这里我们将原本在 index.html 中的代码，变成了一个返回字符串的函数
+    return `
+    <div class="settings-page" id="settingsPage">
+        <div class="settings-header">
+            <div class="back-btn" onclick="closeSettings()">←</div>
+            <div class="settings-title">设置</div>
+        </div>
+
+        <div class="settings-content">
+            <div class="settings-section">
+                <div class="section-title">配置</div>
+                <!-- 1. API设置 -->
+                <div class="settings-item" onclick="openApiConfig()">
+                    <div class="settings-icon icon-api"></div>
+                    <div class="settings-info">
+                        <div class="settings-label">API设置</div>
+                        <div class="settings-desc">管理API配置和模型</div>
+                    </div>
+                    <div class="settings-arrow">›</div>
+                </div>
+                <!-- 2. 数据库设置 -->
+                <div class="settings-item" onclick="openConfig('database')">
+                    <div class="settings-icon icon-database"></div>
+                    <div class="settings-info">
+                        <div class="settings-label">数据库设置</div>
+                        <div class="settings-desc">配置Supabase数据库</div>
+                    </div>
+                    <div class="settings-arrow">›</div>
+                </div>
+                <!-- 3. 全屏模式 -->
+                <div class="settings-item">
+                    <div class="settings-icon icon-fullscreen"></div>
+                    <div class="settings-info">
+                        <div class="settings-label">全屏模式</div>
+                        <div class="settings-desc">移除手机边框，享受沉浸式体验</div>
+                    </div>
+                    <div class="settings-action">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="fullscreenToggle">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+                <!-- 4. 云存储设置 -->
+                <div class="settings-item" onclick="openConfig('storage')">
+                    <div class="settings-icon icon-storage"></div>
+                    <div class="settings-info">
+                        <div class="settings-label">云存储设置</div>
+                        <div class="settings-desc">配置Supabase Storage</div>
+                    </div>
+                    <div class="settings-arrow">›</div>
+                </div>
+                <!-- 5. 联系人库 -->
+                <div class="settings-item" onclick="openContactLibrary('edit')">
+                    <div class="settings-icon icon-contacts"></div>
+                    <div class="settings-info">
+                        <div class="settings-label">联系人库</div>
+                        <div class="settings-desc">管理所有密友和普通联系人</div>
+                    </div>
+                    <div class="settings-arrow">›</div>
+                </div>
+                <!-- 6. 面具管理 -->
+                <div class="settings-item" onclick="openMaskLibrary()">
+                    <div class="settings-icon icon-mask"></div>
+                    <div class="settings-info">
+                        <div class="settings-label">面具管理</div>
+                        <div class="settings-desc">管理你的不同人设</div>
+                    </div>
+                    <div class="settings-arrow">›</div>
+                </div>
+                <!-- 7. 记忆存储中心 -->
+                <div class="settings-item" onclick="openMemoryCenter()">
+                    <div class="settings-icon icon-memory"></div>
+                    <div class="settings-info">
+                        <div class="settings-label">记忆存储中心</div>
+                        <div class="settings-desc">查看AI的记忆数据</div>
+                    </div>
+                    <div class="settings-arrow">›</div>
+                </div>
+                <!-- 8. 美化 -->
+                <div class="settings-item" onclick="openBeautify()">
+                    <div class="settings-icon icon-beautify"></div>
+                    <div class="settings-info">
+                        <div class="settings-label">美化</div>
+                        <div class="settings-desc">自定义应用图标</div>
+                    </div>
+                    <div class="settings-arrow">›</div>
+                </div>
+                <!-- 9. 气泡库 -->
+                <div class="settings-item" onclick="openBubbleLibrary()">
+                    <div class="settings-icon icon-bubble"></div>
+                    <div class="settings-info">
+                        <div class="settings-label">气泡库</div>
+                        <div class="settings-desc">自定义聊天气泡样式</div>
+                    </div>
+                    <div class="settings-arrow">›</div>
+                </div>
+                <!-- 10. 组件 -->
+                <div class="settings-item" onclick="openWidgetManager()">
+                    <div class="settings-icon icon-widget"></div>
+                    <div class="settings-info">
+                        <div class="settings-label">组件</div>
+                        <div class="settings-desc">自定义桌面组件</div>
+                    </div>
+                    <div class="settings-arrow">›</div>
+                </div>
+                <!-- 11. 悬浮球 -->
+                <div class="settings-item">
+                    <div class="settings-icon icon-floatball"></div>
+                    <div class="settings-info">
+                        <div class="settings-label">悬浮球</div>
+                        <div class="settings-desc">在主屏幕显示一个快捷操作悬浮球</div>
+                    </div>
+                    <div class="settings-action">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="floatingBallToggle">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="settings-section">
+                <div class="section-title">危险区域</div>
+                <!-- 12. 清空所有数据 -->
+                <div class="settings-item" onclick="clearAllData()">
+                    <div class="settings-icon icon-danger"></div>
+                    <div class="settings-info">
+                        <div class="settings-label" style="color: #ff3b30;">清空所有数据</div>
+                        <div class="settings-desc">将删除所有设置、联系人、聊天记录和自定义内容</div>
+                    </div>
+                    <div class="settings-arrow">›</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    `;
+}
+
+/**
+ * helper function: 为动态创建的设置页面绑定事件监听
+ * (主要是处理那些不是通过 onclick 绑定的事件)
+ */
+function initializeSettingsPageListeners() {
+    // ===== 全屏模式开关 =====
+    const fullscreenToggle = document.getElementById('fullscreenToggle');
+    if (fullscreenToggle) {
+        // 读取并应用保存的设置
+        const savedFullscreenSetting = localStorage.getItem('fullscreenEnabled') === 'true';
+        fullscreenToggle.checked = savedFullscreenSetting;
+        applyFullscreenSetting(savedFullscreenSetting); // 确保 apply 函数能正确处理初始状态
+
+        // 添加事件监听
+        fullscreenToggle.addEventListener('change', function() {
+            applyFullscreenSetting(this.checked);
+            localStorage.setItem('fullscreenEnabled', this.checked);
+        });
+    }
+
+    // ===== 悬浮球开关 =====
+    const floatingBallToggle = document.getElementById('floatingBallToggle');
+    if (floatingBallToggle) {
+        // 读取并应用保存的设置
+        const savedFloatingBallSetting = localStorage.getItem('floatingBallEnabled') === 'true';
+        floatingBallToggle.checked = savedFloatingBallSetting;
+        applyFloatingBallSetting(savedFloatingBallSetting);
+
+        // 添加事件监听
+        floatingBallToggle.addEventListener('change', function() {
+            applyFloatingBallSetting(this.checked);
+            localStorage.setItem('floatingBallEnabled', this.checked);
+        });
+    }
+}
+
+/**
+ * 【优化版】打开设置页面
+ * 实现了按需渲染（Lazy Rendering）
+ */
 function openSettings() {
-    document.getElementById('settingsPage').classList.add('show');
+    const screen = document.querySelector('.screen');
+    if (!screen) return;
+
+    // 检查设置页面是否已存在于DOM中
+    let settingsPage = document.getElementById('settingsPage');
+
+    // 如果不存在，则动态创建
+    if (!settingsPage) {
+        // 1. 获取HTML内容
+        const settingsHTML = createSettingsPageHTML();
+        // 2. 将HTML插入到 .screen 容器的末尾
+        screen.insertAdjacentHTML('beforeend', settingsHTML);
+        // 3. 重新获取刚刚创建的元素
+        settingsPage = document.getElementById('settingsPage');
+        // 4. 为新创建的页面绑定事件
+        initializeSettingsPageListeners();
+        console.log("设置页面DOM已动态创建并绑定事件。");
+    }
+
+    // 5. 使用 requestAnimationFrame 确保在下一帧再添加 .show 类，以触发CSS动画
+    requestAnimationFrame(() => {
+        if (settingsPage) {
+            settingsPage.classList.add('show');
+        }
+    });
 }
 
+/**
+ * 【优化版】关闭设置页面
+ * 在关闭后从DOM中移除，释放内存
+ */
 function closeSettings() {
-    document.getElementById('settingsPage').classList.remove('show');
+    const settingsPage = document.getElementById('settingsPage');
+    if (!settingsPage) return;
+
+    // 1. 移除 .show 类，触发滑出动画
+    settingsPage.classList.remove('show');
+
+    // 2. 使用 setTimeout 等待动画结束 (时长应与CSS中 transition-duration 保持一致)
+    setTimeout(() => {
+        // 3. 动画结束后，从DOM中彻底移除该元素
+        settingsPage.remove();
+        console.log("设置页面DOM已从内存中移除。");
+    }, 350); // 350ms 对应 CSS 中的 0.35s
 }
 
-function openApiConfig() {
-    document.getElementById('apiConfig').classList.add('show');
-    renderApiConfigs();
-}
 
 function closeApiConfig() {
     document.getElementById('apiConfig').classList.remove('show');
@@ -3568,7 +3788,7 @@ function isOccupied(pageKey, targetRow, targetCol, draggedId) {
 
 
 function handleMove(e) {
-    if (!state.draggedElement) return;
+    if (!state.draggedElement || state.dragMoveScheduled) return;
 
     const touch = getTouch(e);
     const distance = Math.sqrt(
@@ -3593,11 +3813,19 @@ function handleMove(e) {
 
     if (e.cancelable) e.preventDefault();
 
-    const deltaX = touch.clientX - state.dragStart.x;
-    const deltaY = touch.clientY - state.dragStart.y;
-    state.draggedElement.style.transform = `translate(${deltaX}px, ${deltaY}px) scale(1.08)`;
-}
+    // 将更新操作放入 rAF 回调
+    state.dragMoveScheduled = true;
+    requestAnimationFrame(() => {
+        const touch = getTouch(e);
+        const deltaX = touch.clientX - state.dragStart.x;
+        const deltaY = touch.clientY - state.dragStart.y;
 
+        if (state.draggedElement) { // 再次检查，防止元素已不存在
+            state.draggedElement.style.transform = `translate(${deltaX}px, ${deltaY}px) scale(1.08)`;
+        }
+        state.draggedElement.style.transform = `translate(${deltaX}px, ${deltaY}px) scale(1.08)`;
+    });
+}
 // ▼▼▼ 请将你原来的 handleEnd 函数完整地替换成下面这个版本 ▼▼▼
 
 function handleEnd(e) {
@@ -3826,20 +4054,16 @@ function showPage(pageNum) {
 }
 
 
-// 【新增】一个专门用于在 requestAnimationFrame 中更新样式的函数
-function updateSwipeTransform() {
-    if (!state.swipeMoveScheduled) {
-        return;
-    }
-    pagesWrapper.style.transform = `translateX(${state.lastSwipeTranslateX}%)`;
-    state.swipeMoveScheduled = false; // 更新完成后，重置标志
-}
 
 // ============ 开始：请将这个全新的代码块完整粘贴到你的 <script> 中 ============
 
-// 这是一个统一的“滑动结束”处理器，它会清理自身绑定的事件
+/**
+ * [丝滑翻页优化版] 统一的“滑动结束”处理器
+ * - 引入速度判断，实现快速轻扫即可翻页
+ * - 结合最小距离阈值，防止误触
+ */
 function swipeEndHandler(e) {
-    // 解除在 document 上绑定的事件，这是防止冲突的关键！
+    // 解除在 document 上绑定的事件
     document.removeEventListener('mousemove', swipeMoveHandler);
     document.removeEventListener('mouseup', swipeEndHandler);
     document.removeEventListener('touchmove', swipeMoveHandler);
@@ -3847,23 +4071,38 @@ function swipeEndHandler(e) {
 
     if (!state.isSwipingPage) return;
 
-    // --- 动画和翻页逻辑 (这部分和我们上次修复的逻辑一致) ---
-    const diff = getChangedTouch(e).clientX - state.swipeStart.x;
+    // --- 核心升级：智能决策逻辑 ---
+
+    const touch = getChangedTouch(e);
+    const diff = touch.clientX - state.swipeStart.x;
     const timeElapsed = Date.now() - state.swipeStart.time;
+
+    // 计算速度（像素/毫秒），如果时间过短则防止除以零
     const velocity = timeElapsed > 0 ? Math.abs(diff) / timeElapsed : 0;
 
+    // 重新启用CSS动画，用于“吸附”或“弹回”
     pagesWrapper.classList.remove('no-transition');
 
     let targetPage = state.currentPage;
+
+    // 智能决策：
+    // 条件1: 滑动距离超过一个较小的阈值（例如30像素）
+    // 条件2: 滑动速度很快（例如大于0.2像素/毫秒）
+    // 只要满足其中一个，就认为用户想要翻页
     if (Math.abs(diff) > 30 || velocity > 0.2) {
         if (diff > 0 && state.currentPage === 2) {
+            // 从第2页向右滑 -> 前往第1页
             targetPage = 1;
         } else if (diff < 0 && state.currentPage === 1) {
+            // 从第1页向左滑 -> 前往第2页
             targetPage = 2;
         }
     }
 
+    // --- 决策结束 ---
+
     // 使用 setTimeout 确保动画无缝衔接
+    // 浏览器会在执行 showPage 前先应用 'no-transition' 被移除的样式
     setTimeout(() => {
         showPage(targetPage);
     }, 0);
@@ -3871,11 +4110,38 @@ function swipeEndHandler(e) {
     state.isSwipingPage = false;
 }
 
-// 这是一个统一的“滑动中”处理器
+// ============ 开始：请用这个全新的、修复了点击冲突的函数替换旧的 swipeStartHandler ============
+// 这个函数负责在滑动开始时，移除CSS动画，让页面能“跟手”
+function swipeStartHandler(e) {
+    if (e.target.closest('.page-dots, .dock')) {
+        return;
+    }
+    if (Date.now() - state.lastDragEndTime < 300) return;
+    if (e.target.closest('#iconDockPanel, #floatingBall, .cat-widget, .contacts-page, .chat-page, .settings-page, .config-page, .beautify-page, .modal-overlay, #codeSandboxModal')) {
+        return;
+    }
+    if (state.isDraggingFromDock || state.isEditMode || state.isDragging) return;
+
+    const touch = getTouch(e);
+    state.swipeStart = { x: touch.clientX, time: Date.now() };
+    state.isSwipingPage = true;
+    state.initialTransform = -(state.currentPage - 1) * 50;
+
+    // 关键：临时禁用 transition，让页面实时跟随手指
+    pagesWrapper.classList.add('no-transition');
+
+    if (e.type === 'touchstart') {
+        document.addEventListener('touchmove', swipeMoveHandler, { passive: false });
+        document.addEventListener('touchend', swipeEndHandler);
+    } else {
+        document.addEventListener('mousemove', swipeMoveHandler);
+        document.addEventListener('mouseup', swipeEndHandler);
+    }
+}
+
+// 这个函数负责在滑动过程中，通过 rAF 更新页面位置，保证流畅
 function swipeMoveHandler(e) {
     if (!state.isSwipingPage) return;
-
-    // 阻止默认行为（如浏览器返回）
     if (e.cancelable) {
         e.preventDefault();
     }
@@ -3883,10 +4149,11 @@ function swipeMoveHandler(e) {
     const touch = getTouch(e);
     const diffX = touch.clientX - state.swipeStart.x;
 
+    // 将像素差值转换为百分比
     const percentDiff = (diffX / screen.offsetWidth) * 50;
+    // 计算新的 transform 值，并限制在 0% 到 -50% 之间
     const newTransform = Math.max(-50, Math.min(0, state.initialTransform + percentDiff));
 
-    // 使用 rAF 优化性能
     if (!state.swipeMoveScheduled) {
         state.lastSwipeTranslateX = newTransform;
         state.swipeMoveScheduled = true;
@@ -3894,46 +4161,7 @@ function swipeMoveHandler(e) {
     }
 }
 
-// ============ 开始：请用这个全新的、修复了点击冲突的函数替换旧的 swipeStartHandler ============
-
-function swipeStartHandler(e) {
-    // ▼ ▼ ▼ 核心修复点在这里 ▼ ▼ ▼
-    // 检查事件的目标元素是否是我们不希望触发滑动的区域
-    if (e.target.closest('.page-dots, .dock')) {
-        // 如果是，说明用户想点击按钮而不是滑动页面，
-        // 那么我们什么都不做，直接返回，让按钮的 onclick 事件正常执行。
-        return;
-    }
-    // ▲ ▲ ▲ 修复结束 ▲ ▲ ▲
-
-    // --- 后续的滑动判断逻辑保持不变 ---
-    if (Date.now() - state.lastDragEndTime < 300) return;
-    if (e.target.closest('#iconDockPanel, #floatingBall, .cat-widget, .contacts-page, .chat-page, .settings-page, .config-page, .beautify-page, .modal-overlay, #codeSandboxModal')) {
-        return;
-    }
-    if (state.isDraggingFromDock || state.isEditMode || state.isDragging) return;
-
-    // 初始化滑动状态
-    const touch = getTouch(e);
-    state.swipeStart = {x: touch.clientX, time: Date.now()};
-    state.isSwipingPage = true;
-    state.initialTransform = -(state.currentPage - 1) * 50;
-    pagesWrapper.classList.add('no-transition');
-
-    // 动态绑定监听器
-    if (e.type === 'touchstart') {
-        document.addEventListener('touchmove', swipeMoveHandler, {passive: false});
-        document.addEventListener('touchend', swipeEndHandler);
-    } else { // mousedown
-        document.addEventListener('mousemove', swipeMoveHandler);
-        document.addEventListener('mouseup', swipeEndHandler);
-    }
-}
-
-// ============ 结束：替换代码 ============
-
-
-// 这个 rAF 更新函数保持不变
+// updateSwipeTransform 函数保持不变
 function updateSwipeTransform() {
     if (!state.swipeMoveScheduled) {
         return;
@@ -11517,6 +11745,49 @@ function adjustQuestionCount(delta) {
     value = Math.max(1, Math.min(20, value + delta));
     input.value = value;
 }
+/**
+ * [新增] 健壮的AI JSON响应解析器
+ * 它可以处理纯JSON、被文字包裹的JSON和被Markdown包裹的JSON
+ * @param {string} rawMessage - 从AI获取的原始字符串
+ * @returns {object} 解析成功后的JavaScript对象
+ * @throws {Error} 如果无法解析出有效的JSON，则抛出错误
+ */
+function robustJsonParse(rawMessage) {
+    if (!rawMessage) {
+        throw new Error("AI返回内容为空");
+    }
+
+    try {
+        // 步骤 1: 尝试直接解析，这是最理想的情况
+        return JSON.parse(rawMessage);
+    } catch (e) {
+        // 直接解析失败，继续下一步智能提取
+        console.warn("直接解析JSON失败，尝试智能提取...");
+    }
+
+    // 步骤 2: 清理Markdown代码块标记
+    let cleanedMessage = rawMessage.trim()
+        .replace(/^```json\s*/i, '')
+        .replace(/^```\s*/i, '')
+        .replace(/\s*```$/i, '')
+        .trim();
+
+    // 步骤 3: 使用正则表达式贪婪匹配最外层的 { ... } 或 [ ... ]
+    const jsonMatch = cleanedMessage.match(/^(?:\[[\s\S]*\]|\{[\s\S]*\})$/);
+    if (jsonMatch) {
+        try {
+            // 尝试解析提取出的内容
+            const parsed = JSON.parse(jsonMatch[0]);
+            console.log("✅ 智能提取JSON成功！");
+            return parsed;
+        } catch (e) {
+            console.error("❌ 提取JSON后解析仍然失败:", e);
+        }
+    }
+
+    // 步骤 4: 如果以上都失败，则抛出最终错误
+    throw new Error("无法从AI返回的内容中解析出有效的JSON格式");
+}
 
 // ========== 开始生成测试 ==========
 async function startGenerateTest() {
@@ -11586,20 +11857,32 @@ async function startGenerateTest() {
             throw new Error(result.message);
         }
 
-        // 解析生成的题目
+        // // 解析生成的题目
+        // let questionsData;
+        // try {
+        //     // 尝试从返回内容中提取JSON
+        //     const jsonMatch = result.message.match(/\{[\s\S]*\}/);
+        //     if (jsonMatch) {
+        //         questionsData = JSON.parse(jsonMatch[0]);
+        //     } else {
+        //         questionsData = JSON.parse(result.message);
+        //     }
+        // } catch (parseError) {
+        //     console.error('JSON解析失败:', parseError);
+        //     throw new Error('题目格式错误，请重试');
+        // }
+
+        // [新代码 - 使用这个]
         let questionsData;
         try {
-            // 尝试从返回内容中提取JSON
-            const jsonMatch = result.message.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
-                questionsData = JSON.parse(jsonMatch[0]);
-            } else {
-                questionsData = JSON.parse(result.message);
-            }
+            // 使用新的、更健壮的解析函数
+            questionsData = robustJsonParse(result.message);
         } catch (parseError) {
             console.error('JSON解析失败:', parseError);
-            throw new Error('题目格式错误，请重试');
+            // 抛出更具体的错误信息，方便调试
+            throw new Error(`题目格式错误: ${parseError.message}。请重试。`);
         }
+
 
         // 保存测试数据
         testData.questions = questionsData.questions || [];
@@ -12414,32 +12697,6 @@ function initializeApp() {
             if (button.id !== 'sweetheartRegenerateMessageBtn') {
             hideSweetheartMessageActionSheet();
             }
-        });
-    }
-
-    // ===== 全屏模式 =====
-    const fullscreenToggle = document.getElementById('fullscreenToggle');
-    if (fullscreenToggle) {
-        const savedFullscreenSetting = localStorage.getItem('fullscreenEnabled') === 'true';
-        fullscreenToggle.checked = savedFullscreenSetting;
-        applyFullscreenSetting(savedFullscreenSetting);
-
-        fullscreenToggle.addEventListener('change', function () {
-            applyFullscreenSetting(this.checked);
-            localStorage.setItem('fullscreenEnabled', this.checked);
-        });
-    }
-
-    // ===== 悬浮球 =====
-    const floatingBallToggle = document.getElementById('floatingBallToggle');
-    if (floatingBallToggle) {
-        const savedFloatingBallSetting = localStorage.getItem('floatingBallEnabled') === 'true';
-        floatingBallToggle.checked = savedFloatingBallSetting;
-        applyFloatingBallSetting(savedFloatingBallSetting);
-
-        floatingBallToggle.addEventListener('change', function () {
-            applyFloatingBallSetting(this.checked);
-            localStorage.setItem('floatingBallEnabled', this.checked);
         });
     }
 
