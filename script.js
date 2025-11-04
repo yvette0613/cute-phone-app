@@ -4222,24 +4222,31 @@ function swipeEndHandler(e) {
     state.isSwipingPage = false;
 }
 
-// ============ 开始：请用这个全新的、修复了点击冲突的函数替换旧的 swipeStartHandler ============
-// 这个函数负责在滑动开始时，移除CSS动画，让页面能“跟手”
+// script.js
+
+/**
+ * [丝滑翻页优化版] 统一的“滑动开始”处理器
+ * - 修复了在状态弹窗等浮层上无法滚动的问题
+ */
 function swipeStartHandler(e) {
-    if (e.target.closest('.page-dots, .dock')) {
-        return;
+    // 检查触摸事件是否发生在不应触发翻页的元素上
+    if (e.target.closest('.page-dots, .dock, #iconDockPanel, #floatingBall, .cat-widget, .contacts-page, .chat-page, .settings-page, .config-page, .beautify-page, .modal-overlay, #statusPopup')) {
+        return; // 如果是，则直接退出，不处理翻页逻辑
     }
+    
+    // 检查是否刚结束拖拽操作，防止误触
     if (Date.now() - state.lastDragEndTime < 300) return;
-    if (e.target.closest('#iconDockPanel, #floatingBall, .cat-widget, .contacts-page, .chat-page, .settings-page, .config-page, .beautify-page, .modal-overlay, #codeSandboxModal')) {
-        return;
-    }
+
+    // 检查是否正在从收藏夹拖出图标或处于桌面编辑模式
     if (state.isDraggingFromDock || state.isEditMode || state.isDragging) return;
+
+    // --- 后续的翻页逻辑保持不变 ---
 
     const touch = getTouch(e);
     state.swipeStart = { x: touch.clientX, time: Date.now() };
     state.isSwipingPage = true;
     state.initialTransform = -(state.currentPage - 1) * 50;
 
-    // 关键：临时禁用 transition，让页面实时跟随手指
     pagesWrapper.classList.add('no-transition');
 
     if (e.type === 'touchstart') {
@@ -4250,6 +4257,7 @@ function swipeStartHandler(e) {
         document.addEventListener('mouseup', swipeEndHandler);
     }
 }
+
 
 // 这个函数负责在滑动过程中，通过 rAF 更新页面位置，保证流畅
 function swipeMoveHandler(e) {
