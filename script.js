@@ -4230,10 +4230,10 @@ function swipeEndHandler(e) {
  */
 function swipeStartHandler(e) {
     // 检查触摸事件是否发生在不应触发翻页的元素上
-    if (e.target.closest('.page-dots, .dock, #iconDockPanel, #floatingBall, .cat-widget, .contacts-page, .chat-page, .settings-page, .config-page, .beautify-page, .modal-overlay, #statusPopup')) {
+    if (e.target.closest('.page-dots, .dock, #iconDockPanel, #floatingBall, .cat-widget, .contacts-page, .chat-page, .settings-page, .config-page, .beautify-page, .modal-overlay, #statusPopup, .test-page, .worldbook-page, .mask-library-page, .contact-library-page, .memory-center-page, .map-editor-page')) {
         return; // 如果是，则直接退出，不处理翻页逻辑
     }
-    
+
     // 检查是否刚结束拖拽操作，防止误触
     if (Date.now() - state.lastDragEndTime < 300) return;
 
