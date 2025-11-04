@@ -10078,74 +10078,79 @@ function renderContactLibrary() {
     });
 }
 
+// ▼▼▼ 请复制并替换这个完整的函数 ▼▼▼
 
 /**
  * [最终修复版] 从联系人库选择联系人
- * 修复了无法关联到当前世界的Bug
+ * - 修复了联系人已存在于全局列表但未在当前世界时，无法添加的问题
  */
 function selectContactFromLibrary(sourceContact) {
     const contactId = sourceContact.id;
 
-    // 确定目标列表
-    let targetList, targetName, saveFunc, renderFunc;
-
+    // 确定操作的目标列表和相关函数
+    let targetList, targetName, saveFunc, renderFunc, listPageOpener;
     if (contactLibraryMode === 'selectForSweetheart') {
         targetList = sweetheartContactsData;
         targetName = '密友列表';
         saveFunc = saveSweetheartContacts;
         renderFunc = renderSweetheartList;
-    } else {
+        listPageOpener = openSweetheartList;
+    } else { // 'select' mode
         targetList = contactsData;
         targetName = '通讯录';
         saveFunc = () => localStorage.setItem('phoneContactsData', JSON.stringify(contactsData));
         renderFunc = () => renderContacts(contactsData);
+        listPageOpener = openContacts;
     }
 
-    // 检查是否已存在
-    const alreadyExists = targetList.some(c => c.id === contactId);
+    // --- ▼▼▼ 核心逻辑修正 ▼▼▼ ---
 
-    if (alreadyExists) {
-        showSuccessModal(
-            '已存在',
-            `"${sourceContact.name}" 已在${targetName}中。`,
-            2000
-        );
-        closeContactLibrary();
+    let wasAddedToGlobalList = false;
+    let wasAddedToWorld = false;
 
-        // 如果是密友模式，返回到密友列表
-        if (contactLibraryMode === 'selectForSweetheart') {
-            setTimeout(openSweetheartList, 350);
-        }
-        return;
+    // 步骤1: 检查并添加到全局列表
+    const alreadyInGlobalList = targetList.some(c => c.id === contactId);
+    if (!alreadyInGlobalList) {
+        // 如果联系人对象不存在于目标数组中，则添加
+        // 注意：这里我们应该添加源对象的拷贝，以防未来出现引用问题
+        targetList.push({ ...sourceContact });
+        saveFunc();
+        wasAddedToGlobalList = true;
     }
 
-    // 如果不存在，直接添加
-    targetList.push(sourceContact);
-    saveFunc();
-
-    // ▼▼▼【核心Bug修复】将选择的联系人也关联到当前世界 ▼▼▼
-    if (currentWorldId && contactLibraryMode === 'selectForSweetheart') {
+    // 步骤2: 检查并添加到当前世界 (仅限密友模式)
+    if (contactLibraryMode === 'selectForSweetheart' && currentWorldId) {
         const world = worldsData.find(w => w.id === currentWorldId);
-        if (world && !world.contacts.includes(contactId)) {
-            world.contacts.push(contactId);
-            saveWorldsData();
-            console.log(`✅ 已将现有联系人 "${sourceContact.name}" (ID: ${contactId}) 关联到世界 "${world.name}"`);
+        if (world) {
+            const alreadyInWorld = world.contacts.includes(contactId);
+            if (!alreadyInWorld) {
+                world.contacts.push(contactId);
+                saveWorldsData();
+                wasAddedToWorld = true;
+            }
         }
     }
-    // ▲▲▲【修复结束】▲▲▲
 
-    renderFunc();
-    showSuccessModal('添加成功', `已将"${sourceContact.name}"添加到${targetName}。`);
+    // --- ▲▲▲ 修正结束 ▲▲▲ ---
+
+    // 步骤3: 根据操作结果提供反馈并更新UI
+    if (wasAddedToGlobalList || wasAddedToWorld) {
+        showSuccessModal('添加成功', `已将 "${sourceContact.name}" 添加到${targetName}。`);
+    } else {
+        showSuccessModal('已存在', `"${sourceContact.name}" 已在当前${targetName}中。`, 2000);
+    }
+
     closeContactLibrary();
 
-    // 平滑过渡：等待关闭动画结束后再打开密友列表
-    if (contactLibraryMode === 'selectForSweetheart') {
-        setTimeout(() => {
-            openSweetheartList();
-            renderSweetheartList(); // 确保列表更新
-        }, 350);
-    }
+    // 步骤4: 平滑过渡返回列表页面
+    setTimeout(() => {
+        listPageOpener();
+        // 打开页面后，其内部的渲染函数会自动执行，无需在此再次调用 renderFunc
+    }, 350);
 }
+
+// ▲▲▲ 替换结束 ▲▲▲
+
 
 
 // ========== 联系人库多选模式功能 ==========
