@@ -4696,7 +4696,12 @@ async function callApi(messages) {
 
     } catch (error) {
         console.error('调用API时出错:', error);
-        return {success: false, message: `网络或API错误: ${error.message}`};
+        // ▼▼▼ 修改这部分 ▼▼▼
+        let errorMessage = `网络或API错误: ${error.message}`;
+        if (error.name === 'TypeError' && error.message.includes('fetch')) {
+            errorMessage = '网络请求失败。请检查API地址是否正确，以及是否存在CORS跨域问题。';
+        }
+        return {success: false, message: errorMessage};
     }
 }
 // ========== 结束：替换 callApi 函数 ==========
@@ -5092,26 +5097,37 @@ function closeSweetheartChatSettings() {
 function clearCurrentSweetheartChatHistory() {
     if (!currentSweetheartChatContact) return;
 
-    if (confirm(`你确定要清空与密友 "${currentSweetheartChatContact.name}" 的所有悄悄话吗？这个操作无法撤销哦！💖`)) {
+    if (confirm('确定要清空与当前密友的所有聊天记录吗？')) {
+        const contactId = currentSweetheartChatContact.id;
         const chatHistory = JSON.parse(localStorage.getItem('phoneSweetheartChatHistory') || '{}');
 
-        if (chatHistory[currentSweetheartChatContact.id]) {
-            delete chatHistory[currentSweetheartChatContact.id];
-            try {
-                localStorage.setItem('phoneSweetheartChatHistory', JSON.stringify(chatHistory));
+        // 清空该联系人的聊天记录
+        chatHistory[contactId] = [];
+        localStorage.setItem('phoneSweetheartChatHistory', JSON.stringify(chatHistory));
 
-                // 刷新聊天界面
-                openSweetheartChat(currentSweetheartChatContact);
-
-                closeSweetheartChatSettings();
-                showSuccessModal('操作成功', '你们的悄悄话已清空。');
-            } catch (e) {
-                console.error('清空密友聊天记录失败:', e);
-                alert('存储空间似乎不足，操作失败了。');
-            }
+        // 🔥 关键修复：清空UI
+        const messagesEl = document.getElementById('sweetheartChatMessages');
+        if (messagesEl) {
+            messagesEl.innerHTML = '';
         }
+
+        // 🔥 关键修复：重置输入框状态
+        const chatInput = document.getElementById('sweetheartChatInput');
+        if (chatInput) {
+            chatInput.value = '';
+            chatInput.disabled = false;
+            chatInput.removeAttribute('readonly');
+            chatInput.focus(); // 聚焦到输入框
+        }
+
+        // 更新列表显示
+        renderSweetheartList();
+
+        showSuccessModal('清空成功', '聊天记录已清除');
+        closeSweetheartChatSettings();
     }
 }
+
 
 // ========== 结束：粘贴全新的 JavaScript 代码块 ==========
 
@@ -5560,70 +5576,78 @@ function setupAttachmentMenu() {
 
 // ========== 开始：用这个【发送后等待回复版】的函数替换旧的 ==========
 /**
- * [新版] 设置密友聊天界面的附件菜单功能
- * (图片上传后仅作为消息发送，等待用户手动触发AI回复)
+ * 初始化密友聊天附件菜单
  */
 function setupSweetheartAttachmentMenu() {
-    // 1. 获取所有相关的 DOM 元素
-    const showMenuBtn = document.getElementById('sweetheartShowAttachmentMenuBtn');
-    const menu = document.getElementById('sweetheartAttachmentMenu');
+    const attachmentBtn = document.getElementById('sweetheartShowAttachmentMenuBtn');
+    const attachmentMenu = document.getElementById('sweetheartAttachmentMenu');
+    const fileInput = document.getElementById('sweetheartFileInput');
     const imageInput = document.getElementById('sweetheartImageInput');
+
+    if (!attachmentBtn || !attachmentMenu) {
+        console.error('❌ 密友附件菜单元素未找到');
+        return;
+    }
+
+    // 点击附件按钮显示/隐藏菜单
+    attachmentBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        attachmentMenu.classList.toggle('show');
+    });
+
+    // 点击页面其他地方关闭菜单
+    document.addEventListener('click', function(e) {
+        if (!attachmentMenu.contains(e.target) && !attachmentBtn.contains(e.target)) {
+            attachmentMenu.classList.remove('show');
+        }
+    });
+
+    // 文件上传
+    const uploadFileBtn = document.getElementById('sweetheartUploadFileBtn');
+    if (uploadFileBtn && fileInput) {
+        uploadFileBtn.addEventListener('click', function() {
+            fileInput.click();
+            attachmentMenu.classList.remove('show');
+        });
+    }
+
+    // 图片上传
     const uploadImageBtn = document.getElementById('sweetheartUploadImageBtn');
+    if (uploadImageBtn && imageInput) {
+        uploadImageBtn.addEventListener('click', function() {
+            imageInput.click();
+            attachmentMenu.classList.remove('show');
+        });
 
-    // 2. 点击“+”按钮时，切换菜单的显示/隐藏
-    showMenuBtn.addEventListener('click', (event) => {
-        event.stopPropagation();
-        menu.classList.toggle('show');
-    });
+        // 图片上传处理
+        imageInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file && currentSweetheartChatContact) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const messageObj = {
+                        sender: 'user',
+                        imageUrl: event.target.result,
+                        timestamp: Date.now()
+                    };
 
-    // 3. 点击“图片”菜单项时，触发隐藏的文件选择框
-    uploadImageBtn.addEventListener('click', () => {
-        imageInput.click();
-        menu.classList.remove('show');
-    });
+                    const contactId = currentSweetheartChatContact.id;
+                    const newIndex = saveSweetheartMessage(contactId, messageObj);
 
-    // 4. 文件上传（此示例中暂不实现）
-    document.getElementById('sweetheartUploadFileBtn').addEventListener('click', () => {
-        alert('文件上传功能正在开发中...💖');
-        menu.classList.remove('show');
-    });
+                    const messagesEl = document.getElementById('sweetheartChatMessages');
+                    const messageRow = _createMessageDOM(contactId, messageObj, newIndex);
+                    messagesEl.appendChild(messageRow);
+                    messagesEl.scrollTop = messagesEl.scrollHeight;
 
-    // 5. 【核心改造】当用户选择了图片后，只发送不分析
-    imageInput.addEventListener('change', (event) => {
-        const file = event.target.files[0];
-        if (!file || !currentSweetheartChatContact) {
-            event.target.value = '';
-            return;
-        }
-        const reader = new FileReader();
-        reader.onload = function (e) {
-            const base64Image = e.target.result;
-            // 1. 构建一个结构化的图片消息对象
-            const messagePayload = {
-                sender: 'user',
-                text: '[图片]', // 显示的文本可以是占位符
-                imageUrl: base64Image, // 关键：用专门的字段存储图片数据
-                isProcessed: false // 新增标志，表示这张图片还未被AI处理过
-            };
-            // 2. 保存这个结构化对象
-            const newIndex = saveSweetheartMessage(currentSweetheartChatContact.id, messagePayload);
-            // 3. 在UI上渲染
-            const messagesEl = document.getElementById('sweetheartChatMessages');
-            const messageRow = _createMessageDOM(currentSweetheartChatContact.id, messagePayload, newIndex);
-            messagesEl.appendChild(messageRow);
-            messagesEl.scrollTop = messagesEl.scrollHeight;
-            renderSweetheartList();
-        };
-        reader.readAsDataURL(file);
-        event.target.value = '';
-    });
-    // 6. 关闭菜单的通用逻辑
-    document.addEventListener('click', () => {
-        if (menu.classList.contains('show')) {
-            menu.classList.remove('show');
-        }
-    });
-    menu.addEventListener('click', (event) => event.stopPropagation());
+                    renderSweetheartList();
+                };
+                reader.readAsDataURL(file);
+            }
+            this.value = ''; // 清空，允许重复上传同一文件
+        });
+    }
+
+    console.log('✅ 密友附件菜单已初始化');
 }
 
 
@@ -6434,6 +6458,7 @@ function openSweetheartChat(contact) {
     const chatPage = document.getElementById('sweetheartChatPage');
     const contactNameEl = document.getElementById('sweetheartChatContactName');
     const messagesEl = document.getElementById('sweetheartChatMessages');
+    const chatInput = document.getElementById('sweetheartChatInput'); // 🔥 新增：获取输入框
 
     contactNameEl.textContent = contact.name;
     messagesEl.innerHTML = '';
@@ -6464,6 +6489,19 @@ function openSweetheartChat(contact) {
     setTimeout(() => {
         messagesEl.scrollTop = messagesEl.scrollHeight;
     }, 50);
+
+    // 🔥 关键修复：在这里调用初始化函数
+    setupSweetheartChatInput();
+    setupSweetheartAttachmentMenu();
+
+    // 🔥 关键修复：重置输入框状态，确保它永远是可用的
+    if (chatInput) {
+        chatInput.value = '';
+        chatInput.disabled = false;
+        chatInput.removeAttribute('readonly');
+        chatInput.focus(); // 自动聚焦，提升体验
+    }
+
     loadAndApplyStatusData(contact.id);
 }
 
@@ -7993,15 +8031,23 @@ function hideSweetheartMessageActionSheet() {
 }
 
 /**
- * 设置密友输入框监听（在initializeApp中调用）
+ * 初始化密友聊天输入框
  */
 function setupSweetheartChatInput() {
     const chatInput = document.getElementById('sweetheartChatInput');
     const chatInputArea = document.querySelector('.sweetheart-chat-input-area');
 
-    if (!chatInput || !chatInputArea) return;
+    if (!chatInput || !chatInputArea) {
+        console.error('❌ 密友聊天输入框元素未找到');
+        return;
+    }
 
-    chatInput.addEventListener('input', function () {
+    // 移除旧的监听器（防止重复绑定）
+    chatInput.replaceWith(chatInput.cloneNode(true));
+    const newInput = document.getElementById('sweetheartChatInput');
+
+    // 监听输入变化，控制发送按钮显示
+    newInput.addEventListener('input', function() {
         if (this.value.trim().length > 0) {
             chatInputArea.classList.add('has-text');
         } else {
@@ -8009,12 +8055,15 @@ function setupSweetheartChatInput() {
         }
     });
 
-    chatInput.addEventListener('keydown', function (event) {
-        if (event.key === 'Enter' && !event.shiftKey) {
-            event.preventDefault();
+    // 支持回车键发送
+    newInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
             addSweetheartMessageToList();
         }
     });
+
+    console.log('✅ 密友聊天输入框已初始化');
 }
 
 

@@ -9329,3 +9329,37 @@ body.code-scrolling-enabled .code-block-wrapper {
     word-wrap: break-word;
     overflow-wrap: break-word;
 }
+/* style.css */
+
+/* ▼▼▼ 在这里粘贴新增的错误提示框CSS ▼▼▼ */
+.error-modal {
+    z-index: 3000; /* 确保在最顶层 */
+    display: none; /* 默认隐藏 */
+}
+
+.error-modal .modal-content {
+    background: #fff;
+    border: 3px solid #ff4757; /* 醒目的红色边框 */
+    box-shadow: 0 10px 30px rgba(255, 71, 87, 0.3);
+}
+
+.error-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+    animation: shake 0.5s;
+}
+
+.error-modal h3 {
+    color: #c0392b; /* 深红色标题 */
+}
+
+.error-modal p {
+    color: #7f8c8d; /* 灰色描述文字 */
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px) rotate(-2deg); }
+    75% { transform: translateX(5px) rotate(2deg); }
+}
+/* ▲▲▲ CSS代码粘贴结束 ▲▲▲ */
