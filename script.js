@@ -1,58 +1,51 @@
 // ▼▼▼ 步骤3：将下面所有JS代码粘贴到 <script> 标签的最顶部 ▼▼▼
 /**
- * [新增] 健壮的AI JSON响应解析器
+ * [最终健壮版] 智能AI JSON响应解析器
  * 它可以处理纯JSON、被文字包裹的JSON和被Markdown包裹的JSON
  * @param {string} rawMessage - 从AI获取的原始字符串
  * @returns {{chatReplyText: string, statusData: object|null}}
  */
 function parseAiJsonResponse(rawMessage) {
-    if (!rawMessage) {
+    if (!rawMessage || typeof rawMessage !== 'string') {
         return { chatReplyText: '...', statusData: null };
     }
 
-    // 1. 尝试清理可能的markdown代码块标记
-    let cleanedMessage = rawMessage.trim();
-    if (cleanedMessage.startsWith('```json')) {
-        cleanedMessage = cleanedMessage.substring(7);
-    }
-    if (cleanedMessage.endsWith('```')) {
-        cleanedMessage = cleanedMessage.substring(0, cleanedMessage.length - 3);
-    }
-    cleanedMessage = cleanedMessage.trim();
+    let text = rawMessage.trim();
 
-    // 2. 尝试直接解析，这是最理想的情况
-    try {
-        const parsed = JSON.parse(cleanedMessage);
-        return {
-            chatReplyText: parsed.reply || cleanedMessage,
-            statusData: parsed.status || null
-        };
-    } catch (e) {
-        // 直接解析失败，继续下一步
-    }
+    // 1. 尝试清理Markdown代码块标记
+    text = text.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+    text = text.trim();
 
-    // 3. 使用正则表达式提取被包裹的JSON
-    try {
-        const jsonMatch = cleanedMessage.match(/\{[\s\S]*\}/);
-        if (jsonMatch && jsonMatch[0]) {
-            const parsed = JSON.parse(jsonMatch[0]);
-            console.log("✅ 智能提取JSON成功！");
+    // 2. 寻找JSON对象的边界 (从第一个 '{' 到最后一个 '}')
+    const firstBrace = text.indexOf('{');
+    const lastBrace = text.lastIndexOf('}');
+
+    if (firstBrace !== -1 && lastBrace > firstBrace) {
+        const jsonCandidate = text.substring(firstBrace, lastBrace + 1);
+        try {
+            // 3. 尝试解析提取出的JSON字符串
+            const parsed = JSON.parse(jsonCandidate);
+            console.log("✅ 智能提取并解析JSON成功！");
+
+            // 4. 从解析成功的数据中提取 reply 和 status
+            //    如果 reply 不存在，则将整个原始文本作为回复（以防万一）
             return {
-                chatReplyText: parsed.reply || cleanedMessage,
+                chatReplyText: parsed.reply || rawMessage,
                 statusData: parsed.status || null
             };
+        } catch (e) {
+            console.warn(`⚠️ 提取JSON后解析失败: ${e.message}。将作为纯文本处理。`);
         }
-    } catch (e) {
-        console.error("❌ 提取JSON后解析失败:", e);
     }
 
-    // 4. 彻底失败，返回纯文本内容，状态为null
+    // 5. 如果所有尝试都失败，则返回原始文本
     console.warn("⚠️ 未能解析出有效JSON，将作为纯文本处理。");
     return {
         chatReplyText: rawMessage,
         statusData: null
     };
 }
+
 
 // ================== 地址选择与持久化功能 ==================
 
@@ -7474,53 +7467,48 @@ async function getSweetheartAiReply() {
     const thinkingBubble = _createMessageDOM(contactId, { sender: 'contact', text: '...' }, -1);
     messagesEl.appendChild(thinkingBubble);
     messagesEl.scrollTop = messagesEl.scrollHeight;
-
     const result = await callApi(messages);
     thinkingBubble.remove();
-
     if (!result.success) {
         showErrorModal('API 响应错误', result.message);
     } else {
-        // ▼▼▼▼▼ 核心修复点在这里 ▼▼▼▼▼
-        // 使用我们新的解析函数来处理回复
-
-
-        // 在显示AI回复之前，添加验证
-        let {chatReplyText, statusData} = parseOfflineResponse(result);
-// ✅ 验证回复文本
-        if (!chatReplyText || chatReplyText.trim() === '') {
-            console.warn('⚠️ AI回复为空，使用默认文本');
-            chatReplyText = '...';
-        }
-// 如果包含 <render> 标签，验证其完整性
-        if (chatReplyText.includes('<render>')) {
-            const renderMatch = chatReplyText.match(/<render>([\s\S]*?)<\/render>/);
-            if (!renderMatch) {
-                console.warn('⚠️ <render> 标签不完整，将其作为普通文本处理');
-                chatReplyText = chatReplyText.replace(/<render>/g, '[render]').replace(/<\/render>/g, '[/render]');
-            }
-        }
-// 如果解析出了状态数据，就更新UI并保存
+        // ▼▼▼▼▼ 核心改造从这里开始 ▼▼▼▼▼
+        // 1. 使用我们新的、更强大的解析器
+        const { chatReplyText, statusData } = parseAiJsonResponse(result.message);
+        // 2. 如果成功解析出 status 数据，就立即更新UI并保存
         if (statusData) {
             updateStatusPopup(statusData);
             saveStatusData(contactId, statusData);
+            console.log('✅ 状态已成功更新！');
         }
-        // 使用解析出的聊天文本来显示气泡
-        const segments = chatReplyText.split('---').filter(s => s.trim());
-        if (segments.length === 0 && chatReplyText.trim()) {
-            segments.push(chatReplyText);
-        } else if (segments.length === 0) {
-            segments.push('...');
-        }
+        // 3. 处理聊天回复文本（无论JSON解析是否成功，我们总是有文本可以显示）
+        //    我们不再需要在这里分割 '---'，因为 render 逻辑会处理
+        const replyText = chatReplyText || '...';
 
+        // 4. 将回复文本分割成多个气泡
+        const segments = replyText.split('---').filter(s => s.trim());
+
+        // 如果AI没有使用分割符，则将整个回复作为一个气泡
+        if (segments.length === 0 && replyText.trim() !== '') {
+            segments.push(replyText);
+        }
+        // 5. 依次渲染每个分段的气泡
         for (const segmentText of segments) {
             const messageObj = { sender: 'contact', text: segmentText.trim() };
+            // 验证<render>标签的完整性，如果不完整则降级处理
+            if (segmentText.includes('<render>') && !segmentText.includes('</render>')) {
+                console.warn('⚠️ <render> 标签不完整，将其作为普通文本处理');
+                messageObj.text = segmentText.replace(/<render>/g, '[render]');
+            }
             const newIndex = saveSweetheartMessage(contactId, messageObj);
             const messageRow = _createMessageDOM(contactId, messageObj, newIndex);
             messagesEl.appendChild(messageRow);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+
+            // 增加一个自然的延迟，模拟打字效果
             await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 400));
         }
-        // ▲▲▲▲▲ 核心修复点结束 ▲▲▲▲▲
+        // ▲▲▲▲▲ 核心改造到这里结束 ▲▲▲▲▲
     }
 
     // --- 步骤 6: 收尾工作 ---
