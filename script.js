@@ -798,6 +798,8 @@ function formatMessageText(text) {
     if (!text) return '';
 
     let formatted = text;
+    // ✅ 新增：先移除可能存在的 <render> 标签，避免被错误处理
+    formatted = formatted.replace(/<render>[\s\S]*?<\/render>/g, '');
 
     // 1. 处理代码块（三个反引号）- 不创建复制按钮
     formatted = formatted.replace(/```(\w*)\n?([\s\S]*?)```/g, function(match, language, code) {
@@ -1001,12 +1003,29 @@ function escapeHTML(str) {
 
 let messageLongPressTimer = null; // 用于检测长按的计时器
 /**
- * [自适应高度增强版] 创建消息的DOM元素
- * - 支持普通聊天、密友聊天
- * - 支持渲染 <render> 标签内的HTML/CSS代码，并自动调整iframe高度
+ * [修复版] 创建消息的DOM元素
  */
 function _createMessageDOM(contactId, messageObj, messageIndex) {
-    // 1. ✅ 处理特殊消息类型：地点提示
+    // ✅ 改进的防御性检查：允许特殊类型的消息通过
+    if (!messageObj) {
+        console.warn('⚠️ 消息对象为空');
+        const errorRow = document.createElement('div');
+        errorRow.className = 'message-row';
+        errorRow.innerHTML = '<div class="chat-bubble">[消息数据异常]</div>';
+        return errorRow;
+    }
+
+    // ✅ 只有在不是特殊类型消息，且缺少text字段时才报错
+    const isSpecialType = messageObj.type === 'location' || messageObj.imageUrl;
+    if (!isSpecialType && !messageObj.text) {
+        console.warn('⚠️ 普通消息缺少text字段:', messageObj);
+        const errorRow = document.createElement('div');
+        errorRow.className = 'message-row';
+        errorRow.innerHTML = '<div class="chat-bubble">[空消息]</div>';
+        return errorRow;
+    }
+
+    // 1. 处理特殊消息类型：地点提示
     if (messageObj.type === 'location') {
         const locationNotice = document.createElement('div');
         locationNotice.className = 'location-notice';
@@ -1014,11 +1033,10 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
         locationNotice.innerHTML = `
             <div class="location-notice-icon">🗺️</div>
             <div class="location-notice-text">
-                <strong>📍 ${escapeHTML(messageObj.locationName)}</strong>
-                <p>${escapeHTML(messageObj.locationDesc)}</p>
+                <strong>📍 ${escapeHTML(messageObj.locationName || '未知地点')}</strong>
+                <p>${escapeHTML(messageObj.locationDesc || '无描述')}</p>
             </div>
         `;
-        // 为地点提示也添加长按操作
         let longPressTimer = null;
         locationNotice.addEventListener('touchstart', (e) => {
             longPressTimer = setTimeout(() => {
@@ -1035,11 +1053,10 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
     messageRow.className = 'message-row';
     messageRow.classList.add(messageObj.sender === 'user' ? 'sent' : 'received');
 
-    // 3. 创建头像（简洁模式会用到）
+    // 3. 创建头像
     const avatarEl = document.createElement('div');
     avatarEl.className = 'message-chat-avatar';
 
-    // 安全获取联系人数据用于头像和昵称
     let contactData = (currentSweetheartChatContact && currentSweetheartChatContact.id === contactId)
         ? currentSweetheartChatContact
         : currentChatContact;
@@ -1054,7 +1071,7 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
         avatarEl.innerHTML = isUrl ? `<img src="${avatarSrc}" alt="">` : `<div class="initials">${avatarSrc}</div>`;
     }
 
-    // 4. 创建消息内容容器和发送者名称
+    // 4. 创建消息内容容器
     const messageContent = document.createElement('div');
     messageContent.className = 'message-content';
 
@@ -1064,71 +1081,64 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
         ? (userProfile.name || '我')
         : (contactData ? contactData.name : '联系人');
 
-    // 5. ▼▼▼ 核心改造：创建和填充气泡 ▼▼▼
+    // 5. 创建气泡
     const bubble = document.createElement('div');
     bubble.className = 'chat-bubble';
 
     const text = messageObj.text || '';
     const renderMatch = text.match(/<render>([\s\S]*?)<\/render>/);
 
-    // 5a. ▼▼▼ 【最终优化版】处理 <render> 标签的HTML/CSS渲染 ▼▼▼
     if (renderMatch && renderMatch[1]) {
+        // ✅ 处理 render 标签
         bubble.classList.add('render-bubble');
         const iframe = document.createElement('iframe');
         iframe.className = 'render-iframe';
-
-        // 出于安全考虑，使用沙箱模式，但允许脚本执行
         iframe.sandbox = 'allow-scripts allow-same-origin';
-        // 将AI生成的内容包装在一个标准化的HTML模板中，确保有基本的样式和滚动能力
-        iframe.srcdoc = `
-            <html>
-                <head>
-                    <style>
-                        /* 1. 基础重置，确保干净的渲染环境 */
-                        body { 
-                            margin: 0; 
-                            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-                            overscroll-behavior: contain; /* 防止iframe内滚动影响到父页面 */
-                        }
-                        
-                        /* 2. 为AI内容创建一个居中的容器，增加呼吸空间 */
-                        .content-wrapper {
-                            display: flex;
-                            justify-content: center;
-                            align-items: center;
-                            min-height: 100%;
-                            padding: 16px;
-                            box-sizing: border-box;
-                        }
-                    </style>
-                </head>
-                <body>
-                    <div class="content-wrapper">
-                        ${renderMatch[1]}
-                    </div>
-                </body>
-            </html>
-        `;
+
+        const renderContent = renderMatch[1];
+
+        // ✅ 核心修复：直接将HTML作为完整文档
+        const secureSrcDoc = `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { 
+            margin: 0; 
+            padding: 10px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            box-sizing: border-box;
+        }
+        * {
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+${renderContent}
+</body>
+</html>`;
+
+        iframe.srcdoc = secureSrcDoc;
         bubble.appendChild(iframe);
 
-    // 5b. 处理图片消息
     } else if (messageObj.imageUrl) {
+        // 处理图片消息
         bubble.classList.add('image-only');
         const img = document.createElement('img');
         img.src = messageObj.imageUrl;
         img.alt = '图片';
-        img.style.maxWidth = '150px'; // 适当限制图片大小
+        img.style.maxWidth = '150px';
         img.style.borderRadius = '10px';
         bubble.appendChild(img);
 
-    // 5c. 【最终修复】处理普通文本、代码块和引用
     } else {
+        // 处理普通文本消息
         let contentHTML = '';
 
-        // 优先处理引用
         if (messageObj.quote && messageObj.quote.senderName) {
             const senderName = messageObj.quote.senderName;
-            // 修正：安全地处理可能不存在的 qoute.text
             const rawQuotedText = messageObj.quote.text || '';
             let quotedText = rawQuotedText.substring(0, 50);
             if (rawQuotedText.length > 50) quotedText += '...';
@@ -1141,31 +1151,24 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
         `;
         }
 
-        // ▼▼▼ 核心修改在这里 ▼▼▼
-        // 只有当新消息文本存在时，才创建并添加包裹它的 div
         const formattedText = formatMessageText(text);
         if (formattedText) {
             contentHTML += `<div class="main-message-text">${formattedText}</div>`;
         }
-        // ▲▲▲ 修改结束 ▲▲▲
 
         bubble.innerHTML = contentHTML;
     }
 
-
-    // ▲▲▲ 核心改造结束 ▲▲▲
-
-    // 6. 组装最终的 DOM 结构
+    // 6. 组装DOM
     messageContent.appendChild(senderName);
     messageContent.appendChild(bubble);
     messageRow.appendChild(avatarEl);
     messageRow.appendChild(messageContent);
 
-    // 7. ✅ 统一绑定消息操作事件（长按和右键）
-    if (bubble.addEventListener) { // 检查浏览器兼容性
+    // 7. 绑定事件
+    if (bubble.addEventListener) {
         let longPressTimer = null;
         let startPos = { x: 0, y: 0 };
-        // 检查是普通聊天还是密友聊天
         const isSweetheart = document.getElementById('sweetheartChatPage').classList.contains('show');
 
         const handleStart = (e) => {
@@ -1177,13 +1180,12 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
                 } else {
                     showNormalMessageActionSheet(contactId, messageIndex);
                 }
-            }, 500); // 500ms 长按
+            }, 500);
         };
 
         const handleMove = (e) => {
             if (!longPressTimer) return;
             const touch = e.touches ? e.touches[0] : e;
-            // 如果移动超过10像素，则取消长按
             if (Math.sqrt(Math.pow(touch.clientX - startPos.x, 2) + Math.pow(touch.clientY - startPos.y, 2)) > 10) {
                 clearTimeout(longPressTimer);
                 longPressTimer = null;
@@ -1203,16 +1205,29 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
             }
         };
 
-        // 为触摸和鼠标事件都绑定处理器
-        bubble.addEventListener('touchstart', handleStart, { passive: true });
+        bubble.addEventListener('touchstart', handleStart, {passive: true});
         bubble.addEventListener('mousedown', handleStart);
-        bubble.addEventListener('touchmove', handleMove, { passive: true });
+        bubble.addEventListener('touchmove', handleMove, {passive: true});
         bubble.addEventListener('mousemove', handleMove);
         bubble.addEventListener('touchend', handleEnd);
         bubble.addEventListener('mouseup', handleEnd);
         bubble.addEventListener('contextmenu', handleContextMenu);
     }
+
     return messageRow;
+}
+
+
+// ✅ 新增：降级函数
+function createFallbackMessage(messageObj) {
+    const row = document.createElement('div');
+    row.className = 'message-row ' + (messageObj.sender === 'user' ? 'sent' : 'received');
+    const bubble = document.createElement('div');
+    bubble.className = 'chat-bubble';
+    bubble.textContent = messageObj.text || '[渲染失败]';
+    bubble.style.cssText = 'background:#fff3cd;color:#856404;border-left:3px solid #ffc107';
+    row.appendChild(bubble);
+    return row;
 }
 
 
@@ -7430,14 +7445,28 @@ async function getSweetheartAiReply() {
     } else {
         // ▼▼▼▼▼ 核心修复点在这里 ▼▼▼▼▼
         // 使用我们新的解析函数来处理回复
-        const { chatReplyText, statusData } = parseAiJsonResponse(result.message);
 
-        // 如果解析出了状态数据，就更新UI并保存
+
+        // 在显示AI回复之前，添加验证
+        const {chatReplyText, statusData} = parseOfflineResponse(result);
+// ✅ 验证回复文本
+        if (!chatReplyText || chatReplyText.trim() === '') {
+            console.warn('⚠️ AI回复为空，使用默认文本');
+            chatReplyText = '...';
+        }
+// 如果包含 <render> 标签，验证其完整性
+        if (chatReplyText.includes('<render>')) {
+            const renderMatch = chatReplyText.match(/<render>([\s\S]*?)<\/render>/);
+            if (!renderMatch) {
+                console.warn('⚠️ <render> 标签不完整，将其作为普通文本处理');
+                chatReplyText = chatReplyText.replace(/<render>/g, '[render]').replace(/<\/render>/g, '[/render]');
+            }
+        }
+// 如果解析出了状态数据，就更新UI并保存
         if (statusData) {
             updateStatusPopup(statusData);
             saveStatusData(contactId, statusData);
         }
-
         // 使用解析出的聊天文本来显示气泡
         const segments = chatReplyText.split('---').filter(s => s.trim());
         if (segments.length === 0 && chatReplyText.trim()) {
@@ -7606,6 +7635,345 @@ function loadAndApplyStatusData(contactId) {
         console.error("加载状态历史数据失败:", e);
     }
 }
+
+/* ========== 同步组管理功能 - 开始 ========== */
+
+/**
+ * 打开同步组管理界面
+ */
+function openStatusSyncGroup() {
+    if (!currentWorldId) {
+        showSuccessModal('提示', '请先进入一个世界！', 2000);
+        return;
+    }
+
+    if (!currentSweetheartChatContact) {
+        showSuccessModal('提示', '请先打开一个密友聊天！', 2000);
+        return;
+    }
+
+    const popup = document.getElementById('statusSyncPopup');
+    if (!popup) return;
+
+    // 渲染同步组信息
+    renderSyncGroupInfo();
+
+    // 显示弹窗
+    popup.classList.add('show');
+}
+
+/**
+ * 关闭同步组管理界面
+ */
+function closeStatusSyncGroup() {
+    const popup = document.getElementById('statusSyncPopup');
+    if (popup) {
+        popup.classList.remove('show');
+    }
+}
+
+/**
+ * 渲染同步组信息
+ */
+function renderSyncGroupInfo() {
+    const world = worldsData.find(w => w.id === currentWorldId);
+    if (!world) return;
+
+    // 获取当前世界的同步组
+    const syncGroup = getSyncGroupForWorld(currentWorldId);
+
+    // 获取当前联系人是否在同步组中
+    const currentContactId = currentSweetheartChatContact.id;
+    const isInGroup = syncGroup.includes(currentContactId);
+
+    // 更新状态提示
+    const statusInfo = document.getElementById('syncStatusInfo');
+    if (syncGroup.length === 0) {
+        statusInfo.innerHTML = `
+            <div class="sync-status-icon">🌍</div>
+            <div class="sync-status-text">
+                世界「${escapeHTML(world.name)}」还没有人加入状态同步组<br>
+                <small style="color: #BCAAA4;">加入后，你的状态会与其他成员实时同步</small>
+            </div>
+        `;
+    } else if (isInGroup) {
+        statusInfo.innerHTML = `
+            <div class="sync-status-icon">✅</div>
+            <div class="sync-status-text">
+                你已加入同步组（共${syncGroup.length}人）<br>
+                <small style="color: #BCAAA4;">你的状态会与下列成员互相同步</small>
+            </div>
+        `;
+    } else {
+        statusInfo.innerHTML = `
+            <div class="sync-status-icon">ℹ️</div>
+            <div class="sync-status-text">
+                当前有${syncGroup.length}人在同步组中<br>
+                <small style="color: #BCAAA4;">加入后可以与他们互相同步状态</small>
+            </div>
+        `;
+    }
+
+    // 渲染成员列表
+    renderSyncGroupMembers(world, syncGroup);
+
+    // 更新按钮状态
+    const toggleBtn = document.getElementById('syncToggleBtn');
+    if (isInGroup) {
+        toggleBtn.textContent = '退出同步组';
+        toggleBtn.className = 'status-sync-toggle-btn leave';
+    } else {
+        toggleBtn.textContent = '加入同步组';
+        toggleBtn.className = 'status-sync-toggle-btn join';
+    }
+}
+
+/**
+ * 渲染同步组成员列表
+ */
+function renderSyncGroupMembers(world, syncGroup) {
+    const container = document.getElementById('syncGroupMembers');
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    // 获取当前世界的所有联系人
+    const worldContacts = world.contacts.map(contactId =>
+        sweetheartContactsData.find(c => c.id === contactId)
+    ).filter(Boolean);
+
+    if (worldContacts.length === 0) {
+        container.innerHTML = `
+            <div style="text-align: center; padding: 20px; color: #BCAAA4;">
+                当前世界还没有联系人
+            </div>
+        `;
+        return;
+    }
+
+    const currentContactId = currentSweetheartChatContact.id;
+
+    // 渲染每个联系人
+    worldContacts.forEach(contact => {
+        const isInGroup = syncGroup.includes(contact.id);
+        const isMe = contact.id === currentContactId;
+
+        const item = document.createElement('div');
+        item.className = 'sync-member-item' + (isMe ? ' is-me' : '');
+
+        const isUrl = contact.avatar && (contact.avatar.startsWith('http') || contact.avatar.startsWith('data:'));
+        const avatarContent = isUrl
+            ? `<img src="${escapeHTML(contact.avatar)}" alt="">`
+            : escapeHTML(contact.avatar);
+
+        const badge = isMe ? '（我）' : '';
+        const statusIcon = isInGroup ? '✓' : '○';
+        const statusClass = isInGroup ? 'active' : 'inactive';
+
+        item.innerHTML = `
+            <div class="sync-member-avatar">${avatarContent}</div>
+            <div class="sync-member-info">
+                <div class="sync-member-name">${escapeHTML(contact.name)}</div>
+                <div class="sync-member-badge ${statusClass}">${badge}${isInGroup ? '已加入同步' : '未加入'}</div>
+            </div>
+            <div class="sync-member-status ${statusClass}">${statusIcon}</div>
+        `;
+
+        container.appendChild(item);
+    });
+}
+
+/**
+ * 切换同步组成员资格
+ */
+function toggleSyncGroupMembership() {
+    if (!currentWorldId || !currentSweetheartChatContact) return;
+
+    const currentContactId = currentSweetheartChatContact.id;
+    const syncGroup = getSyncGroupForWorld(currentWorldId);
+    const isInGroup = syncGroup.includes(currentContactId);
+
+    if (isInGroup) {
+        // 退出同步组
+        if (confirm('确定要退出同步组吗？退出后你的状态将不再与其他成员同步。')) {
+            removeMemberFromSyncGroup(currentWorldId, currentContactId);
+            showSuccessModal('已退出', '你已退出状态同步组');
+        }
+    } else {
+        // 加入同步组
+        addMemberToSyncGroup(currentWorldId, currentContactId);
+        showSuccessModal('已加入', '你已加入状态同步组，现在你的状态会与其他成员互相同步！');
+    }
+
+    // 刷新界面
+    renderSyncGroupInfo();
+}
+
+/**
+ * 获取指定世界的同步组成员
+ * @param {string} worldId - 世界ID
+ * @returns {Array<string>} - 同步组成员ID数组
+ */
+function getSyncGroupForWorld(worldId) {
+    try {
+        const allSyncGroups = JSON.parse(localStorage.getItem('worldStatusSyncGroups') || '{}');
+        return allSyncGroups[worldId] || [];
+    } catch (e) {
+        console.error('读取同步组失败:', e);
+        return [];
+    }
+}
+
+/**
+ * 将成员添加到同步组
+ * @param {string} worldId - 世界ID
+ * @param {string} contactId - 联系人ID
+ */
+function addMemberToSyncGroup(worldId, contactId) {
+    try {
+        const allSyncGroups = JSON.parse(localStorage.getItem('worldStatusSyncGroups') || '{}');
+
+        if (!allSyncGroups[worldId]) {
+            allSyncGroups[worldId] = [];
+        }
+
+        if (!allSyncGroups[worldId].includes(contactId)) {
+            allSyncGroups[worldId].push(contactId);
+            localStorage.setItem('worldStatusSyncGroups', JSON.stringify(allSyncGroups));
+            console.log(`✅ ${contactId} 已加入世界 ${worldId} 的同步组`);
+        }
+    } catch (e) {
+        console.error('添加到同步组失败:', e);
+    }
+}
+
+/**
+ * 从同步组移除成员
+ * @param {string} worldId - 世界ID
+ * @param {string} contactId - 联系人ID
+ */
+function removeMemberFromSyncGroup(worldId, contactId) {
+    try {
+        const allSyncGroups = JSON.parse(localStorage.getItem('worldStatusSyncGroups') || '{}');
+
+        if (allSyncGroups[worldId]) {
+            allSyncGroups[worldId] = allSyncGroups[worldId].filter(id => id !== contactId);
+            localStorage.setItem('worldStatusSyncGroups', JSON.stringify(allSyncGroups));
+            console.log(`✅ ${contactId} 已退出世界 ${worldId} 的同步组`);
+        }
+    } catch (e) {
+        console.error('从同步组移除失败:', e);
+    }
+}
+
+/**
+ * [修改] 保存状态数据，并在同步组内互相同步
+ * @param {string} contactId - 当前密友的ID
+ * @param {object} statusData - 要保存的状态对象
+ */
+function saveStatusData(contactId, statusData) {
+    if (!contactId || !statusData) return;
+
+    try {
+        const allStatusHistories = JSON.parse(localStorage.getItem('sweetheartStatusHistory') || '{}');
+        let contactHistory = allStatusHistories[contactId] || [];
+
+        const newStatusEntry = {
+            ...statusData,
+            timestamp: Date.now()
+        };
+
+        contactHistory.unshift(newStatusEntry);
+        contactHistory = contactHistory.slice(0, 5);
+        allStatusHistories[contactId] = contactHistory;
+
+        localStorage.setItem('sweetheartStatusHistory', JSON.stringify(allStatusHistories));
+        console.log(`✅ 已为 ${contactId} 更新状态历史`);
+
+        // ✅ 新增：在同步组内互相同步"我的状态"
+        if (currentWorldId && statusData.user) {
+            syncMyStatusInGroup(currentWorldId, contactId, statusData.user);
+        }
+
+    } catch (e) {
+        console.error('保存状态历史数据失败:', e);
+    }
+}
+
+/**
+ * [新增] 在同步组内同步"我的状态"
+ * @param {string} worldId - 当前世界ID
+ * @param {string} sourceContactId - 源联系人ID
+ * @param {object} myStatus - 我的状态数据
+ */
+function syncMyStatusInGroup(worldId, sourceContactId, myStatus) {
+    if (!myStatus) return;
+
+    // 获取同步组成员
+    const syncGroup = getSyncGroupForWorld(worldId);
+
+    // 检查源联系人是否在同步组中
+    if (!syncGroup.includes(sourceContactId)) {
+        console.log('ℹ️ 当前联系人不在同步组中，跳过同步');
+        return;
+    }
+
+    // 过滤出需要同步的目标（排除自己）
+    const syncTargets = syncGroup.filter(id => id !== sourceContactId);
+
+    if (syncTargets.length === 0) {
+        console.log('ℹ️ 同步组中只有自己，无需同步');
+        return;
+    }
+
+    try {
+        const allStatusHistories = JSON.parse(localStorage.getItem('sweetheartStatusHistory') || '{}');
+
+        syncTargets.forEach(targetContactId => {
+            let targetHistory = allStatusHistories[targetContactId] || [];
+
+            if (targetHistory.length > 0) {
+                // 更新最新一条的"我的状态"
+                targetHistory[0].user = {
+                    ...myStatus,
+                    syncedFrom: sourceContactId,
+                    syncedAt: Date.now()
+                };
+            } else {
+                // 创建新的状态记录
+                targetHistory.unshift({
+                    character: {
+                        location: '...',
+                        appearance: '...',
+                        action: '...',
+                        thoughts: '...',
+                        private_thoughts: '...'
+                    },
+                    user: {
+                        ...myStatus,
+                        syncedFrom: sourceContactId,
+                        syncedAt: Date.now()
+                    },
+                    timestamp: Date.now()
+                });
+            }
+
+            targetHistory = targetHistory.slice(0, 5);
+            allStatusHistories[targetContactId] = targetHistory;
+
+            console.log(`🔄 已将"我的状态"同步到 ${targetContactId}`);
+        });
+
+        localStorage.setItem('sweetheartStatusHistory', JSON.stringify(allStatusHistories));
+        console.log(`✅ 同步完成，共同步到 ${syncTargets.length} 个成员`);
+
+    } catch (e) {
+        console.error('同步状态失败:', e);
+    }
+}
+
+/* ========== 同步组管理功能 - 结束 ========== */
+
 
 /**
  * 取消引用（密友版）

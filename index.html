@@ -1986,7 +1986,15 @@
 
                     <!-- 我的状态 -->
                     <div class="status-section my-status">
-                        <h4>我的状态</h4>
+                        <div class="my-status-header">
+                            <h4>我的状态</h4>
+                            <!-- ✅ 新增：同步组管理按钮 -->
+                            <button class="status-sync-btn" onclick="openStatusSyncGroup()" title="同步设置">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M12 5.9c1.16 0 2.1.94 2.1 2.1s-.94 2.1-2.1 2.1S9.9 9.16 9.9 8s.94-2.1 2.1-2.1m0 9c2.97 0 6.1 1.46 6.1 2.1v1.1H5.9V17c0-.64 3.13-2.1 6.1-2.1M12 4C9.79 4 8 5.79 8 8s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm0 9c-2.67 0-8 1.34-8 4v3h16v-3c0-2.66-5.33-4-8-4z"/>
+                                </svg>
+                            </button>
+                        </div>
                         <div class="status-field">
                             <span class="status-label">📍 所在</span>
                             <div class="status-value" id="status-my-location">...</div>
@@ -2007,6 +2015,32 @@
                             <div class="status-value" id="status-my-features">...</div>
                             <input type="text" class="status-input" data-target="status-my-features">
                         </div>
+                    </div>
+                </div>
+            </div>
+            <!-- ✅ 新增：同步组管理弹窗 -->
+            <div class="status-sync-popup-overlay" id="statusSyncPopup">
+                <div class="status-sync-popup-backdrop" onclick="closeStatusSyncGroup()"></div>
+                <div class="status-sync-popup-modal">
+                    <div class="status-sync-popup-header">
+                        <h3 class="status-sync-title">状态同步组</h3>
+                        <div class="status-popup-close" onclick="closeStatusSyncGroup()">×</div>
+                    </div>
+                    <div class="status-sync-popup-content">
+                        <!-- 同步状态提示 -->
+                        <div class="sync-status-info" id="syncStatusInfo">
+                            <div class="sync-status-icon">🔄</div>
+                            <div class="sync-status-text">正在加载...</div>
+                        </div>
+                        <!-- 同步组成员列表 -->
+                        <div class="sync-group-members" id="syncGroupMembers">
+                            <!-- 由JS动态生成 -->
+                        </div>
+                    </div>
+                    <div class="status-sync-popup-footer">
+                        <button class="status-sync-toggle-btn" id="syncToggleBtn" onclick="toggleSyncGroupMembership()">
+                            加入同步组
+                        </button>
                     </div>
                 </div>
             </div>
