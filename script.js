@@ -7486,7 +7486,7 @@ async function getSweetheartAiReply() {
 
 
         // 在显示AI回复之前，添加验证
-        const {chatReplyText, statusData} = parseOfflineResponse(result);
+        let {chatReplyText, statusData} = parseOfflineResponse(result);
 // ✅ 验证回复文本
         if (!chatReplyText || chatReplyText.trim() === '') {
             console.warn('⚠️ AI回复为空，使用默认文本');
