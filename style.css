@@ -186,6 +186,7 @@ body {
 .chat-messages {
     flex: 1;
     overflow-y: auto;
+    min-height: 0;
     padding: 20px;
     display: flex;
     flex-direction: column;
@@ -3925,8 +3926,10 @@ body.code-scrolling-enabled .code-block-wrapper {
 
 /* 消息区域 - 带心形图案背景 */
 .sweetheart-chat-messages {
-    flex: 1;
-    overflow-y: auto;
+    flex: 1; /* 保持：占满可用垂直空间 */
+    overflow-y: auto; /* 保持：当内容超出时滚动 */
+    min-height: 0; /* ✨ 这是解决问题的关键！允许此区域收缩 */
+    /* ... 其他样式保持不变 ... */
     padding: 20px;
     display: flex;
     flex-direction: column;
