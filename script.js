@@ -1115,6 +1115,20 @@ ${renderContent}
 
         iframe.srcdoc = secureSrcDoc;
         bubble.appendChild(iframe);
+        // ▼▼▼【核心修复代码】▼▼▼
+        // 监听触摸开始事件
+        bubble.addEventListener('touchstart', () => {
+            // 当用户开始触摸iframe气泡时，立即禁用iframe的指针事件
+            // 这样接下来的滑动事件就会被父级的聊天窗口捕获
+            iframe.style.pointerEvents = 'none';
+        }, { passive: true });
+        // 监听触摸结束事件
+        bubble.addEventListener('touchend', () => {
+            // 当用户手指离开屏幕时，重新启用iframe的指针事件
+            // 这样用户就可以点击iframe内部的内容了
+            iframe.style.pointerEvents = 'auto';
+        }, { passive: true });
+
 
     } else if (messageObj.imageUrl) {
         // 处理图片消息
@@ -1165,6 +1179,8 @@ ${renderContent}
         const isSweetheart = document.getElementById('sweetheartChatPage').classList.contains('show');
 
         const handleStart = (e) => {
+            // 如果点击的是iframe的气泡，则不触发长按菜单，避免与滚动修复冲突
+            if (e.target.closest('.render-bubble')) return;
             const touch = e.touches ? e.touches[0] : e;
             startPos = { x: touch.clientX, y: touch.clientY };
             longPressTimer = setTimeout(() => {
