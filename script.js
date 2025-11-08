@@ -1154,6 +1154,7 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
     return messageRow;
 }
 
+
 /**
  * 辅助函数：为一个消息元素绑定长按和右键上下文菜单事件
  * @param {HTMLElement} element - 要绑定事件的DOM元素 (通常是 .chat-bubble 或 .location-notice)
@@ -1176,8 +1177,12 @@ function bindMessageEvents(element, contactId, messageIndex) {
     };
 
     const handleStart = (e) => {
-        // 阻止默认行为，特别是在触摸设备上防止页面滚动等
-        // e.preventDefault();
+        // 对于触摸事件，我们不阻止默认行为，以允许滚动
+        // 对于鼠标事件，可以阻止，以防止拖动时选中文本
+        if (e.type === 'mousedown') {
+            e.preventDefault();
+        }
+
         const touch = e.touches ? e.touches[0] : e;
         startPos = { x: touch.clientX, y: touch.clientY };
 
@@ -1219,6 +1224,7 @@ function bindMessageEvents(element, contactId, messageIndex) {
     element.addEventListener('touchcancel', handleEnd);
     element.addEventListener('contextmenu', handleContextMenu);
 }
+
 
 /**
  * 辅助函数：创建一条降级显示的消息，用于处理渲染错误
@@ -4272,7 +4278,8 @@ function swipeEndHandler(e) {
  */
 function swipeStartHandler(e) {
     // 检查触摸事件是否发生在不应触发翻页的元素上
-    if (e.target.closest('.page-dots, .dock, #iconDockPanel, #floatingBall, .cat-widget, .contacts-page, .chat-page, .settings-page, .config-page, .beautify-page, .modal-overlay, #statusPopup, .test-page, .worldbook-page, .mask-library-page, .contact-library-page, .memory-center-page, .map-editor-page')) {
+    // ✅ 核心修复：在这里添加了 .sweetheart-chat-page
+    if (e.target.closest('.page-dots, .dock, #iconDockPanel, #floatingBall, .cat-widget, .contacts-page, .chat-page, .sweetheart-chat-page, .settings-page, .config-page, .beautify-page, .modal-overlay, #statusPopup, .test-page, .worldbook-page, .mask-library-page, .contact-library-page, .memory-center-page, .map-editor-page')) {
         return; // 如果是，则直接退出，不处理翻页逻辑
     }
 
@@ -4299,6 +4306,7 @@ function swipeStartHandler(e) {
         document.addEventListener('mouseup', swipeEndHandler);
     }
 }
+
 
 
 // 这个函数负责在滑动过程中，通过 rAF 更新页面位置，保证流畅
@@ -13062,6 +13070,27 @@ function deleteStatusHistoryItem(timestamp) {
 
 
 function initializeApp() {
+    // ▼▼▼ 在这里粘贴全局错误处理代码 ▼▼▼
+    window.addEventListener('error', (event) => {
+        console.error('捕获到未处理的全局错误:', event.error);
+        // 使用您已有的 showErrorModal 函数来显示友好的错误提示
+        showErrorModal(
+            '哎呀，出错了！',
+            '应用遇到一个未知问题，部分功能可能无法使用。建议刷新页面重试。',
+            5000 // 显示5秒
+        );
+        // 在开发阶段，你可以在这里阻止默认的浏览器错误提示
+        // event.preventDefault();
+    });
+    window.addEventListener('unhandledrejection', (event) => {
+        console.error('捕获到未处理的Promise拒绝:', event.reason);
+        showErrorModal(
+            '操作失败',
+            '一个异步操作失败了，请检查网络连接或API设置后重试。',
+            5000
+        );
+        // event.preventDefault();
+    });
     const chatInput = document.getElementById('chatInput');
     const chatInputArea = document.querySelector('.chat-input-area');
     if (!chatInput || !chatInputArea) {
