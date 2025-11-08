@@ -1149,26 +1149,30 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
     }
 
     // 【核心修复】为气泡绑定长按和右键事件
-    bindMessageEvents(bubble, contactId, messageIndex);
+    bindMessageEvents(bubble, contactId, messageIndex, isSweetheart);
 
     return messageRow;
 }
 
 
 /**
- * 辅助函数：为一个消息元素绑定长按和右键上下文菜单事件
+ * [最终修复版] 为一个消息元素绑定长按和右键上下文菜单事件
+ * - 增加了移动阈值，解决因微小抖动导致长按失败的问题
+ * - 优化了isSweetheart状态的传递，避免重复DOM查询
+ *
  * @param {HTMLElement} element - 要绑定事件的DOM元素 (通常是 .chat-bubble 或 .location-notice)
  * @param {string} contactId - 联系人ID
  * @param {number} messageIndex - 消息索引
+ * @param {boolean} isSweetheart - 是否为密友聊天模式
  */
-function bindMessageEvents(element, contactId, messageIndex) {
+function bindMessageEvents(element, contactId, messageIndex, isSweetheart) {
     if (!element.addEventListener) return;
 
     let longPressTimer = null;
     let startPos = { x: 0, y: 0 };
-    const isSweetheart = document.getElementById('sweetheartChatPage').classList.contains('show');
 
     const showMenu = () => {
+        // 直接使用传入的 isSweetheart 参数
         if (isSweetheart) {
             showSweetheartMessageActionSheet(contactId, messageIndex);
         } else {
@@ -1177,8 +1181,7 @@ function bindMessageEvents(element, contactId, messageIndex) {
     };
 
     const handleStart = (e) => {
-        // 对于触摸事件，我们不阻止默认行为，以允许滚动
-        // 对于鼠标事件，可以阻止，以防止拖动时选中文本
+        // 对于鼠标事件，阻止默认行为以防止拖动时选中文本
         if (e.type === 'mousedown') {
             e.preventDefault();
         }
@@ -1186,6 +1189,7 @@ function bindMessageEvents(element, contactId, messageIndex) {
         const touch = e.touches ? e.touches[0] : e;
         startPos = { x: touch.clientX, y: touch.clientY };
 
+        // 启动长按计时器
         longPressTimer = setTimeout(() => {
             longPressTimer = null; // 计时器触发后清除自身
             showMenu();
@@ -1195,8 +1199,10 @@ function bindMessageEvents(element, contactId, messageIndex) {
     const handleMove = (e) => {
         if (!longPressTimer) return;
         const touch = e.touches ? e.touches[0] : e;
-        // 如果手指移动超过10像素，就判定为滑动，取消长按计时
-        if (Math.hypot(touch.clientX - startPos.x, touch.clientY - startPos.y) > 10) {
+
+        // 🔥 核心修复：将移动阈值从 10 像素增加到 15 像素
+        // 这为用户手指的微小抖动提供了更多容错空间，显著提高长按成功率。
+        if (Math.hypot(touch.clientX - startPos.x, touch.clientY - startPos.y) > 15) {
             clearTimeout(longPressTimer);
             longPressTimer = null;
         }
@@ -1224,6 +1230,7 @@ function bindMessageEvents(element, contactId, messageIndex) {
     element.addEventListener('touchcancel', handleEnd);
     element.addEventListener('contextmenu', handleContextMenu);
 }
+
 
 
 /**
