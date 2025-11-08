@@ -996,32 +996,28 @@ function escapeHTML(str) {
 
 let messageLongPressTimer = null; // 用于检测长按的计时器
 /**
- * [修复版] 创建消息的DOM元素
+ * [最终健壮版] 创建消息的DOM元素
+ * - 解决了 iframe 滚动冲突问题
+ * - 修复了所有消息类型（包括iframe）的长按/右键菜单
+ * - 增加了对异常数据的防御性处理
+ *
+ * @param {string} contactId - 联系人ID
+ * @param {object} messageObj - 消息对象
+ * @param {number} messageIndex - 消息在历史记录中的索引
+ * @returns {HTMLElement} 创建好的消息行DOM元素
  */
 function _createMessageDOM(contactId, messageObj, messageIndex) {
-    // ✅ 改进的防御性检查：允许特殊类型的消息通过
+    // ▼▼▼ 步骤1：对异常数据进行防御性检查 ▼▼▼
     if (!messageObj) {
-        console.warn('⚠️ 消息对象为空');
-        const errorRow = document.createElement('div');
-        errorRow.className = 'message-row';
-        errorRow.innerHTML = '<div class="chat-bubble">[消息数据异常]</div>';
-        return errorRow;
+        console.warn(`⚠️ 消息渲染失败：消息对象为空 (Index: ${messageIndex})`);
+        return createFallbackMessage({ sender: 'system' });
     }
 
-    // ✅ 只有在不是特殊类型消息，且缺少text字段时才报错
-    const isSpecialType = messageObj.type === 'location' || messageObj.imageUrl;
-    if (!isSpecialType && !messageObj.text) {
-        console.warn('⚠️ 普通消息缺少text字段:', messageObj);
-        const errorRow = document.createElement('div');
-        errorRow.className = 'message-row';
-        errorRow.innerHTML = '<div class="chat-bubble">[空消息]</div>';
-        return errorRow;
-    }
-
-    // 1. 处理特殊消息类型：地点提示
+    // 处理特殊消息类型：地点提示 (通常是系统消息)
     if (messageObj.type === 'location') {
         const locationNotice = document.createElement('div');
         locationNotice.className = 'location-notice';
+        // 存储索引，以便菜单操作
         locationNotice.dataset.index = messageIndex;
         locationNotice.innerHTML = `
             <div class="location-notice-icon">🗺️</div>
@@ -1030,41 +1026,40 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
                 <p>${escapeHTML(messageObj.locationDesc || '无描述')}</p>
             </div>
         `;
-        let longPressTimer = null;
-        locationNotice.addEventListener('touchstart', (e) => {
-            longPressTimer = setTimeout(() => {
-                showSweetheartMessageActionSheet(contactId, messageIndex);
-            }, 500);
-        });
-        locationNotice.addEventListener('touchend', () => clearTimeout(longPressTimer));
-        locationNotice.addEventListener('touchmove', () => clearTimeout(longPressTimer));
+        // 为地点提示也绑定长按/右键事件
+        bindMessageEvents(locationNotice, contactId, messageIndex);
         return locationNotice;
     }
 
-    // 2. 创建消息行和基础结构
+    // 如果是普通消息但缺少必要内容，也进行降级处理
+    const hasContent = messageObj.text || messageObj.imageUrl;
+    if (!hasContent) {
+        console.warn(`⚠️ 消息渲染失败：消息内容为空 (Index: ${messageIndex})`, messageObj);
+        return createFallbackMessage(messageObj);
+    }
+
+    // ▼▼▼ 步骤2：创建消息行的基础结构 ▼▼▼
     const messageRow = document.createElement('div');
     messageRow.className = 'message-row';
     messageRow.classList.add(messageObj.sender === 'user' ? 'sent' : 'received');
 
-    // 3. 创建头像
+    // 创建头像
     const avatarEl = document.createElement('div');
     avatarEl.className = 'message-chat-avatar';
 
-    let contactData = (currentSweetheartChatContact && currentSweetheartChatContact.id === contactId)
-        ? currentSweetheartChatContact
-        : currentChatContact;
+    const isSweetheart = document.getElementById('sweetheartChatPage').classList.contains('show');
+    let contactData = isSweetheart ? currentSweetheartChatContact : currentChatContact;
 
-    if (messageObj.sender === 'user') {
-        const avatarSrc = userProfile?.avatar || '👤';
-        const isUrl = avatarSrc.startsWith('http') || avatarSrc.startsWith('data:');
-        avatarEl.innerHTML = isUrl ? `<img src="${avatarSrc}" alt="">` : `<div class="initials">${avatarSrc}</div>`;
-    } else {
-        const avatarSrc = contactData?.avatar || '💬';
-        const isUrl = avatarSrc.startsWith('http') || avatarSrc.startsWith('data:');
-        avatarEl.innerHTML = isUrl ? `<img src="${avatarSrc}" alt="">` : `<div class="initials">${avatarSrc}</div>`;
-    }
+    let avatarSrc = messageObj.sender === 'user'
+        ? (userProfile?.avatar || '👤')
+        : (contactData?.avatar || '💬');
 
-    // 4. 创建消息内容容器
+    const isUrl = avatarSrc.startsWith('http') || avatarSrc.startsWith('data:');
+    avatarEl.innerHTML = isUrl
+        ? `<img src="${avatarSrc}" alt="avatar">`
+        : `<div class="initials">${avatarSrc}</div>`;
+
+    // 创建消息内容容器（包含昵称和气泡）
     const messageContent = document.createElement('div');
     messageContent.className = 'message-content';
 
@@ -1072,9 +1067,9 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
     senderName.className = 'message-sender-name';
     senderName.textContent = messageObj.sender === 'user'
         ? (userProfile.name || '我')
-        : (contactData ? contactData.name : '联系人');
+        : (contactData?.name || '联系人');
 
-    // 5. 创建气泡
+    // ▼▼▼ 步骤3：根据消息类型创建核心的气泡（Bubble）内容 ▼▼▼
     const bubble = document.createElement('div');
     bubble.className = 'chat-bubble';
 
@@ -1082,56 +1077,34 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
     const renderMatch = text.match(/<render>([\s\S]*?)<\/render>/);
 
     if (renderMatch && renderMatch[1]) {
-        // ✅ 处理 render 标签
+        // --- A. 处理 <render> 标签 (iframe) ---
         bubble.classList.add('render-bubble');
         const iframe = document.createElement('iframe');
         iframe.className = 'render-iframe';
         iframe.sandbox = 'allow-scripts allow-same-origin';
 
         const renderContent = renderMatch[1];
-
-        // ✅ 核心修复：直接将HTML作为完整文档
-        const secureSrcDoc = `<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-        body { 
-            margin: 0; 
-            padding: 10px;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            box-sizing: border-box;
-        }
-        * {
-            box-sizing: border-box;
-        }
-    </style>
-</head>
-<body>
-${renderContent}
-</body>
-</html>`;
-
+        const secureSrcDoc = `
+            <!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>body{margin:0;padding:10px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;box-sizing:border-box;}*{box-sizing:border-box;}</style>
+            </head><body>${renderContent}</body></html>`;
         iframe.srcdoc = secureSrcDoc;
+
         bubble.appendChild(iframe);
-        // ▼▼▼【核心修复代码】▼▼▼
-        // 监听触摸开始事件
+
+        // 【核心修复】为iframe气泡绑定特殊的事件处理，以解决滚动冲突
         bubble.addEventListener('touchstart', () => {
-            // 当用户开始触摸iframe气泡时，立即禁用iframe的指针事件
-            // 这样接下来的滑动事件就会被父级的聊天窗口捕获
             iframe.style.pointerEvents = 'none';
         }, { passive: true });
-        // 监听触摸结束事件
         bubble.addEventListener('touchend', () => {
-            // 当用户手指离开屏幕时，重新启用iframe的指针事件
-            // 这样用户就可以点击iframe内部的内容了
-            iframe.style.pointerEvents = 'auto';
+            setTimeout(() => { iframe.style.pointerEvents = 'auto'; }, 50);
+        }, { passive: true });
+        bubble.addEventListener('touchcancel', () => {
+            setTimeout(() => { iframe.style.pointerEvents = 'auto'; }, 50);
         }, { passive: true });
 
-
     } else if (messageObj.imageUrl) {
-        // 处理图片消息
+        // --- B. 处理图片消息 ---
         bubble.classList.add('image-only');
         const img = document.createElement('img');
         img.src = messageObj.imageUrl;
@@ -1141,21 +1114,17 @@ ${renderContent}
         bubble.appendChild(img);
 
     } else {
-        // 处理普通文本消息
+        // --- C. 处理普通文本和引用消息 ---
         let contentHTML = '';
-
         if (messageObj.quote && messageObj.quote.senderName) {
-            const senderName = messageObj.quote.senderName;
-            const rawQuotedText = messageObj.quote.text || '';
-            let quotedText = rawQuotedText.substring(0, 50);
-            if (rawQuotedText.length > 50) quotedText += '...';
+            let quotedText = (messageObj.quote.text || '').substring(0, 50);
+            if ((messageObj.quote.text || '').length > 50) quotedText += '...';
 
             contentHTML += `
-            <div class="quoted-message-wrapper">
-                <div class="quoted-sender">${escapeHTML(senderName)}</div>
-                <div class="quoted-text">${escapeHTML(quotedText)}</div>
-            </div>
-        `;
+                <div class="quoted-message-wrapper">
+                    <div class="quoted-sender">${escapeHTML(messageObj.quote.senderName)}</div>
+                    <div class="quoted-text">${escapeHTML(quotedText)}</div>
+                </div>`;
         }
 
         const formattedText = formatMessageText(text);
@@ -1166,65 +1135,114 @@ ${renderContent}
         bubble.innerHTML = contentHTML;
     }
 
-    // 6. 组装DOM
+    // ▼▼▼ 步骤4：组装所有DOM元素并绑定通用事件 ▼▼▼
     messageContent.appendChild(senderName);
     messageContent.appendChild(bubble);
-    messageRow.appendChild(avatarEl);
-    messageRow.appendChild(messageContent);
 
-    // 7. 绑定事件
-    if (bubble.addEventListener) {
-        let longPressTimer = null;
-        let startPos = { x: 0, y: 0 };
-        const isSweetheart = document.getElementById('sweetheartChatPage').classList.contains('show');
-
-        const handleStart = (e) => {
-            // 如果点击的是iframe的气泡，则不触发长按菜单，避免与滚动修复冲突
-            if (e.target.closest('.render-bubble')) return;
-            const touch = e.touches ? e.touches[0] : e;
-            startPos = { x: touch.clientX, y: touch.clientY };
-            longPressTimer = setTimeout(() => {
-                if (isSweetheart) {
-                    showSweetheartMessageActionSheet(contactId, messageIndex);
-                } else {
-                    showNormalMessageActionSheet(contactId, messageIndex);
-                }
-            }, 500);
-        };
-
-        const handleMove = (e) => {
-            if (!longPressTimer) return;
-            const touch = e.touches ? e.touches[0] : e;
-            if (Math.sqrt(Math.pow(touch.clientX - startPos.x, 2) + Math.pow(touch.clientY - startPos.y, 2)) > 10) {
-                clearTimeout(longPressTimer);
-                longPressTimer = null;
-            }
-        };
-
-        const handleEnd = () => {
-            if (longPressTimer) clearTimeout(longPressTimer);
-        };
-
-        const handleContextMenu = (e) => {
-            e.preventDefault();
-            if (isSweetheart) {
-                showSweetheartMessageActionSheet(contactId, messageIndex);
-            } else {
-                showNormalMessageActionSheet(contactId, messageIndex);
-            }
-        };
-
-        bubble.addEventListener('touchstart', handleStart, {passive: true});
-        bubble.addEventListener('mousedown', handleStart);
-        bubble.addEventListener('touchmove', handleMove, {passive: true});
-        bubble.addEventListener('mousemove', handleMove);
-        bubble.addEventListener('touchend', handleEnd);
-        bubble.addEventListener('mouseup', handleEnd);
-        bubble.addEventListener('contextmenu', handleContextMenu);
+    // 根据发送方决定头像和内容的顺序
+    if (messageObj.sender === 'user') {
+        messageRow.appendChild(messageContent);
+        messageRow.appendChild(avatarEl);
+    } else {
+        messageRow.appendChild(avatarEl);
+        messageRow.appendChild(messageContent);
     }
+
+    // 【核心修复】为气泡绑定长按和右键事件
+    bindMessageEvents(bubble, contactId, messageIndex);
 
     return messageRow;
 }
+
+/**
+ * 辅助函数：为一个消息元素绑定长按和右键上下文菜单事件
+ * @param {HTMLElement} element - 要绑定事件的DOM元素 (通常是 .chat-bubble 或 .location-notice)
+ * @param {string} contactId - 联系人ID
+ * @param {number} messageIndex - 消息索引
+ */
+function bindMessageEvents(element, contactId, messageIndex) {
+    if (!element.addEventListener) return;
+
+    let longPressTimer = null;
+    let startPos = { x: 0, y: 0 };
+    const isSweetheart = document.getElementById('sweetheartChatPage').classList.contains('show');
+
+    const showMenu = () => {
+        if (isSweetheart) {
+            showSweetheartMessageActionSheet(contactId, messageIndex);
+        } else {
+            showNormalMessageActionSheet(contactId, messageIndex);
+        }
+    };
+
+    const handleStart = (e) => {
+        // 阻止默认行为，特别是在触摸设备上防止页面滚动等
+        // e.preventDefault();
+        const touch = e.touches ? e.touches[0] : e;
+        startPos = { x: touch.clientX, y: touch.clientY };
+
+        longPressTimer = setTimeout(() => {
+            longPressTimer = null; // 计时器触发后清除自身
+            showMenu();
+        }, 500); // 500ms 触发长按
+    };
+
+    const handleMove = (e) => {
+        if (!longPressTimer) return;
+        const touch = e.touches ? e.touches[0] : e;
+        // 如果手指移动超过10像素，就判定为滑动，取消长按计时
+        if (Math.hypot(touch.clientX - startPos.x, touch.clientY - startPos.y) > 10) {
+            clearTimeout(longPressTimer);
+            longPressTimer = null;
+        }
+    };
+
+    const handleEnd = () => {
+        if (longPressTimer) {
+            clearTimeout(longPressTimer);
+            longPressTimer = null;
+        }
+    };
+
+    const handleContextMenu = (e) => {
+        e.preventDefault(); // 阻止浏览器默认的右键菜单
+        showMenu();
+    };
+
+    // 绑定所有事件
+    element.addEventListener('touchstart', handleStart, { passive: true });
+    element.addEventListener('mousedown', handleStart);
+    element.addEventListener('touchmove', handleMove, { passive: true });
+    element.addEventListener('mousemove', handleMove);
+    element.addEventListener('touchend', handleEnd);
+    element.addEventListener('mouseup', handleEnd);
+    element.addEventListener('touchcancel', handleEnd);
+    element.addEventListener('contextmenu', handleContextMenu);
+}
+
+/**
+ * 辅助函数：创建一条降级显示的消息，用于处理渲染错误
+ * @param {object} messageObj - 原始消息对象
+ * @returns {HTMLElement} - 创建好的错误消息行DOM元素
+ */
+function createFallbackMessage(messageObj) {
+    const row = document.createElement('div');
+    const senderClass = messageObj.sender === 'user' ? 'sent' : 'received';
+    row.className = `message-row ${senderClass}`;
+
+    const bubble = document.createElement('div');
+    bubble.className = 'chat-bubble';
+    bubble.textContent = messageObj.text || '[消息渲染失败]';
+    bubble.style.cssText = 'background:#fff3cd; color:#856404; border-left:3px solid #ffc107;';
+
+    const messageContent = document.createElement('div');
+    messageContent.className = 'message-content';
+    messageContent.appendChild(bubble);
+
+    row.appendChild(messageContent);
+    return row;
+}
+
 
 
 // ✅ 新增：降级函数
