@@ -1841,7 +1841,7 @@ body.fullscreen-enabled {
 }
 
 .modal-overlay {
-    position: absolute;
+    position: fixed;
     top: 0;
     left: 0;
     width: 100%;
@@ -1856,6 +1856,7 @@ body.fullscreen-enabled {
     visibility: hidden;
     transition: opacity 0.3s ease, visibility 0.3s ease;
     backdrop-filter: blur(5px);
+    overscroll-behavior: contain;
 }
 
 .modal-overlay.show {
@@ -9366,3 +9367,11 @@ body.code-scrolling-enabled .code-block-wrapper {
     75% { transform: translateX(5px) rotate(2deg); }
 }
 /* ▲▲▲ CSS代码粘贴结束 ▲▲▲ */
+
+/* 优化触摸响应 */
+.chat-action-btn,
+.attachment-item,
+.action-option {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+}
