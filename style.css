@@ -2268,7 +2268,7 @@ input:checked + .slider:before {
     left: 0;
     width: 100%;
     height: 100%;
-    z-index: 1008;
+    z-index: 1020;
     display: flex;
     flex-direction: column;
     justify-content: flex-end;
@@ -2313,7 +2313,7 @@ input:checked + .slider:before {
     left: 0;
     width: 100%;
     height: 100%;
-    z-index: 1008;
+    z-index: 1020;
     display: flex;
     flex-direction: column;
     justify-content: flex-end;
@@ -6575,6 +6575,20 @@ body.code-scrolling-enabled .code-block-wrapper {
     box-shadow: 0 4px 12px rgba(255, 182, 193, 0.3);
 }
 
+/* ========== 针对 iframe 消息的事件捕获覆盖层 ========== */
+.iframe-event-capture-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10; /* 确保在 iframe 上方 */
+    cursor: pointer; /* 鼠标样式，提示可交互 */
+    background: transparent; /* 完全透明 */
+    pointer-events: auto; /* 关键：始终捕获事件 */
+}
+
+
 /* ========== HTML渲染气泡样式 - 结束 ========== */
 /* ========== 联系人库页面样式 (最终版) ========== */
 .contact-library-page {
@@ -7473,6 +7487,12 @@ body.code-scrolling-enabled .code-block-wrapper {
 
     /* 🔥 关键：默认不拦截事件，允许用户与 iframe 交互 */
     pointer-events: none;
+}
+
+/* 🎯 只在需要时激活事件捕获（例如长按时） */
+/* 这是为了确保在长按检测过程中，iframe 内部的元素不会吞噬事件 */
+.render-bubble .iframe-event-overlay {
+    pointer-events: none; /* 默认关闭 */
 }
 
 /* 🎯 只在需要时激活事件捕获（例如长按时） */

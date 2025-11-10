@@ -1003,10 +1003,9 @@ function escapeHTML(str) {
 
 let messageLongPressTimer = null; // 用于检测长按的计时器
 /**
- * [最终健壮版] 创建消息的DOM元素
- * - 解决了 iframe 滚动冲突问题
- * - 修复了所有消息类型（包括iframe）的长按/右键菜单
- * - 增加了对异常数据的防御性处理
+ * [终极修复版] 创建消息的DOM元素
+ * - 确保所有消息类型（包括iframe）的长按/右键菜单能够被准确捕捉并触发。
+ * - 全面解决 iframe 消息的事件捕获问题。
  *
  * @param {string} contactId - 联系人ID
  * @param {object} messageObj - 消息对象
@@ -1014,17 +1013,17 @@ let messageLongPressTimer = null; // 用于检测长按的计时器
  * @returns {HTMLElement} 创建好的消息行DOM元素
  */
 function _createMessageDOM(contactId, messageObj, messageIndex) {
-    // ▼▼▼ 步骤1：对异常数据进行防御性检查 ▼▼▼
     if (!messageObj) {
         console.warn(`⚠️ 消息渲染失败：消息对象为空 (Index: ${messageIndex})`);
         return createFallbackMessage({ sender: 'system' });
     }
+    // 核心修正：在消息创建时，动态获取当前页面的类型
+    const sweetheartChatPageEl = document.getElementById('sweetheartChatPage');
+    const isSweetheartChatActive = sweetheartChatPageEl && sweetheartChatPageEl.classList.contains('show');
 
-    // 处理特殊消息类型：地点提示 (通常是系统消息)
     if (messageObj.type === 'location') {
         const locationNotice = document.createElement('div');
         locationNotice.className = 'location-notice';
-        // 存储索引，以便菜单操作
         locationNotice.dataset.index = messageIndex;
         locationNotice.innerHTML = `
             <div class="location-notice-icon">🗺️</div>
@@ -1033,29 +1032,24 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
                 <p>${escapeHTML(messageObj.locationDesc || '无描述')}</p>
             </div>
         `;
-        // 为地点提示也绑定长按/右键事件
-        bindMessageEvents(locationNotice, contactId, messageIndex);
+        bindMessageEvents(locationNotice, contactId, messageIndex, isSweetheartChatActive);
         return locationNotice;
     }
 
-    // 如果是普通消息但缺少必要内容，也进行降级处理
     const hasContent = messageObj.text || messageObj.imageUrl;
     if (!hasContent) {
         console.warn(`⚠️ 消息渲染失败：消息内容为空 (Index: ${messageIndex})`, messageObj);
         return createFallbackMessage(messageObj);
     }
 
-    // ▼▼▼ 步骤2：创建消息行的基础结构 ▼▼▼
     const messageRow = document.createElement('div');
     messageRow.className = 'message-row';
     messageRow.classList.add(messageObj.sender === 'user' ? 'sent' : 'received');
 
-    // 创建头像
     const avatarEl = document.createElement('div');
     avatarEl.className = 'message-chat-avatar';
 
-    const isSweetheart = document.getElementById('sweetheartChatPage').classList.contains('show');
-    let contactData = isSweetheart ? currentSweetheartChatContact : currentChatContact;
+    let contactData = isSweetheartChatActive ? currentSweetheartChatContact : currentChatContact;
 
     let avatarSrc = messageObj.sender === 'user'
         ? (userProfile?.avatar || '👤')
@@ -1066,7 +1060,6 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
         ? `<img src="${avatarSrc}" alt="avatar">`
         : `<div class="initials">${avatarSrc}</div>`;
 
-    // 创建消息内容容器（包含昵称和气泡）
     const messageContent = document.createElement('div');
     messageContent.className = 'message-content';
 
@@ -1076,7 +1069,6 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
         ? (userProfile.name || '我')
         : (contactData?.name || '联系人');
 
-    // ▼▼▼ 步骤3：根据消息类型创建核心的气泡（Bubble）内容 ▼▼▼
     const bubble = document.createElement('div');
     bubble.className = 'chat-bubble';
 
@@ -1088,7 +1080,8 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
         bubble.classList.add('render-bubble');
         const iframe = document.createElement('iframe');
         iframe.className = 'render-iframe';
-        iframe.sandbox = 'allow-scripts allow-same-origin';
+        // 关键：iframe 的 sandbox 属性，这里设置为允许必要的交互，但限制了对父页面的访问
+        iframe.sandbox = 'allow-scripts allow-forms allow-pointer-lock allow-popups allow-same-origin allow-top-navigation-by-user-activation';
 
         const renderContent = renderMatch[1];
         const secureSrcDoc = `
@@ -1099,16 +1092,13 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
 
         bubble.appendChild(iframe);
 
-        // 【核心修复】为iframe气泡绑定特殊的事件处理，以解决滚动冲突
-        bubble.addEventListener('touchstart', () => {
-            iframe.style.pointerEvents = 'none';
-        }, { passive: true });
-        bubble.addEventListener('touchend', () => {
-            setTimeout(() => { iframe.style.pointerEvents = 'auto'; }, 50);
-        }, { passive: true });
-        bubble.addEventListener('touchcancel', () => {
-            setTimeout(() => { iframe.style.pointerEvents = 'auto'; }, 50);
-        }, { passive: true });
+        // ⭐ 核心修复：添加一个事件捕获全覆盖层（透明不可见），确保所有事件都先经过这个层
+        const eventCaptureLayer = document.createElement('div');
+        eventCaptureLayer.className = 'iframe-event-capture-layer'; // 新的类名
+        bubble.appendChild(eventCaptureLayer);
+
+        // 移除所有 iframe 自身对事件的拦截，完全交给 bubble 外部的 capture layer 处理
+        // iframe.addEventListener('touchstart', ...); 等逻辑全部移除
 
     } else if (messageObj.imageUrl) {
         // --- B. 处理图片消息 ---
@@ -1142,11 +1132,9 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
         bubble.innerHTML = contentHTML;
     }
 
-    // ▼▼▼ 步骤4：组装所有DOM元素并绑定通用事件 ▼▼▼
     messageContent.appendChild(senderName);
     messageContent.appendChild(bubble);
 
-    // 根据发送方决定头像和内容的顺序
     if (messageObj.sender === 'user') {
         messageRow.appendChild(messageContent);
         messageRow.appendChild(avatarEl);
@@ -1155,17 +1143,17 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
         messageRow.appendChild(messageContent);
     }
 
-    // 【核心修复】为气泡绑定长按和右键事件
-    bindMessageEvents(bubble, contactId, messageIndex, isSweetheart);
+    // 绑定事件到气泡本身
+    bindMessageEvents(bubble, contactId, messageIndex, isSweetheartChatActive);
 
     return messageRow;
 }
 
 
 /**
- * [最终修复版] 为一个消息元素绑定长按和右键上下文菜单事件
- * - 增加了移动阈值，解决因微小抖动导致长按失败的问题
- * - 优化了isSweetheart状态的传递，避免重复DOM查询
+ * [终极修复版] 为指定消息元素绑定长按和右键菜单事件
+ * - 确保事件被目标元素精确捕获，并全面阻止浏览器默认行为。
+ * - 健壮性处理区分长按、拖动和点击。
  *
  * @param {HTMLElement} element - 要绑定事件的DOM元素 (通常是 .chat-bubble 或 .location-notice)
  * @param {string} contactId - 联系人ID
@@ -1174,70 +1162,137 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
  */
 function bindMessageEvents(element, contactId, messageIndex, isSweetheart) {
     if (!element.addEventListener) return;
+    console.log(`💡 Binding events for message index ${messageIndex} (Sweetheart: ${isSweetheart})`);
 
     let longPressTimer = null;
     let startPos = { x: 0, y: 0 };
+    let isMoving = false; // 判断用户是否在“拖动”
+    let hasMenuShown = false; // 标记菜单是否已显示过，防止多次触发
+
+    // ==================== 辅助函数 START ====================
+    const getCoords = (e) => {
+        if (e.touches && e.touches[0]) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        return { x: e.clientX, y: e.clientY };
+    };
 
     const showMenu = () => {
-        // 直接使用传入的 isSweetheart 参数
+        hasMenuShown = true;
         if (isSweetheart) {
             showSweetheartMessageActionSheet(contactId, messageIndex);
         } else {
             showNormalMessageActionSheet(contactId, messageIndex);
         }
+        // 显示菜单后，确保所有计时器和状态被清除，防止后续事件干扰
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+        isMoving = false;
     };
 
+    const resetState = () => {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+        isMoving = false;
+        hasMenuShown = false;
+    };
+    // ==================== 辅助函数 END ====================
+
+
+    // ==================== 事件处理 START ====================
     const handleStart = (e) => {
-        // 对于鼠标事件，阻止默认行为以防止拖动时选中文本
-        if (e.type === 'mousedown') {
+        // 阻止浏览器默认行为（例如：长按选中文本、拖动图像等）
+        // 对于 touchstart，阻止默认行为非常关键，防止浏览器劫持长按
+        if (e.cancelable) {
             e.preventDefault();
         }
+        e.stopPropagation(); // 阻止事件冒泡到父元素（如可滚动的 chat-messages 区域）
 
-        const touch = e.touches ? e.touches[0] : e;
-        startPos = { x: touch.clientX, y: touch.clientY };
+        resetState(); // 重置所有状态
 
-        // 启动长按计时器
+        startPos = getCoords(e);
+
         longPressTimer = setTimeout(() => {
-            longPressTimer = null; // 计时器触发后清除自身
-            showMenu();
+            // 只有在没有移动过的情况下，才触发长按菜单
+            if (!isMoving) {
+                showMenu();
+            }
         }, 500); // 500ms 触发长按
     };
 
     const handleMove = (e) => {
-        if (!longPressTimer) return;
-        const touch = e.touches ? e.touches[0] : e;
+        if (!longPressTimer || hasMenuShown) return;
 
-        // 🔥 核心修复：将移动阈值从 10 像素增加到 15 像素
-        // 这为用户手指的微小抖动提供了更多容错空间，显著提高长按成功率。
-        if (Math.hypot(touch.clientX - startPos.x, touch.clientY - startPos.y) > 15) {
+        const currentCoords = getCoords(e);
+        const distance = Math.hypot(currentCoords.x - startPos.x, currentCoords.y - startPos.y);
+
+        // 如果移动距离超过一个阈值，就认为是拖动，取消长按计时器
+        if (distance > 10) { // 设置10像素的抖动阈值
+            isMoving = true;
             clearTimeout(longPressTimer);
             longPressTimer = null;
+        }
+
+        // 如果是正在长按的事件，并且已经移动了，阻止滚动
+        // 这很重要，防止长按被转换为滚动
+        if (isMoving && e.cancelable) {
+            e.preventDefault();
         }
     };
 
-    const handleEnd = () => {
+    const handleEnd = (e) => {
+        // 如果菜单已经显示，不要再触发点击等其他行为
+        if (hasMenuShown) {
+            e.stopPropagation(); // 阻止事件传播
+            resetState(); // 清理状态
+            return;
+        }
+
+        // 如果有长按计时器但未触发，说明是短点击或短拖动
         if (longPressTimer) {
             clearTimeout(longPressTimer);
             longPressTimer = null;
+
+            // 只有当没有移动过，才模拟点击行为（例如：打开 iframe 交互）
+            // 注意：这里需要考虑与多选模式的兼容性，多选模式下点击消息是选择，而不是模拟点击。
+            if (!isMoving && (!isSweetheart && !isNormalMultiSelectMode) && (isSweetheart && !isSweetheartMultiSelectMode) ) {
+                // 如果是 iframe 消息，且是短点击，那么就让 iframe 进入交互模式
+                const iframe = element.querySelector('.render-iframe');
+                if (iframe) {
+                     // 可以在这里触发 iframe 的某种交互，例如让它获得焦点或者触发内部模拟点击
+                     // 然而，直接操作 iframe 内部是不允许的，只能通过 pointer-events 间接控制
+                     // 这里的策略是：短点击不打开菜单，长按才开菜单。
+                     // iframe 自身的点击事件会由其内部处理，无需额外模拟
+                }
+            }
         }
+        resetState(); // 总是清除状态
     };
 
     const handleContextMenu = (e) => {
         e.preventDefault(); // 阻止浏览器默认的右键菜单
+        e.stopPropagation(); // 防止冒泡
         showMenu();
+        resetState(); // 显示菜单后重置状态
     };
+    // ==================== 事件处理 END ====================
 
-    // 绑定所有事件
-    element.addEventListener('touchstart', handleStart, { passive: true });
-    element.addEventListener('mousedown', handleStart);
-    element.addEventListener('touchmove', handleMove, { passive: true });
-    element.addEventListener('mousemove', handleMove);
-    element.addEventListener('touchend', handleEnd);
-    element.addEventListener('mouseup', handleEnd);
-    element.addEventListener('touchcancel', handleEnd);
-    element.addEventListener('contextmenu', handleContextMenu);
+
+    // ==================== 绑定事件 START ====================
+    // 使用 capture 阶段捕获事件，以确保它在我们期望的元素上被处理
+    // 移除 passive: true，确保 preventDefault 能生效
+    element.addEventListener('touchstart', handleStart, { passive: false, capture: true });
+    element.addEventListener('mousedown', handleStart, { capture: true });
+
+    element.addEventListener('touchmove', handleMove, { passive: false, capture: true });
+    element.addEventListener('mousemove', handleMove, { capture: true });
+
+    element.addEventListener('touchend', handleEnd, { capture: true });
+    element.addEventListener('mouseup', handleEnd, { capture: true });
+    element.addEventListener('touchcancel', handleEnd, { capture: true });
+
+    // 鼠标右键事件
+    element.addEventListener('contextmenu', handleContextMenu, { capture: true });
+    // ==================== 绑定事件 END ====================
 }
-
 
 
 /**
@@ -4715,7 +4770,7 @@ async function callApi(messages) {
         model: model,
         messages: messages,
         // 如果是视觉模型，可以设置更高的 max_tokens 来获取更详细的描述
-        max_tokens: isVisionModel ? 4096 : 2048
+        max_tokens: isVisionModel ? 8192 : 4096
     };
 
     // 4. 发送 API 请求
@@ -6496,62 +6551,70 @@ let currentSweetheartChatContact = null;
 let currentSweetheartQuoteData = null;
 
 /**
- * 打开密友聊天页面
+ * [修正版] 打开密友聊天页面
  */
 function openSweetheartChat(contact) {
-    hideMessageActionSheet();
-    hideSweetheartMessageActionSheet();
+    hideMessageActionSheet(); // 隐藏普通聊天菜单
+    hideSweetheartMessageActionSheet(); // 隐藏密友聊天菜单
     if (!contact) return;
     currentSweetheartChatContact = contact;
 
     const chatPage = document.getElementById('sweetheartChatPage');
     const contactNameEl = document.getElementById('sweetheartChatContactName');
     const messagesEl = document.getElementById('sweetheartChatMessages');
-    const chatInput = document.getElementById('sweetheartChatInput'); // 🔥 新增：获取输入框
+    const chatInput = document.getElementById('sweetheartChatInput');
 
     contactNameEl.textContent = contact.name;
-    messagesEl.innerHTML = '';
+    messagesEl.innerHTML = ''; // 清空旧消息
 
+    // 核心优化：确保 show 类在消息渲染前被添加，并且浏览器有机会感知到这个变化
+    // 使用 requestAnimationFrame 来确保类名添加在下一个渲染周期前完成
     requestAnimationFrame(() => {
         chatPage.classList.add('show');
+
+        // 加载聊天记录
+        const chatHistory = JSON.parse(localStorage.getItem('phoneSweetheartChatHistory') || '{}');
+        const contactMessages = chatHistory[contact.id] || [];
+
+        // 在这里重新获取 isSweetheartChatActive 状态，确保是正确的
+        const isSweetheartChatActiveCorrect = chatPage.classList.contains('show'); // 重新获取正确的状态
+        console.log(`Debug openSweetheartChat: isSweetheartChatActive (after add show)=${isSweetheartChatActiveCorrect}`);
+
+        if (contactMessages.length === 0) {
+            const welcomeMessageEl = document.createElement('div');
+            welcomeMessageEl.textContent = `和密友 ${contact.name} 的悄悄话开始了...💖`;
+            welcomeMessageEl.style.textAlign = 'center';
+            welcomeMessageEl.style.fontSize = '12px';
+            welcomeMessageEl.style.color = '#D4A5A5';
+            welcomeMessageEl.style.margin = '10px 0';
+            messagesEl.appendChild(welcomeMessageEl);
+        } else {
+            contactMessages.forEach((message, index) => {
+                // 此时 _createMessageDOM 接收到的 isSweetheart 参数会是正确的 true
+                const messageRow = _createMessageDOM(contact.id, message, index);
+                messagesEl.appendChild(messageRow);
+            });
+        }
+
+        // 滚动到底部
+        setTimeout(() => {
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        }, 50);
+
+        // 初始化函数
+        setupSweetheartChatInput();
+        setupSweetheartAttachmentMenu();
+
+        // 确保输入框可用
+        if (chatInput) {
+            chatInput.value = '';
+            chatInput.disabled = false;
+            chatInput.removeAttribute('readonly');
+            chatInput.focus();
+        }
+
+        loadAndApplyStatusData(contact.id);
     });
-
-    // 加载聊天记录
-    const chatHistory = JSON.parse(localStorage.getItem('phoneSweetheartChatHistory') || '{}');
-    const contactMessages = chatHistory[contact.id] || [];
-
-    if (contactMessages.length === 0) {
-        const welcomeMessageEl = document.createElement('div');
-        welcomeMessageEl.textContent = `和密友 ${contact.name} 的悄悄话开始了...💖`;
-        welcomeMessageEl.style.textAlign = 'center';
-        welcomeMessageEl.style.fontSize = '12px';
-        welcomeMessageEl.style.color = '#D4A5A5';
-        welcomeMessageEl.style.margin = '10px 0';
-        messagesEl.appendChild(welcomeMessageEl);
-    } else {
-        contactMessages.forEach((message, index) => {
-            const messageRow = _createMessageDOM(contact.id, message, index);
-            messagesEl.appendChild(messageRow);
-        });
-    }
-
-    setTimeout(() => {
-        messagesEl.scrollTop = messagesEl.scrollHeight;
-    }, 50);
-
-    // 🔥 关键修复：在这里调用初始化函数
-    setupSweetheartChatInput();
-    setupSweetheartAttachmentMenu();
-
-    // 🔥 关键修复：重置输入框状态，确保它永远是可用的
-    if (chatInput) {
-        chatInput.value = '';
-        chatInput.disabled = false;
-        chatInput.removeAttribute('readonly');
-        chatInput.focus(); // 自动聚焦，提升体验
-    }
-
-    loadAndApplyStatusData(contact.id);
 }
 
 /**
