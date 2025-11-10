@@ -4770,7 +4770,7 @@ async function callApi(messages) {
         model: model,
         messages: messages,
         // 如果是视觉模型，可以设置更高的 max_tokens 来获取更详细的描述
-        max_tokens: isVisionModel ? 8192 : 4096
+        max_tokens: isVisionModel ? 16384 : 8192
     };
 
     // 4. 发送 API 请求
