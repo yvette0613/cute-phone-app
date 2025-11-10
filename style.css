@@ -3570,7 +3570,7 @@ body.code-scrolling-enabled .code-block-wrapper {
     height: 100%;
     background: rgba(161, 136, 127, 0.5);
     z-index: 1020;
-    display: flex;
+    display: none;
     justify-content: center;
     align-items: center;
     padding: 20px;
@@ -3583,6 +3583,7 @@ body.code-scrolling-enabled .code-block-wrapper {
 #sweetheartCardModal.show {
     opacity: 1;
     visibility: visible;
+    display: flex;
 }
 
 /* 卡片主体 */

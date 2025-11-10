@@ -321,6 +321,8 @@ function openSweetheartCardModal() {
     document.getElementById('sweetheart-mask-arrow').classList.remove('open');
 
 
+    document.getElementById('sweetheartCardModal').style.display = 'flex'; // 先显示容器再触发动画
+    document.getElementById('sweetheartCardModal').classList.add('show');
     // 显示弹窗
     document.getElementById('sweetheartCardModal').classList.add('show');
 }
@@ -329,9 +331,14 @@ function openSweetheartCardModal() {
  * 关闭密友角色卡弹窗
  */
 function closeSweetheartCardModal() {
-    document.getElementById('sweetheartCardModal').classList.remove('show');
-    currentEditingSweetheartId = null;
+    const modal = document.getElementById('sweetheartCardModal');
+    modal.classList.remove('show');
+    // 动画结束后彻底隐藏
+    setTimeout(() => {
+        modal.style.display = 'none';
+    }, 300); // 300ms 对应 CSS 过渡时间
 }
+
 
 /**
  * 打开头像选择器
