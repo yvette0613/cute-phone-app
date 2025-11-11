@@ -1055,7 +1055,6 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
 
         // 3. 创建红包气泡并绑定事件
         const bubble = createRedPacketBubble(messageObj);
-        bubble.onclick = () => handleRedPacketClick(contactId, messageIndex);
 
         // 4. 【核心】将气泡放入 message-content 容器
         messageContent.appendChild(bubble);
@@ -1294,6 +1293,13 @@ function bindMessageEvents(element, contactId, messageIndex, isSweetheart) {
         // 如果有长按计时器但未触发，说明是短点击或短拖动
         if (longPressTimer) {
             clearTimeout(longPressTimer);
+            if (!isMoving) { // 确保是点击，而不是滑动
+                if (element.classList.contains('red-packet-bubble')) {
+                    // 如果点击的是红包，就调用开红包函数
+                    handleRedPacketClick(contactId, messageIndex);
+                }
+                // 这里可以为其他类型的元素添加点击逻辑...
+            }
             longPressTimer = null;
 
             // 只有当没有移动过，才模拟点击行为（例如：打开 iframe 交互）
