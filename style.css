@@ -8309,47 +8309,47 @@ body.code-scrolling-enabled .code-block-wrapper {
 }
 
 .icon-database {
-    background-image: url('https://cdn-icons-png.flaticon.com/512/1265/1265492.png');
+    background-image: url('https://s3plus.meituan.net/opapisdk/op_ticket_1_5677168484_1762885229487_qdqqd_1tiq2h.png');
 }
 
 .icon-fullscreen {
-    background-image: url('https://cdn-icons-png.flaticon.com/512/9348/9348106.png');
+    background-image: url('https://kycloud4.koyoo.cn/202511127acfa202511120219417826.png');
 }
 
 .icon-storage {
-    background-image: url('https://cdn-icons-png.flaticon.com/512/1198/1198369.png');
+    background-image: url('https://static.eeo.cn/upload/images/20251112/b1d57cfe371561654181.png');
 }
 
 .icon-contacts {
-    background-image: url('https://cdn-icons-png.flaticon.com/512/3781/3781907.png');
+    background-image: url('https://kycloud4.koyoo.cn/20251112fc1d4202511120222082324.png');
 }
 
 .icon-mask {
-    background-image: url('https://cdn-icons-png.flaticon.com/512/3233/3233488.png');
+    background-image: url('https://static.eeo.cn/upload/file/20251112/1762884823848355.png');
 }
 
 .icon-memory {
-    background-image: url('https://cdn-icons-png.flaticon.com/512/2641/2641261.png');
+    background-image: url('https://static.eeo.cn/upload/images/20251112/130697f11739d9c51667.png');
 }
 
 .icon-beautify {
-    background-image: url('https://cdn-icons-png.flaticon.com/512/1214/1214310.png');
+    background-image: url('https://kycloud4.koyoo.cn/202511129f0ea202511120216506324.png');
 }
 
 .icon-bubble {
-    background-image: url('https://cdn-icons-png.flaticon.com/512/134/134796.png');
+    background-image: url('https://www.yn12377.cn/jubao/upload/smjb/2025/11/12/83b37e19fd754b9abab38a2d15649c99.png');
 }
 
 .icon-widget {
-    background-image: url('https://cdn-icons-png.flaticon.com/512/2089/2089158.png');
+    background-image: url('https://yanfa-upload.oss-cn-zhangjiakou.aliyuncs.com/images/20251112/1762885109_wqbs_tpzb.png');
 }
 
 .icon-floatball {
-    background-image: url('https://cdn-icons-png.flaticon.com/512/7798/7798822.png');
+    background-image: url('https://e3f49eaa46b57.cdn.sohucs.com/2025/11/12/2/8/MTAwMTE0XzE3NjI4ODQ1MzkwNDY=.png');
 }
 
 .icon-danger {
-    background-image: url('https://cdn-icons-png.flaticon.com/512/3221/3221803.png');
+    background-image: url('https://file.zhuyitai.com/feedback/202511/12/ad03506e64f04510b9ab6e85c5dff324.png');
 }
 
 /*
@@ -9396,3 +9396,335 @@ body.code-scrolling-enabled .code-block-wrapper {
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
 }
+/* ▼▼▼ 粘贴以下所有CSS代码 ▼▼▼ */
+
+/*
+============================
+ 红包功能 - 样式
+============================
+*/
+
+/* 1. 聊天气泡中的红包样式 */
+.red-packet-bubble {
+    background-color: #FA9D3B; /* 微信红包的橙色 */
+    color: white;
+    padding: 12px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 220px;
+    transition: background-color 0.3s;
+}
+
+.red-packet-bubble.opened {
+    background-color: #FAD0A3; /* 打开后的浅橙色 */
+    cursor: default;
+}
+
+.red-packet-icon {
+    font-size: 36px;
+    flex-shrink: 0;
+}
+
+.red-packet-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.red-packet-greeting {
+    font-size: 14px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.red-packet-type {
+    font-size: 12px;
+    margin-top: 4px;
+    padding-top: 4px;
+    border-top: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* 2. 发红包的弹窗样式 */
+.red-packet-creator {
+    width: 100%;
+    max-width: 350px;
+    background: #F7F7F7;
+    border-radius: 12px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    animation: rpModalIn 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+@keyframes rpModalIn {
+    from { transform: scale(0.9); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
+
+.rp-creator-header {
+    position: relative;
+    text-align: center;
+    padding: 16px;
+}
+
+.rp-creator-close {
+    position: absolute;
+    left: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 20px;
+    color: #888;
+    cursor: pointer;
+}
+
+.rp-creator-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+}
+
+.rp-creator-body {
+    padding: 16px;
+    background: white;
+}
+
+.rp-amount-field, .rp-greeting-field {
+    border-bottom: 1px solid #F0F0F0;
+    padding: 16px 0;
+}
+
+.rp-amount-field {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.rp-amount-label {
+    font-size: 16px;
+    color: #333;
+}
+
+.rp-amount-input {
+    flex: 1;
+    border: none;
+    font-size: 24px;
+    text-align: right;
+    font-weight: bold;
+}
+.rp-amount-input:focus, .rp-greeting-input:focus {
+    outline: none;
+}
+
+.rp-amount-unit {
+    font-size: 16px;
+    color: #333;
+}
+
+.rp-greeting-input {
+    width: 100%;
+    border: none;
+    background: transparent;
+    font-size: 15px;
+    padding: 8px 0;
+}
+
+.rp-creator-footer {
+    padding: 30px 16px;
+    text-align: center;
+}
+
+.rp-display-amount {
+    font-size: 40px;
+    font-weight: 300;
+    color: #000;
+    margin-bottom: 24px;
+}
+.rp-display-amount span {
+    font-weight: 500;
+}
+
+.rp-send-btn {
+    width: 80%;
+    padding: 14px;
+    border: none;
+    border-radius: 8px;
+    background: #E55743;
+    color: white;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.rp-send-btn.disabled {
+    background: #FFAD9F;
+    cursor: not-allowed;
+}
+
+/* 3. 开红包的弹窗样式 */
+#redPacketOpenModal {
+    background: transparent;
+    backdrop-filter: none;
+}
+.rp-opener-backdrop {
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(5px);
+    z-index: 5;
+}
+
+.rp-opener-card {
+    position: relative;
+    z-index: 10;
+    width: 280px;
+    height: 480px;
+    background: linear-gradient(180deg, #E55845 0%, #D84B38 100%);
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+    transform: translateY(-100vh);
+    animation: rpOpenerFall 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes rpOpenerFall {
+    to { transform: translateY(0); }
+}
+
+.rp-cover, .rp-details {
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px;
+    transition: opacity 0.5s ease;
+}
+
+.rp-cover::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 120px;
+    background: linear-gradient(180deg, #D4422D 0%, #D84B38 100%);
+    border-radius: 0 0 50% 50% / 0 0 10% 10%;
+}
+
+.rp-sender-info {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: 60px;
+}
+
+.rp-sender-avatar {
+    width: 54px; height: 54px;
+    border-radius: 8px;
+    background: #fff;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+.rp-sender-avatar img, .rp-sender-avatar span {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    font-size: 28px;
+    display: flex; align-items: center; justify-content: center;
+}
+
+.rp-sender-name {
+    font-size: 16px;
+    color: #F8D69A;
+}
+
+.rp-greeting {
+    position: relative;
+    z-index: 1;
+    margin-top: 24px;
+    font-size: 22px;
+    color: #F8D69A;
+    font-weight: 500;
+}
+
+/* 用这段新的CSS替换旧的 .rp-open-btn 样式 */
+.rp-open-btn {
+    position: absolute;      /* 1. 改为绝对定位 */
+    z-index: 20;             /* 2. 赋予一个非常高的层级 */
+    bottom: 90px;            /* 3. 直接定位在底部 */
+    left: 50%;               /* 4. 水平居中 */
+    transform: translateX(-50%); /* 5. 精确水平居中 */
+
+    /* 以下样式保持不变，但为了完整性一并提供 */
+    width: 90px;
+    height: 90px;
+    background: #F8D69A;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 36px;
+    color: #A9622A;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 6px 15px rgba(0,0,0,0.2), inset 0 2px 3px rgba(255,255,255,0.4);
+}
+
+.rp-open-btn.spinning {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* 打开后的样式 */
+.rp-opener-card.is-opened .rp-cover {
+    opacity: 0;
+    pointer-events: none;
+}
+.rp-opener-card.is-opened .rp-details {
+    opacity: 1;
+}
+
+.rp-details {
+    opacity: 0;
+    background: #F7F7F7;
+    transition-delay: 0.3s;
+}
+
+.rp-details-amount {
+    margin-top: 80px;
+    font-size: 50px;
+    font-weight: 500;
+    color: #333;
+}
+.rp-details-amount span:last-child {
+    font-size: 16px;
+    margin-left: 4px;
+}
+
+.rp-details-greeting {
+    margin-top: 12px;
+    font-size: 16px;
+    color: #888;
+}
+
+.rp-details-tip {
+    position: absolute;
+    bottom: 24px;
+    font-size: 14px;
+    color: #5583A8;
+    cursor: pointer;
+}
+
+/* ▲▲▲ CSS代码粘贴结束 ▲▲▲ */

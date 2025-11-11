@@ -1329,6 +1329,11 @@
                             <div class="attachment-icon">🗺️</div>
                             <div class="attachment-label">地图</div>
                         </div>
+                        <!-- 在这里添加新的红包功能 -->
+                        <div class="attachment-item" id="sweetheartSendRedPacketBtn">
+                            <div class="attachment-icon">🧧</div>
+                            <div class="attachment-label">红包</div>
+                        </div>
                     </div>
                     <input type="file" id="sweetheartFileInput" style="display: none;">
                     <input type="file" id="sweetheartImageInput" accept="image/*" style="display: none;">
@@ -2062,15 +2067,60 @@
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+    <!-- 1. 发红包的弹窗 -->
+    <div class="modal-overlay" id="redPacketModal">
+        <div class="red-packet-creator">
+            <div class="rp-creator-header">
+                <span class="rp-creator-close" onclick="closeRedPacketModal()">✕</span>
+                <span class="rp-creator-title">发红包</span>
+            </div>
+            <div class="rp-creator-body">
+                <div class="rp-amount-field">
+                    <span class="rp-amount-label">金额</span>
+                    <input type="number" id="rpAmountInput" class="rp-amount-input" placeholder="0.00">
+                    <span class="rp-amount-unit">元</span>
+                </div>
+                <div class="rp-greeting-field">
+                    <input type="text" id="rpGreetingInput" class="rp-greeting-input" placeholder="恭喜发财，大吉大利！">
+                </div>
+            </div>
+            <div class="rp-creator-footer">
+                <div class="rp-display-amount">￥<span id="rpDisplayAmount">0.00</span></div>
+                <button id="rpSendBtn" class="rp-send-btn disabled" onclick="sendRedPacket()">塞钱进红包</button>
             </div>
         </div>
-        <!-- ▼▼▼ 在这里粘贴新增的错误提示框HTML ▼▼▼ -->
-        <div class="modal-overlay error-modal" id="errorModal">
-            <div class="modal-content">
-                <div class="error-icon">⚠️</div>
-                <h3 id="errorModalTitle">操作失败</h3>
-                <p id="errorModalMessage">出现未知错误。</p>
+    </div>
+    <!-- 2. 开红包的动画弹窗 -->
+    <div class="modal-overlay" id="redPacketOpenModal">
+        <div class="rp-opener-backdrop" onclick="closeRedPacketOpener()"></div>
+        <div class="rp-opener-card" id="rpOpenerCard">
+            <!-- 红包封面 (未打开时) -->
+            <div class="rp-cover">
+                <div class="rp-sender-info">
+                    <div class="rp-sender-avatar" id="rpOpenerAvatar"></div>
+                    <div class="rp-sender-name" id="rpOpenerSenderName"></div>
+                </div>
+                <div class="rp-greeting" id="rpOpenerGreeting"></div>
+                <div class="rp-open-btn-wrapper">
+                    <div class="rp-open-btn" id="rpOpenBtn" onclick="animateAndOpenPacket()">开</div>
+                </div>
             </div>
+            <!-- 红包详情 (打开后) -->
+            <div class="rp-details">
+                <div class="rp-details-amount"><span id="rpOpenedAmount"></span><span> 元</span></div>
+                <div class="rp-details-greeting" id="rpOpenedGreeting"></div>
+                <div class="rp-details-tip">已存入零钱</div>
+            </div>
+        </div>
+    </div>
+    <!-- ▼▼▼ 在这里粘贴新增的错误提示框HTML ▼▼▼ -->
+    <div class="modal-overlay error-modal" id="errorModal">
+        <div class="modal-content">
+            <div class="error-icon">⚠️</div>
+            <h3 id="errorModalTitle">操作失败</h3>
+            <p id="errorModalMessage">出现未知错误。</p>
         </div>
     </div>
 </div>

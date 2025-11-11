@@ -7,7 +7,7 @@
  */
 function parseAiJsonResponse(rawMessage) {
     if (!rawMessage || typeof rawMessage !== 'string') {
-        return { chatReplyText: '...', statusData: null };
+        return {chatReplyText: '...', statusData: null};
     }
 
     let text = rawMessage.trim();
@@ -802,7 +802,7 @@ function formatMessageText(text) {
     formatted = formatted.replace(/<render>[\s\S]*?<\/render>/g, '');
 
     // 1. 处理代码块（三个反引号）- 不创建复制按钮
-    formatted = formatted.replace(/```(\w*)\n?([\s\S]*?)```/g, function(match, language, code) {
+    formatted = formatted.replace(/```(\w*)\n?([\s\S]*?)```/g, function (match, language, code) {
         const lang = language || 'plaintext';
         const escapedCode = escapeHTML(code.trim());
 
@@ -927,7 +927,7 @@ function createCopyButton(preElement) {
     button.appendChild(span);
 
     // 复制功能
-    button.onclick = async function() {
+    button.onclick = async function () {
         const code = preElement.textContent || preElement.innerText;
 
         try {
@@ -955,7 +955,7 @@ function createCopyButton(preElement) {
 }
 
 // 为所有代码块添加复制按钮
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     // 查找所有代码块
     const codeBlocks = document.querySelectorAll('.code-block-wrapper pre');
 
@@ -965,9 +965,9 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // 如果使用 MutationObserver 监听动态内容
-const observer = new MutationObserver(function(mutations) {
-    mutations.forEach(function(mutation) {
-        mutation.addedNodes.forEach(function(node) {
+const observer = new MutationObserver(function (mutations) {
+    mutations.forEach(function (mutation) {
+        mutation.addedNodes.forEach(function (node) {
             if (node.nodeType === 1) { // Element node
                 const preElements = node.querySelectorAll?.('.code-block-wrapper pre') || [];
                 preElements.forEach(pre => createCopyButton(pre));
@@ -1000,7 +1000,6 @@ function escapeHTML(str) {
 }
 
 
-
 let messageLongPressTimer = null; // 用于检测长按的计时器
 /**
  * [终极修复版] 创建消息的DOM元素
@@ -1015,7 +1014,7 @@ let messageLongPressTimer = null; // 用于检测长按的计时器
 function _createMessageDOM(contactId, messageObj, messageIndex) {
     if (!messageObj) {
         console.warn(`⚠️ 消息渲染失败：消息对象为空 (Index: ${messageIndex})`);
-        return createFallbackMessage({ sender: 'system' });
+        return createFallbackMessage({sender: 'system'});
     }
     // 核心修正：在消息创建时，动态获取当前页面的类型
     const sweetheartChatPageEl = document.getElementById('sweetheartChatPage');
@@ -1034,6 +1033,52 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
         `;
         bindMessageEvents(locationNotice, contactId, messageIndex, isSweetheartChatActive);
         return locationNotice;
+    }
+
+    /* ▼▼▼ 使用这个【绝对修正版】的红包渲染逻辑进行替换 ▼▼▼ */
+    if (messageObj.type === 'red-packet') {
+        const messageRow = document.createElement('div');
+        messageRow.className = 'message-row ' + (messageObj.sender === 'user' ? 'sent' : 'received');
+        messageRow.dataset.timestamp = messageObj.timestamp; // 记录时间戳
+
+        // 1. 【新增】创建正确的头像DOM
+        const avatarEl = document.createElement('div');
+        avatarEl.className = 'message-chat-avatar';
+        const contactData = document.getElementById('sweetheartChatPage').classList.contains('show') ? currentSweetheartChatContact : currentChatContact;
+        const avatarSrc = messageObj.sender === 'user' ? (userProfile?.avatar || '👤') : (contactData?.avatar || '💬');
+        const isUrl = avatarSrc.startsWith('http') || avatarSrc.startsWith('data:');
+        avatarEl.innerHTML = isUrl ? `<img src="${avatarSrc}" alt="avatar">` : `<div class="initials">${avatarSrc}</div>`;
+
+        // 2. 【新增】创建 message-content 容器
+        const messageContent = document.createElement('div');
+        messageContent.className = 'message-content';
+
+        // 3. 创建红包气泡并绑定事件
+        const bubble = createRedPacketBubble(messageObj);
+        bubble.onclick = () => handleRedPacketClick(contactId, messageIndex);
+
+        // 4. 【核心】将气泡放入 message-content 容器
+        messageContent.appendChild(bubble);
+
+        // 5. 【核心】根据发送者，决定头像和内容的顺序
+        if (messageObj.sender === 'user') {
+            messageRow.appendChild(messageContent);
+            messageRow.appendChild(avatarEl);
+        } else {
+            messageRow.appendChild(avatarEl);
+            messageRow.appendChild(messageContent);
+        }
+
+        // 绑定长按等事件到气泡上（保持和其他消息一致的体验）
+        const isSweetheartChatActive = document.getElementById('sweetheartChatPage').classList.contains('show');
+        bindMessageEvents(bubble, contactId, messageIndex, isSweetheartChatActive);
+
+        return messageRow;
+    }
+    /* ▲▲▲ 替换结束 ▲▲▲ */
+
+    if (messageObj.type === 'notice') {
+        return createSystemNotice(messageObj);
     }
 
     const hasContent = messageObj.text || messageObj.imageUrl;
@@ -1165,14 +1210,14 @@ function bindMessageEvents(element, contactId, messageIndex, isSweetheart) {
     console.log(`💡 Binding events for message index ${messageIndex} (Sweetheart: ${isSweetheart})`);
 
     let longPressTimer = null;
-    let startPos = { x: 0, y: 0 };
+    let startPos = {x: 0, y: 0};
     let isMoving = false; // 判断用户是否在“拖动”
     let hasMenuShown = false; // 标记菜单是否已显示过，防止多次触发
 
     // ==================== 辅助函数 START ====================
     const getCoords = (e) => {
-        if (e.touches && e.touches[0]) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
-        return { x: e.clientX, y: e.clientY };
+        if (e.touches && e.touches[0]) return {x: e.touches[0].clientX, y: e.touches[0].clientY};
+        return {x: e.clientX, y: e.clientY};
     };
 
     const showMenu = () => {
@@ -1253,14 +1298,14 @@ function bindMessageEvents(element, contactId, messageIndex, isSweetheart) {
 
             // 只有当没有移动过，才模拟点击行为（例如：打开 iframe 交互）
             // 注意：这里需要考虑与多选模式的兼容性，多选模式下点击消息是选择，而不是模拟点击。
-            if (!isMoving && (!isSweetheart && !isNormalMultiSelectMode) && (isSweetheart && !isSweetheartMultiSelectMode) ) {
+            if (!isMoving && (!isSweetheart && !isNormalMultiSelectMode) && (isSweetheart && !isSweetheartMultiSelectMode)) {
                 // 如果是 iframe 消息，且是短点击，那么就让 iframe 进入交互模式
                 const iframe = element.querySelector('.render-iframe');
                 if (iframe) {
-                     // 可以在这里触发 iframe 的某种交互，例如让它获得焦点或者触发内部模拟点击
-                     // 然而，直接操作 iframe 内部是不允许的，只能通过 pointer-events 间接控制
-                     // 这里的策略是：短点击不打开菜单，长按才开菜单。
-                     // iframe 自身的点击事件会由其内部处理，无需额外模拟
+                    // 可以在这里触发 iframe 的某种交互，例如让它获得焦点或者触发内部模拟点击
+                    // 然而，直接操作 iframe 内部是不允许的，只能通过 pointer-events 间接控制
+                    // 这里的策略是：短点击不打开菜单，长按才开菜单。
+                    // iframe 自身的点击事件会由其内部处理，无需额外模拟
                 }
             }
         }
@@ -1279,18 +1324,18 @@ function bindMessageEvents(element, contactId, messageIndex, isSweetheart) {
     // ==================== 绑定事件 START ====================
     // 使用 capture 阶段捕获事件，以确保它在我们期望的元素上被处理
     // 移除 passive: true，确保 preventDefault 能生效
-    element.addEventListener('touchstart', handleStart, { passive: false, capture: true });
-    element.addEventListener('mousedown', handleStart, { capture: true });
+    element.addEventListener('touchstart', handleStart, {passive: false, capture: true});
+    element.addEventListener('mousedown', handleStart, {capture: true});
 
-    element.addEventListener('touchmove', handleMove, { passive: false, capture: true });
-    element.addEventListener('mousemove', handleMove, { capture: true });
+    element.addEventListener('touchmove', handleMove, {passive: false, capture: true});
+    element.addEventListener('mousemove', handleMove, {capture: true});
 
-    element.addEventListener('touchend', handleEnd, { capture: true });
-    element.addEventListener('mouseup', handleEnd, { capture: true });
-    element.addEventListener('touchcancel', handleEnd, { capture: true });
+    element.addEventListener('touchend', handleEnd, {capture: true});
+    element.addEventListener('mouseup', handleEnd, {capture: true});
+    element.addEventListener('touchcancel', handleEnd, {capture: true});
 
     // 鼠标右键事件
-    element.addEventListener('contextmenu', handleContextMenu, { capture: true });
+    element.addEventListener('contextmenu', handleContextMenu, {capture: true});
     // ==================== 绑定事件 END ====================
 }
 
@@ -1317,7 +1362,6 @@ function createFallbackMessage(messageObj) {
     row.appendChild(messageContent);
     return row;
 }
-
 
 
 // ✅ 新增：降级函数
@@ -1446,7 +1490,6 @@ function copyMessage(contactId, messageIndex) {
     }
     hideMessageActionSheet();
 }
-
 
 
 /**
@@ -2809,7 +2852,7 @@ function initializeSettingsPageListeners() {
         applyFullscreenSetting(savedFullscreenSetting); // 确保 apply 函数能正确处理初始状态
 
         // 添加事件监听
-        fullscreenToggle.addEventListener('change', function() {
+        fullscreenToggle.addEventListener('change', function () {
             applyFullscreenSetting(this.checked);
             localStorage.setItem('fullscreenEnabled', this.checked);
         });
@@ -2824,7 +2867,7 @@ function initializeSettingsPageListeners() {
         applyFloatingBallSetting(savedFloatingBallSetting);
 
         // 添加事件监听
-        floatingBallToggle.addEventListener('change', function() {
+        floatingBallToggle.addEventListener('change', function () {
             applyFloatingBallSetting(this.checked);
             localStorage.setItem('floatingBallEnabled', this.checked);
         });
@@ -2881,6 +2924,7 @@ function closeSettings() {
         console.log("设置页面DOM已从内存中移除。");
     }, 350); // 350ms 对应 CSS 中的 0.35s
 }
+
 function openApiConfig() {
     // 确保先关闭其他可能打开的页面
     document.querySelectorAll('.config-page.show').forEach(page => {
@@ -2893,7 +2937,6 @@ function openApiConfig() {
     apiConfig.classList.add('show');
     renderApiConfigs(); // 确保渲染配置列表
 }
-
 
 
 function closeApiConfig() {
@@ -3142,7 +3185,6 @@ function openBeautify() {
     const currentWallpaper = localStorage.getItem('phoneWallpaper');
     updateWallpaperActiveState(currentWallpaper);
 }
-
 
 
 function closeBeautify() {
@@ -4055,6 +4097,7 @@ function handleMove(e) {
         state.draggedElement.style.transform = `translate(${deltaX}px, ${deltaY}px) scale(1.08)`;
     });
 }
+
 // ▼▼▼ 请将你原来的 handleEnd 函数完整地替换成下面这个版本 ▼▼▼
 
 function handleEnd(e) {
@@ -4283,7 +4326,6 @@ function showPage(pageNum) {
 }
 
 
-
 // ============ 开始：请将这个全新的代码块完整粘贴到你的 <script> 中 ============
 
 /**
@@ -4361,21 +4403,20 @@ function swipeStartHandler(e) {
     // --- 后续的翻页逻辑保持不变 ---
 
     const touch = getTouch(e);
-    state.swipeStart = { x: touch.clientX, time: Date.now() };
+    state.swipeStart = {x: touch.clientX, time: Date.now()};
     state.isSwipingPage = true;
     state.initialTransform = -(state.currentPage - 1) * 50;
 
     pagesWrapper.classList.add('no-transition');
 
     if (e.type === 'touchstart') {
-        document.addEventListener('touchmove', swipeMoveHandler, { passive: false });
+        document.addEventListener('touchmove', swipeMoveHandler, {passive: false});
         document.addEventListener('touchend', swipeEndHandler);
     } else {
         document.addEventListener('mousemove', swipeMoveHandler);
         document.addEventListener('mouseup', swipeEndHandler);
     }
 }
-
 
 
 // 这个函数负责在滑动过程中，通过 rAF 更新页面位置，保证流畅
@@ -4770,7 +4811,7 @@ async function callApi(messages) {
         model: model,
         messages: messages,
         // 如果是视觉模型，可以设置更高的 max_tokens 来获取更详细的描述
-        max_tokens: isVisionModel ? 16384 : 8192
+        max_tokens: isVisionModel ? 8192 : 4096
     };
 
     // 4. 发送 API 请求
@@ -4808,8 +4849,8 @@ async function callApi(messages) {
         return {success: false, message: errorMessage};
     }
 }
-// ========== 结束：替换 callApi 函数 ==========
 
+// ========== 结束：替换 callApi 函数 ==========
 
 
 /**
@@ -4856,6 +4897,7 @@ function addMessageToList() {
     messagesEl.scrollTop = messagesEl.scrollHeight; // 滚动到底部
     inputEl.focus();
 }
+
 /**
  * [全新] 格式化一段历史记录，作为提供给AI的背景上下文
  * @param {Array} history - 要格式化的聊天记录数组
@@ -4884,6 +4926,7 @@ ${formattedDialog}
 ---
 `;
 }
+
 /**
  * 普通聊天 - 获取AI回复（完整版）
  */
@@ -4991,24 +5034,24 @@ async function getAiReply() {
             // 构建符合 Vision API 的多部分 content 数组
             const contentArray = [];
             if (surroundingText) {
-                contentArray.push({ type: 'text', text: surroundingText });
+                contentArray.push({type: 'text', text: surroundingText});
             }
             contentArray.push({
                 type: 'image_url',
-                image_url: { url: imageUrl }
+                image_url: {url: imageUrl}
             });
 
-            messages.push({ role, content: contentArray });
+            messages.push({role, content: contentArray});
         } else {
             // 如果没有图片，或者消息是AI发的，则作为纯文本处理
-            messages.push({ role, content: textContent.replace(/<br>/g, '\n') });
+            messages.push({role, content: textContent.replace(/<br>/g, '\n')});
         }
     });
     // 4. 处理当前输入框中可能存在的新消息 (这部分逻辑不变)
     const userMessage = chatInput.value.trim();
     if (userMessage) {
         simulateSendingMessage(userMessage);
-        messages.push({ role: 'user', content: userMessage });
+        messages.push({role: 'user', content: userMessage});
         chatInput.value = '';
         document.querySelector('.chat-input-area').classList.remove('has-text');
     }
@@ -5021,7 +5064,7 @@ async function getAiReply() {
     }
     // 5. 显示"思考中"气泡并调用API (这部分逻辑不变)
     console.log('📋 [带图识别] - 发送给AI的消息结构：', messages);
-    const thinkingBubble = _createMessageDOM(contactId, { sender: 'contact', text: '...' }, -1);
+    const thinkingBubble = _createMessageDOM(contactId, {sender: 'contact', text: '...'}, -1);
     messagesEl.appendChild(thinkingBubble);
     messagesEl.scrollTop = messagesEl.scrollHeight;
     const result = await callApi(messages);
@@ -5038,7 +5081,7 @@ async function getAiReply() {
         }
         // 遍历每个片段，依次显示为独立的气泡
         for (const segmentText of segments) {
-            const messageObj = { sender: 'contact', text: segmentText.trim() };
+            const messageObj = {sender: 'contact', text: segmentText.trim()};
             const newIndex = saveMessage(contactId, messageObj);
             const messageRow = _createMessageDOM(contactId, messageObj, newIndex);
             messagesEl.appendChild(messageRow);
@@ -5068,7 +5111,7 @@ function saveMessage(contactId, message) {
     }
 
     // ✅ 核心修复：同样地，保存完整的消息对象
-    const messageToSave = { ...message };
+    const messageToSave = {...message};
 
     chatHistory[contactId].push(messageToSave);
 
@@ -5680,7 +5723,8 @@ function setupAttachmentMenu() {
 
 // ========== 开始：用这个【发送后等待回复版】的函数替换旧的 ==========
 /**
- * 初始化密友聊天附件菜单
+ * [最终修复版] 初始化密友聊天附件菜单
+ * - 使用 cloneNode 技巧移除旧的事件监听器，修复重复绑定问题。
  */
 function setupSweetheartAttachmentMenu() {
     const attachmentBtn = document.getElementById('sweetheartShowAttachmentMenuBtn');
@@ -5688,70 +5732,84 @@ function setupSweetheartAttachmentMenu() {
     const fileInput = document.getElementById('sweetheartFileInput');
     const imageInput = document.getElementById('sweetheartImageInput');
 
+    const redPacketBtn = document.getElementById('sweetheartSendRedPacketBtn');
+
     if (!attachmentBtn || !attachmentMenu) {
         console.error('❌ 密友附件菜单元素未找到');
         return;
     }
 
-    // 点击附件按钮显示/隐藏菜单
-    attachmentBtn.addEventListener('click', function(e) {
+    // ▼▼▼ 核心修复：克隆“+”按钮以移除所有旧的 click 事件 ▼▼▼
+    const freshAttachmentBtn = attachmentBtn.cloneNode(true);
+    attachmentBtn.parentNode.replaceChild(freshAttachmentBtn, attachmentBtn);
+    // ▲▲▲ 修复结束 ▲▲▲
+
+    // 现在，我们在“干净”的新按钮上绑定唯一的 click 事件
+    freshAttachmentBtn.addEventListener('click', function (e) {
         e.stopPropagation();
         attachmentMenu.classList.toggle('show');
     });
 
-    // 点击页面其他地方关闭菜单
-    document.addEventListener('click', function(e) {
-        if (!attachmentMenu.contains(e.target) && !attachmentBtn.contains(e.target)) {
+    // --- 其他部分的逻辑保持不变 ---
+
+    document.addEventListener('click', function (e) {
+        if (!attachmentMenu.contains(e.target) && !freshAttachmentBtn.contains(e.target)) {
             attachmentMenu.classList.remove('show');
         }
     });
 
-    // 文件上传
     const uploadFileBtn = document.getElementById('sweetheartUploadFileBtn');
     if (uploadFileBtn && fileInput) {
-        uploadFileBtn.addEventListener('click', function() {
+        uploadFileBtn.addEventListener('click', function () {
             fileInput.click();
             attachmentMenu.classList.remove('show');
         });
     }
 
-    // 图片上传
     const uploadImageBtn = document.getElementById('sweetheartUploadImageBtn');
     if (uploadImageBtn && imageInput) {
-        uploadImageBtn.addEventListener('click', function() {
+        // 为图片上传按钮也进行克隆清理，确保万无一失
+        const freshUploadImageBtn = uploadImageBtn.cloneNode(true);
+        uploadImageBtn.parentNode.replaceChild(freshUploadImageBtn, uploadImageBtn);
+
+        freshUploadImageBtn.addEventListener('click', function () {
             imageInput.click();
             attachmentMenu.classList.remove('show');
         });
 
-        // 图片上传处理
-        imageInput.addEventListener('change', function(e) {
+        // 图片上传处理逻辑保持不变
+        imageInput.addEventListener('change', function (e) {
             const file = e.target.files[0];
             if (file && currentSweetheartChatContact) {
                 const reader = new FileReader();
-                reader.onload = function(event) {
+                reader.onload = function (event) {
                     const messageObj = {
                         sender: 'user',
                         imageUrl: event.target.result,
                         timestamp: Date.now()
                     };
-
                     const contactId = currentSweetheartChatContact.id;
                     const newIndex = saveSweetheartMessage(contactId, messageObj);
-
                     const messagesEl = document.getElementById('sweetheartChatMessages');
                     const messageRow = _createMessageDOM(contactId, messageObj, newIndex);
                     messagesEl.appendChild(messageRow);
                     messagesEl.scrollTop = messagesEl.scrollHeight;
-
                     renderSweetheartList();
                 };
                 reader.readAsDataURL(file);
             }
-            this.value = ''; // 清空，允许重复上传同一文件
+            this.value = '';
         });
     }
 
-    console.log('✅ 密友附件菜单已初始化');
+    if (redPacketBtn) {
+        redPacketBtn.addEventListener('click', function () {
+            attachmentMenu.classList.remove('show'); // 先关掉附件菜单
+            openRedPacketModal(); // 再打开红包弹窗
+        });
+    }
+
+    console.log('✅ 密友附件菜单已初始化 (已清除旧事件)');
 }
 
 
@@ -6513,10 +6571,10 @@ function renderSweetheartList() {
         const contentEl = wrapper.querySelector('.sweetheart-item-content');
         if (contentEl) {
             contentEl.onclick = () => {
-                 if (!wrapper.classList.contains('is-swiped')) {
+                if (!wrapper.classList.contains('is-swiped')) {
                     closeSweetheartList(false);
                     setTimeout(() => openSweetheartChat(contact), 350);
-                 }
+                }
             };
         }
 
@@ -6603,7 +6661,7 @@ function openSweetheartChat(contact) {
 
         // 初始化函数
         setupSweetheartChatInput();
-        setupSweetheartAttachmentMenu();
+
 
         // 确保输入框可用
         if (chatInput) {
@@ -6612,6 +6670,9 @@ function openSweetheartChat(contact) {
             chatInput.removeAttribute('readonly');
             chatInput.focus();
         }
+
+        setupSweetheartChatInput();     // 初始化输入框功能
+        setupSweetheartAttachmentMenu(); // 初始化附件菜单功能
 
         loadAndApplyStatusData(contact.id);
     });
@@ -6629,6 +6690,7 @@ function closeSweetheartChat() {
         openSweetheartList();
     }, 350); // 350ms 与关闭动画的时长一致
 }
+
 // ========== 左滑删除功能 JS (V2 - 兼容鼠标和触摸) 开始 ==========
 
 /**
@@ -6705,8 +6767,8 @@ function addSwipeToDeleteListeners(wrapperElement) {
 
         // 如果只是轻微移动，就当做是误触，不触发点击事件
         if (!hasMoved) {
-             contentElement.style.transform = 'translateX(0px)';
-             return;
+            contentElement.style.transform = 'translateX(0px)';
+            return;
         }
 
         // 阻止 touchend 后的 click 事件
@@ -6728,7 +6790,7 @@ function addSwipeToDeleteListeners(wrapperElement) {
 
     // 同时监听鼠标按下和触摸开始
     contentElement.addEventListener('mousedown', onDragStart);
-    contentElement.addEventListener('touchstart', onDragStart, { passive: true });
+    contentElement.addEventListener('touchstart', onDragStart, {passive: true});
 
 }
 
@@ -6793,7 +6855,7 @@ function toggleSweetheartContactMenu(event) {
  */
 function selectExistingContactForSweetheart() {
     const menu = document.getElementById('sweetheartContactMenu');
-    if(menu) menu.classList.remove('show');
+    if (menu) menu.classList.remove('show');
 
     // 1. 先关闭当前的“密友列表”页面
     // 参数 false 表示我们不是点击返回键，只是临时关闭
@@ -6808,9 +6870,7 @@ function selectExistingContactForSweetheart() {
 }
 
 
-
 // ========== 左滑删除功能 JS 结束 ==========
-
 
 
 /**
@@ -6855,7 +6915,7 @@ function saveSweetheartMessage(contactId, message) {
     }
 
     // ✅ 核心修复：为每条消息添加唯一的 `timestamp`
-    const messageToSave = { ...message, timestamp: Date.now() };
+    const messageToSave = {...message, timestamp: Date.now()};
 
     chatHistory[contactId].push(messageToSave);
 
@@ -6958,7 +7018,7 @@ function saveStatusEditor() {
 
     // 1. 获取当前已保存的状态数据，或创建一个空对象
     const allStatuses = JSON.parse(localStorage.getItem('sweetheartStatuses') || '{}');
-    const currentStatus = allStatuses[currentSweetheartChatContact.id] || { character: {}, user: {} };
+    const currentStatus = allStatuses[currentSweetheartChatContact.id] || {character: {}, user: {}};
 
     // 2. 遍历所有输入框，读取新值并更新UI和数据对象
     modal.querySelectorAll('.status-input').forEach(input => {
@@ -7164,7 +7224,7 @@ The JSON object must have two main keys: "reply" and "status".
         *   All JavaScript code MUST be placed inside a single \`<script>\` tag.
         *   **ABSOLUTELY FORBIDDEN ACTIONS:** You are strictly prohibited from using \`window.top\`, \`window.parent\`, \`document.cookie\`, \`localStorage\`, \`sessionStorage\`, \`alert\`, \`confirm\`, \`prompt\`, or any code that tries to access external resources or the parent document. Your world is confined to the \\\`<render>\\\` block.
         *   Focus on harmless, visually appealing, and romantic creations.
-
+        
     *   **Example 1 (Interactive Heart):**
         \\\`---<render>
 <style> .heart { font-size: 50px; cursor: pointer; transition: transform 0.2s; } .heart:hover { transform: scale(1.3); } </style>
@@ -7209,6 +7269,11 @@ The JSON object must have two main keys: "reply" and "status".
   <p style="text-align: right; margin-top: 30px; color: #777; font-size: 14px;">爱你的____</p>
 </div>
 </render>---\\\`
+    *   **To send a red packet**, you MUST use a special tag format: \`/red-packet/{"amount": "VALUE", "greeting": "MESSAGE"}/\`. **IMPORTANT: All double quotes within the JSON part (e.g., "VALUE", "MESSAGE") MUST be escaped with a backslash if they are part of the \`reply\` string. For example, use \`\\"\` instead of \`"\`.**
+    *   **Example 6 (Sending a Red Packet):**
+        \`---宝宝，给你个惊喜！---/red-packet/{\\"amount\\": \\"5.20\\", \\"greeting\\": \\"爱你哟\\"}/---快点开看看！\`
+        (Note the \`\\"\` for internal quotes. Your AI model should handle this escaping.)
+
 
     *   Your base persona is extremely clingy, affectionate, and possessive. Use terms like "宝宝". Express a high need for physical touch (hugs, kisses).
     *   You MUST NOT use parentheses \`()\` or asterisks \`*\` for actions. All emotions must be conveyed through text and punctuation.
@@ -7442,12 +7507,12 @@ async function getSweetheartAiReply() {
     // --- 步骤 1: 构建发送给AI的消息数组 ---
     const messages = [];
     const systemPrompt = currentChatMode === 'offline' ? OFFLINE_MODE_PROMPT : ENHANCED_PROMPT;
-    messages.push({ role: "system", content: systemPrompt });
+    messages.push({role: "system", content: systemPrompt});
 
     // 添加世界书上下文
     const worldbookContext = gatherWorldbookContext();
     if (worldbookContext) {
-        messages.push({ role: "system", content: worldbookContext });
+        messages.push({role: "system", content: worldbookContext});
     }
 
     // 添加世界设定
@@ -7458,7 +7523,7 @@ async function getSweetheartAiReply() {
             if (world.description) worldSettingText += `描述：${world.description}\n`;
             if (world.rules) worldSettingText += `基本法则：${world.rules}\n`;
             if (world.special) worldSettingText += `特殊设定：${world.special}\n`;
-            messages.push({ role: "system", content: worldSettingText });
+            messages.push({role: "system", content: worldSettingText});
         }
     }
 
@@ -7469,11 +7534,11 @@ async function getSweetheartAiReply() {
     if (currentSweetheartChatContact.occupation) characterSetting += `职业：${currentSweetheartChatContact.occupation}\n`;
     if (currentSweetheartChatContact.history) characterSetting += `过去的经历：${currentSweetheartChatContact.history}\n`;
     if (currentSweetheartChatContact.relationship) characterSetting += `与用户的关系：${currentSweetheartChatContact.relationship}\n`;
-    messages.push({ role: "system", content: characterSetting });
+    messages.push({role: "system", content: characterSetting});
 
     // 添加用户设定
     if (userProfile.persona) {
-        messages.push({ role: "system", content: `[用户设定]\n昵称：${userProfile.name}\n${userProfile.persona}` });
+        messages.push({role: "system", content: `[用户设定]\n昵称：${userProfile.name}\n${userProfile.persona}`});
     }
 
     // 添加绑定的面具
@@ -7505,7 +7570,7 @@ async function getSweetheartAiReply() {
             const textContent = (msg.text || '').replace(/<[^>]+>/g, '[多媒体内容]');
             backgroundInfo += `${sender}: ${textContent}\n`;
         });
-        messages.push({ role: "system", content: backgroundInfo });
+        messages.push({role: "system", content: backgroundInfo});
     }
 
     const chatHistory = JSON.parse(localStorage.getItem('phoneSweetheartChatHistory') || '{}');
@@ -7522,10 +7587,10 @@ async function getSweetheartAiReply() {
                 console.log("🖼️ 顺序处理到一张图片，打包发送...");
                 const contentArray = [];
                 if (userTextBuffer.length > 0) {
-                    contentArray.push({ type: 'text', text: userTextBuffer.join('\n') });
+                    contentArray.push({type: 'text', text: userTextBuffer.join('\n')});
                 }
-                contentArray.push({ type: 'image_url', image_url: { url: msg.imageUrl } });
-                messages.push({ role: 'user', content: contentArray });
+                contentArray.push({type: 'image_url', image_url: {url: msg.imageUrl}});
+                messages.push({role: 'user', content: contentArray});
                 userTextBuffer = []; // 3. 清空缓冲区
                 // 标记图片为“已处理”并立即保存
                 const msgIndex = contactMessages.findIndex(m => m.timestamp === msg.timestamp);
@@ -7540,12 +7605,15 @@ async function getSweetheartAiReply() {
             // 当消息是AI发送时
             // 5. 先“冲刷”缓冲区里用户的文本
             if (userTextBuffer.length > 0) {
-                messages.push({ role: 'user', content: userTextBuffer.join('\n') });
+                messages.push({role: 'user', content: userTextBuffer.join('\n')});
                 userTextBuffer = [];
             }
             // 6. 再添加AI的回复
             if (msg.type === 'location') {
-                messages.push({ role: 'system', content: `[场景变化] 你们来到了【${msg.locationName}】。描述：${msg.locationDesc}`});
+                messages.push({
+                    role: 'system',
+                    content: `[场景变化] 你们来到了【${msg.locationName}】。描述：${msg.locationDesc}`
+                });
             } else if (msg.text) {
                 messages.push({
                     role: 'assistant',
@@ -7553,10 +7621,11 @@ async function getSweetheartAiReply() {
                 });
             }
         }
+
     }
     // 7. 循环结束后，冲刷最后剩余的用户文本
     if (userTextBuffer.length > 0) {
-        messages.push({ role: 'user', content: userTextBuffer.join('\n') });
+        messages.push({role: 'user', content: userTextBuffer.join('\n')});
     }
     // 保存对 isProcessed 标志的修改
     localStorage.setItem('phoneSweetheartChatHistory', JSON.stringify(chatHistory));
@@ -7564,13 +7633,13 @@ async function getSweetheartAiReply() {
     const currentUserInput = chatInput.value.trim();
     if (currentUserInput) {
         // 先在UI上渲染出来
-        const messageObj = { sender: 'user', text: currentUserInput };
+        const messageObj = {sender: 'user', text: currentUserInput};
         const newIndex = saveSweetheartMessage(contactId, messageObj);
         const messageRow = _createMessageDOM(contactId, messageObj, newIndex);
         messagesEl.appendChild(messageRow);
         chatInput.value = '';
         // 再添加到API请求的末尾
-        messages.push({ role: 'user', content: currentUserInput });
+        messages.push({role: 'user', content: currentUserInput});
     }
 
     // --- 步骤 4: 检查并调用API (与旧版相同) ---
@@ -7583,7 +7652,7 @@ async function getSweetheartAiReply() {
 
     // --- 步骤 5: 调用API并处理回复 ---
     console.log('🚀 准备调用API，最终发送结构:', messages);
-    const thinkingBubble = _createMessageDOM(contactId, { sender: 'contact', text: '...' }, -1);
+    const thinkingBubble = _createMessageDOM(contactId, {sender: 'contact', text: '...'}, -1);
     messagesEl.appendChild(thinkingBubble);
     messagesEl.scrollTop = messagesEl.scrollHeight;
     const result = await callApi(messages);
@@ -7593,7 +7662,7 @@ async function getSweetheartAiReply() {
     } else {
         // ▼▼▼▼▼ 核心改造从这里开始 ▼▼▼▼▼
         // 1. 使用我们新的、更强大的解析器
-        const { chatReplyText, statusData } = parseAiJsonResponse(result.message);
+        const {chatReplyText, statusData} = parseAiJsonResponse(result.message);
         // 2. 如果成功解析出 status 数据，就立即更新UI并保存
         if (statusData) {
             updateStatusPopup(statusData);
@@ -7612,20 +7681,68 @@ async function getSweetheartAiReply() {
             segments.push(replyText);
         }
         // 5. 依次渲染每个分段的气泡
+        const redPacketFullRegex = /\/red-packet\/({.*?})\//g; // 匹配整个标签，捕获内部 JSON
         for (const segmentText of segments) {
-            const messageObj = { sender: 'contact', text: segmentText.trim() };
-            // 验证<render>标签的完整性，如果不完整则降级处理
-            if (segmentText.includes('<render>') && !segmentText.includes('</render>')) {
-                console.warn('⚠️ <render> 标签不完整，将其作为普通文本处理');
-                messageObj.text = segmentText.replace(/<render>/g, '[render]');
+            const trimmedSegment = segmentText.trim();
+            let lastIndex = 0;
+            let match;
+            // 尝试在当前 segmentText 中查找所有红包标签
+            while ((match = redPacketFullRegex.exec(trimmedSegment)) !== null) {
+                // 如果在红包标签之前有普通文本，先将其作为普通消息添加
+                if (match.index > lastIndex) {
+                    const preText = trimmedSegment.substring(lastIndex, match.index).trim();
+                    if (preText) {
+                        const messageObj = {sender: 'contact', text: preText};
+                        const newIndex = saveSweetheartMessage(contactId, messageObj);
+                        const messageRow = _createMessageDOM(contactId, messageObj, newIndex);
+                        messagesEl.appendChild(messageRow);
+                        messagesEl.scrollTop = messagesEl.scrollHeight;
+                        await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 400));
+                    }
+                }
+                // 处理捕获到的红包标签
+                try {
+                    // match[1] 应该就是红包标签内部的 JSON 字符串
+                    const packetData = JSON.parse(match[1]);
+                    const redPacketMessageObj = {
+                        sender: 'contact', // AI发的
+                        type: 'red-packet',
+                        content: {
+                            greeting: packetData.greeting || '恭喜发财，大吉大利！',
+                            amount: packetData.amount || '0.00',
+                            status: 'unopened',
+                        },
+                        timestamp: Date.now()
+                    };
+                    const newIndex = saveSweetheartMessage(contactId, redPacketMessageObj);
+                    const messageRow = _createMessageDOM(contactId, redPacketMessageObj, newIndex);
+                    messagesEl.appendChild(messageRow);
+                    messagesEl.scrollTop = messagesEl.scrollHeight;
+                    await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 400));
+                } catch (e) {
+                    console.error("解析AI红包JSON失败，将其作为普通文本处理:", e, "JSON字符串:", match[1]);
+                    // 如果JSON解析失败，整个红包标签就当作普通文本处理
+                    const errorMessageObj = {sender: 'contact', text: match[0]};
+                    const newIndex = saveSweetheartMessage(contactId, errorMessageObj);
+                    const messageRow = _createMessageDOM(contactId, errorMessageObj, newIndex);
+                    messagesEl.appendChild(messageRow);
+                    messagesEl.scrollTop = messagesEl.scrollHeight;
+                    await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 400));
+                }
+                lastIndex = redPacketFullRegex.lastIndex;
             }
-            const newIndex = saveSweetheartMessage(contactId, messageObj);
-            const messageRow = _createMessageDOM(contactId, messageObj, newIndex);
-            messagesEl.appendChild(messageRow);
-            messagesEl.scrollTop = messagesEl.scrollHeight;
-
-            // 增加一个自然的延迟，模拟打字效果
-            await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 400));
+            // 处理红包标签之后可能存在的普通文本
+            if (lastIndex < trimmedSegment.length) {
+                const postText = trimmedSegment.substring(lastIndex).trim();
+                if (postText) {
+                    const messageObj = {sender: 'contact', text: postText};
+                    const newIndex = saveSweetheartMessage(contactId, messageObj);
+                    const messageRow = _createMessageDOM(contactId, messageObj, newIndex);
+                    messagesEl.appendChild(messageRow);
+                    messagesEl.scrollTop = messagesEl.scrollHeight;
+                    await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 400));
+                }
+            }
         }
         // ▲▲▲▲▲ 核心改造到这里结束 ▲▲▲▲▲
     }
@@ -7637,7 +7754,6 @@ async function getSweetheartAiReply() {
     chatInput.disabled = false;
     chatInput.focus();
 }
-
 
 
 /**
@@ -7705,7 +7821,7 @@ function updateStatusPopup(statusData) {
         return;
     }
 
-    const { character, user } = statusData;
+    const {character, user} = statusData;
 
     // 更新角色状态
     if (character) {
@@ -7774,7 +7890,7 @@ function loadAndApplyStatusData(contactId) {
             updateStatusPopup(contactHistory[0]);
         } else {
             // 如果没有历史状态，则清空弹窗的旧数据
-            updateStatusPopup({ character: {}, user: {} });
+            updateStatusPopup({character: {}, user: {}});
         }
     } catch (e) {
         console.error("加载状态历史数据失败:", e);
@@ -8138,7 +8254,8 @@ function hideSweetheartMessageActionSheet() {
 }
 
 /**
- * 初始化密友聊天输入框
+ * [最终修复版] 初始化密友聊天输入框
+ * - 使用 cloneNode 技巧移除旧的事件监听器，防止堆叠。
  */
 function setupSweetheartChatInput() {
     const chatInput = document.getElementById('sweetheartChatInput');
@@ -8149,12 +8266,13 @@ function setupSweetheartChatInput() {
         return;
     }
 
-    // 移除旧的监听器（防止重复绑定）
-    chatInput.replaceWith(chatInput.cloneNode(true));
-    const newInput = document.getElementById('sweetheartChatInput');
+    // ▼▼▼ 核心修复：克隆节点以移除所有旧事件 ▼▼▼
+    const freshChatInput = chatInput.cloneNode(true);
+    chatInput.parentNode.replaceChild(freshChatInput, chatInput);
+    // ▲▲▲ 修复结束 ▲▲▲
 
-    // 监听输入变化，控制发送按钮显示
-    newInput.addEventListener('input', function() {
+    // 现在，我们在“干净”的新输入框上绑定事件
+    freshChatInput.addEventListener('input', function () {
         if (this.value.trim().length > 0) {
             chatInputArea.classList.add('has-text');
         } else {
@@ -8162,15 +8280,14 @@ function setupSweetheartChatInput() {
         }
     });
 
-    // 支持回车键发送
-    newInput.addEventListener('keypress', function(e) {
+    freshChatInput.addEventListener('keypress', function (e) {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             addSweetheartMessageToList();
         }
     });
 
-    console.log('✅ 密友聊天输入框已初始化');
+    console.log('✅ 密友聊天输入框已初始化 (已清除旧事件)');
 }
 
 
@@ -10472,6 +10589,7 @@ function testStatusUpdate() {
 
     alert("✅ 测试完成！请查看状态弹窗是否正确显示。");
 }
+
 // ========================================================================
 // ========== 联系人库 (管理/选择双模式) 功能 - 完整且无省略 ==========
 // ========================================================================
@@ -10539,21 +10657,21 @@ function renderContactLibrary() {
     // 1. 添加密友列表中的源联系人
     sweetheartContactsData.forEach(contact => {
         if (!contact.id.includes('_')) {
-            allContactsMap.set(contact.id, { ...contact, type: 'sweetheart' });
+            allContactsMap.set(contact.id, {...contact, type: 'sweetheart'});
         }
     });
 
     // 2. 添加普通联系人列表中的源联系人
     contactsData.forEach(contact => {
         if (!contact.id.includes('_') && !allContactsMap.has(contact.id)) {
-            allContactsMap.set(contact.id, { ...contact, type: 'normal' });
+            allContactsMap.set(contact.id, {...contact, type: 'normal'});
         }
     });
 
     // 🆕 3. 添加仅存在于库中的联系人
     libraryOnlyContactsData.forEach(contact => {
         if (!allContactsMap.has(contact.id)) {
-            allContactsMap.set(contact.id, { ...contact, type: 'library-only' });
+            allContactsMap.set(contact.id, {...contact, type: 'library-only'});
         }
     });
 
@@ -10637,7 +10755,7 @@ function selectContactFromLibrary(sourceContact) {
     if (!alreadyInGlobalList) {
         // 如果联系人对象不存在于目标数组中，则添加
         // 注意：这里我们应该添加源对象的拷贝，以防未来出现引用问题
-        targetList.push({ ...sourceContact });
+        targetList.push({...sourceContact});
         saveFunc();
         wasAddedToGlobalList = true;
     }
@@ -10674,7 +10792,6 @@ function selectContactFromLibrary(sourceContact) {
 }
 
 // ▲▲▲ 替换结束 ▲▲▲
-
 
 
 // ========== 联系人库多选模式功能 ==========
@@ -10790,8 +10907,8 @@ function batchCloneContacts() {
 
     selectedContactIds.forEach(contactId => {
         let sourceContact = sweetheartContactsData.find(c => c.id === contactId) ||
-                            contactsData.find(c => c.id === contactId) ||
-                            libraryOnlyContactsData.find(c => c.id === contactId);
+            contactsData.find(c => c.id === contactId) ||
+            libraryOnlyContactsData.find(c => c.id === contactId);
 
         if (!sourceContact) return;
 
@@ -10830,12 +10947,12 @@ function cloneContact(sourceContact) {
         status: sourceContact.status,
         avatar: sourceContact.avatar,
         // 密友专属属性（如果有）
-        ...(sourceContact.personality && { personality: sourceContact.personality }),
-        ...(sourceContact.occupation && { occupation: sourceContact.occupation }),
-        ...(sourceContact.catchphrase && { catchphrase: sourceContact.catchphrase }),
-        ...(sourceContact.history && { history: sourceContact.history }),
-        ...(sourceContact.relationship && { relationship: sourceContact.relationship }),
-        ...(sourceContact.memoryRounds && { memoryRounds: sourceContact.memoryRounds }),
+        ...(sourceContact.personality && {personality: sourceContact.personality}),
+        ...(sourceContact.occupation && {occupation: sourceContact.occupation}),
+        ...(sourceContact.catchphrase && {catchphrase: sourceContact.catchphrase}),
+        ...(sourceContact.history && {history: sourceContact.history}),
+        ...(sourceContact.relationship && {relationship: sourceContact.relationship}),
+        ...(sourceContact.memoryRounds && {memoryRounds: sourceContact.memoryRounds}),
         // 绑定的世界书（深拷贝数组）
         boundWorldbooks: sourceContact.boundWorldbooks ? [...sourceContact.boundWorldbooks] : []
     };
@@ -11280,7 +11397,7 @@ async function triggerLocationPlot(event, pinId) {
     // 3.2 静态上下文 - 世界书、世界设定、角色设定
     const worldbookContext = gatherWorldbookContext();
     if (worldbookContext) {
-        messages.push({ role: "system", content: worldbookContext });
+        messages.push({role: "system", content: worldbookContext});
     }
 
     if (currentWorldId) {
@@ -11290,7 +11407,7 @@ async function triggerLocationPlot(event, pinId) {
             if (world.description) worldSettingText += `描述：${world.description}\n`;
             if (world.rules) worldSettingText += `基本法则：${world.rules}\n`;
             if (world.special) worldSettingText += `特殊设定：${world.special}\n`;
-            messages.push({ role: "system", content: worldSettingText });
+            messages.push({role: "system", content: worldSettingText});
         }
     }
 
@@ -11300,10 +11417,10 @@ async function triggerLocationPlot(event, pinId) {
     if (currentSweetheartChatContact.occupation) characterSetting += `职业：${currentSweetheartChatContact.occupation}\n`;
     if (currentSweetheartChatContact.history) characterSetting += `过去的经历：${currentSweetheartChatContact.history}\n`;
     if (currentSweetheartChatContact.relationship) characterSetting += `与用户的关系：${currentSweetheartChatContact.relationship}\n`;
-    messages.push({ role: "system", content: characterSetting });
+    messages.push({role: "system", content: characterSetting});
 
     if (userProfile.persona) {
-        messages.push({ role: "system", content: `[用户设定]\n昵称：${userProfile.name}\n${userProfile.persona}` });
+        messages.push({role: "system", content: `[用户设定]\n昵称：${userProfile.name}\n${userProfile.persona}`});
     }
 
     if (currentSweetheartChatContact.boundMasks && currentSweetheartChatContact.boundMasks.length > 0) {
@@ -11312,7 +11429,7 @@ async function triggerLocationPlot(event, pinId) {
             const mask = masksData.find(m => m.id === maskId);
             if (mask) maskContent += `${mask.name}: ${mask.content}\n\n`;
         });
-        messages.push({ role: "system", content: maskContent });
+        messages.push({role: "system", content: maskContent});
     }
 
     // [全新添加] 获取实时状态和历史状态，并注入提示词
@@ -11337,7 +11454,7 @@ async function triggerLocationPlot(event, pinId) {
             backgroundInfo += `${sender}: ${textContent}\n`;
         });
 
-        messages.push({ role: "system", content: backgroundInfo });
+        messages.push({role: "system", content: backgroundInfo});
     }
 
     // ⭐ 3.4 当前对话历史：遵守记忆轮数设置
@@ -11388,12 +11505,15 @@ async function triggerLocationPlot(event, pinId) {
     // 将历史消息（可能已移除了最后一条图片消息）添加到API请求中
     recentMessages.forEach(msg => {
         if (msg.type === 'location') {
-             messages.push({ role: 'system', content: `[场景变化] 你们来到了【${msg.locationName}】。描述：${msg.locationDesc}`});
+            messages.push({
+                role: 'system',
+                content: `[场景变化] 你们来到了【${msg.locationName}】。描述：${msg.locationDesc}`
+            });
         } else if (msg.text) {
-             messages.push({
+            messages.push({
                 role: msg.sender === 'user' ? 'user' : 'assistant',
                 content: msg.text.replace(/<render>[\s\S]*?<\/render>/, '[特殊渲染内容]')
-             });
+            });
         }
     });
     // 如果有多模态消息，就添加它
@@ -11402,11 +11522,11 @@ async function triggerLocationPlot(event, pinId) {
     }
     // 否则，如果只有普通文本输入，就正常添加
     else if (currentUserInput) {
-        messages.push({ role: 'user', content: currentUserInput });
+        messages.push({role: 'user', content: currentUserInput});
     }
     // 如果用户有输入，无论是否带图片，都需要在UI上显示这条文本消息并保存
     if (currentUserInput) {
-        const messageObj = { sender: 'user', text: currentUserInput };
+        const messageObj = {sender: 'user', text: currentUserInput};
         const newIndex = saveSweetheartMessage(contactId, messageObj);
         const messageRow = _createMessageDOM(contactId, messageObj, newIndex);
         messagesEl.appendChild(messageRow);
@@ -11415,12 +11535,15 @@ async function triggerLocationPlot(event, pinId) {
 
     // 3.5 地点触发事件（作为用户输入）
     const plotPrompt = `[地点事件] 我们来到了"${pin.name}"。这里的特点是："${pin.description || '一个神秘的地方'}"。请基于这个场景，生动地描述接下来发生的故事或对话。`;
-    messages.push({ role: "user", content: plotPrompt });
+    messages.push({role: "user", content: plotPrompt});
 
     // === 步骤4: 显示"思考中"气泡并调用API ===
-    console.log('🗺️ 地图触发 - 最终发送给AI的Prompt结构:', messages.map(m => ({role: m.role, content: m.content.substring(0, 50) + '...'})));
+    console.log('🗺️ 地图触发 - 最终发送给AI的Prompt结构:', messages.map(m => ({
+        role: m.role,
+        content: m.content.substring(0, 50) + '...'
+    })));
 
-    const thinkingBubble = _createMessageDOM(contactId, { sender: 'contact', text: '...' }, -1);
+    const thinkingBubble = _createMessageDOM(contactId, {sender: 'contact', text: '...'}, -1);
     messagesEl.appendChild(thinkingBubble);
     messagesEl.scrollTop = messagesEl.scrollHeight;
 
@@ -11433,7 +11556,7 @@ async function triggerLocationPlot(event, pinId) {
     }
 
     // === 步骤5: 处理AI回复 ===
-    const { chatReplyText, statusData } = parseOfflineResponse(result);
+    const {chatReplyText, statusData} = parseOfflineResponse(result);
 
     if (statusData) {
         updateStatusPopup(statusData);
@@ -11445,7 +11568,7 @@ async function triggerLocationPlot(event, pinId) {
     const segments = chatReplyText.split('---').filter(s => s.trim());
     if (segments.length > 0) {
         for (const segmentText of segments) {
-            const messageObj = { sender: 'contact', text: segmentText.trim() };
+            const messageObj = {sender: 'contact', text: segmentText.trim()};
             const newIndex = saveSweetheartMessage(contactId, messageObj);
             const messageRow = _createMessageDOM(contactId, messageObj, newIndex);
             messagesEl.appendChild(messageRow);
@@ -11519,7 +11642,7 @@ function parseOfflineResponse(result) {
         }
     }
 
-    return { chatReplyText, statusData };
+    return {chatReplyText, statusData};
 }
 
 
@@ -11581,6 +11704,7 @@ function exitNormalMultiSelectMode() {
         }
     }
 }
+
 /**
  * 进入密友聊天的多选模式
  */
@@ -11631,6 +11755,7 @@ function exitSweetheartMultiSelectMode() {
         }
     }
 }
+
 /**
  * 为消息添加复选框
  * @param {string} chatType - 'normal' 或 'sweetheart'
@@ -12204,8 +12329,8 @@ ${conversationText}
     try {
         // 调用API
         const apiMessages = [
-            { role: 'system', content: '你是一个专业的知识整理助手。' },
-            { role: 'user', content: summaryPrompt }
+            {role: 'system', content: '你是一个专业的知识整理助手。'},
+            {role: 'user', content: summaryPrompt}
         ];
 
         const result = await callApi(apiMessages);
@@ -12268,6 +12393,7 @@ function setupSummarizeButton() {
         });
     }
 }
+
 /**
  * 绑定测试按钮事件
  */
@@ -12355,6 +12481,7 @@ function adjustQuestionCount(delta) {
     value = Math.max(1, Math.min(20, value + delta));
     input.value = value;
 }
+
 /**
  * [新增] 健壮的AI JSON响应解析器
  * 它可以处理纯JSON、被文字包裹的JSON和被Markdown包裹的JSON
@@ -12459,8 +12586,8 @@ async function startGenerateTest() {
     try {
         // 调用API生成题目
         const result = await callApi([
-            { role: 'system', content: '你是一个专业的教育测试专家。' },
-            { role: 'user', content: prompt }
+            {role: 'system', content: '你是一个专业的教育测试专家。'},
+            {role: 'user', content: prompt}
         ]);
 
         if (!result.success) {
@@ -12751,7 +12878,7 @@ function closeTest() {
         }
 
         document.getElementById('testPage').classList.remove('show');
-        testData = { questions: [], answers: {}, startTime: null, selectedKnowledgeIds: [] };
+        testData = {questions: [], answers: {}, startTime: null, selectedKnowledgeIds: []};
     }
 }
 
@@ -12767,7 +12894,7 @@ async function closeTestResult() {
     }
 
     // 清空测试数据
-    testData = { questions: [], answers: {}, startTime: null, selectedKnowledgeIds: [] };
+    testData = {questions: [], answers: {}, startTime: null, selectedKnowledgeIds: []};
 }
 
 // ========== 生成测试反馈 ==========
@@ -12874,7 +13001,7 @@ function buildChatContext(contactId, userMessage) {
     const contact = contactsData.find(c => c.id === contactId);
     if (!contact) {
         return [
-            { role: 'user', content: userMessage }
+            {role: 'user', content: userMessage}
         ];
     }
 
@@ -13063,6 +13190,7 @@ function openStatusHistory() {
         renderStatusHistory(); // 打开时渲染列表
     }
 }
+
 /**
  * 关闭状态历史记录弹窗
  */
@@ -13072,6 +13200,7 @@ function closeStatusHistory() {
         popup.classList.remove('show');
     }
 }
+
 /**
  * 渲染状态历史列表
  */
@@ -13126,6 +13255,7 @@ function renderStatusHistory() {
         container.appendChild(card);
     });
 }
+
 /**
  * 删除指定的一条历史记录
  * @param {number} timestamp - 要删除的历史记录的时间戳
@@ -13144,6 +13274,276 @@ function deleteStatusHistoryItem(timestamp) {
         renderStatusHistory();
     }
 }
+
+// ▼▼▼ 粘贴以下所有JavaScript代码 ▼▼▼
+
+// ===================================
+//
+//      红包功能 - 核心逻辑
+//
+// ===================================
+
+let currentRedPacket = null; // 用于存储正在操作的红包信息
+
+// --- 1. 发红包流程 ---
+
+/**
+ * 打开“发红包”弹窗
+ */
+function openRedPacketModal() {
+    // 重置输入框
+    const amountInput = document.getElementById('rpAmountInput');
+    const greetingInput = document.getElementById('rpGreetingInput');
+    const displayAmount = document.getElementById('rpDisplayAmount');
+    const sendBtn = document.getElementById('rpSendBtn');
+
+    amountInput.value = '';
+    greetingInput.value = '';
+    displayAmount.textContent = '0.00';
+    sendBtn.classList.add('disabled');
+
+    // 显示弹窗
+    document.getElementById('redPacketModal').classList.add('show');
+    amountInput.focus();
+}
+
+/**
+ * 关闭“发红包”弹窗
+ */
+function closeRedPacketModal() {
+    document.getElementById('redPacketModal').classList.remove('show');
+}
+
+/**
+ * 发送红包消息
+ */
+function sendRedPacket() {
+    const amountInput = document.getElementById('rpAmountInput');
+    const greetingInput = document.getElementById('rpGreetingInput');
+    const amount = parseFloat(amountInput.value);
+
+    // 数据校验
+    if (isNaN(amount) || amount <= 0) {
+        alert('请输入有效的红包金额！');
+        return;
+    }
+
+    const greeting = greetingInput.value.trim() || greetingInput.placeholder;
+
+    // 构造红包消息对象
+    const redPacketMessage = {
+        sender: 'user',
+        type: 'red-packet', // 新的消息类型
+        content: {
+            greeting: greeting,
+            amount: amount.toFixed(2), // 保留两位小数
+            status: 'unopened', // 'unopened' 或 'opened'
+        },
+        timestamp: Date.now()
+    };
+
+    // 保存并渲染消息
+    const contactId = currentSweetheartChatContact.id;
+    const newIndex = saveSweetheartMessage(contactId, redPacketMessage);
+    const messagesEl = document.getElementById('sweetheartChatMessages');
+    const messageRow = _createMessageDOM(contactId, redPacketMessage, newIndex);
+    messagesEl.appendChild(messageRow);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+
+    // 清理工作
+    closeRedPacketModal();
+    renderSweetheartList(); // 更新密友列表的最后消息
+}
+
+// 事件监听：实时更新发红包弹窗的金额显示和按钮状态
+document.getElementById('rpAmountInput')?.addEventListener('input', (e) => {
+    const amount = parseFloat(e.target.value) || 0;
+    document.getElementById('rpDisplayAmount').textContent = amount.toFixed(2);
+
+    const sendBtn = document.getElementById('rpSendBtn');
+    if (amount > 0) {
+        sendBtn.classList.remove('disabled');
+    } else {
+        sendBtn.classList.add('disabled');
+    }
+});
+
+
+// --- 2. 渲染红包消息 ---
+
+/**
+ * 创建红包气泡的DOM
+ * @param {object} messageObj - 红包消息对象
+ * @returns {HTMLElement}
+ */
+function createRedPacketBubble(messageObj) {
+    const content = messageObj.content;
+    const bubble = document.createElement('div');
+    bubble.className = 'chat-bubble red-packet-bubble';
+
+    if (content.status === 'opened') {
+        bubble.classList.add('opened');
+    }
+
+    bubble.innerHTML = `
+        <div class="red-packet-icon">🧧</div>
+        <div class="red-packet-info">
+            <span class="red-packet-greeting">${escapeHTML(content.greeting)}</span>
+            <span class="red-packet-type">微信红包</span>
+        </div>
+    `;
+
+    return bubble;
+}
+
+
+// --- 3. 开红包流程 ---
+
+/**
+ * 用户点击聊天中的红包气泡
+ * @param {string} contactId
+ * @param {number} messageIndex
+ */
+function handleRedPacketClick(contactId, messageIndex) {
+    console.log("✅ 红包气泡被点击，正在尝试打开弹窗...", {contactId, messageIndex});
+    const chatHistory = JSON.parse(localStorage.getItem('phoneSweetheartChatHistory') || '{}');
+    const message = chatHistory[contactId]?.[messageIndex];
+
+    if (!message || message.type !== 'red-packet') return;
+    // ✅ 核心改动在这里：判断红包是不是自己发的
+    if (message.sender === 'user') {
+        showSuccessModal('提示', '你发出去的红包，不能自己拆哦～', 1500);
+        return; // 直接退出，不执行开红包动画
+    }
+    // 如果红包已打开，则不显示开红包界面
+    if (message.content.status === 'opened') {
+        showSuccessModal('提示', '这个红包已经被你领过啦～', 1500);
+        return;
+    }
+
+    // 存储当前要操作的红包信息
+    currentRedPacket = {
+        contactId,
+        messageIndex,
+        message
+    };
+
+    // 填充“开红包”弹窗内容
+    const sender = message.sender === 'user' ? userProfile : currentSweetheartChatContact;
+
+    document.getElementById('rpOpenerSenderName').textContent = `${sender.name}的红包`;
+    document.getElementById('rpOpenerGreeting').textContent = message.content.greeting;
+
+    const avatarEl = document.getElementById('rpOpenerAvatar');
+    const isUrl = sender.avatar && (sender.avatar.startsWith('http') || sender.avatar.startsWith('data:'));
+    avatarEl.innerHTML = isUrl ? `<img src="${sender.avatar}" alt="avatar">` : `<span>${sender.avatar}</span>`;
+
+    // 重置弹窗状态并显示
+    const openerCard = document.getElementById('rpOpenerCard');
+    openerCard.classList.remove('is-opened');
+    document.getElementById('rpOpenBtn').classList.remove('spinning');
+    document.getElementById('redPacketOpenModal').classList.add('show');
+}
+
+/**
+ * 关闭“开红包”弹窗
+ */
+function closeRedPacketOpener() {
+    document.getElementById('redPacketOpenModal').classList.remove('show');
+}
+
+/**
+ * 执行开红包动画并处理后续逻辑
+ */
+function animateAndOpenPacket() {
+    console.log("✅ “开”按钮被点击，animateAndOpenPacket函数已触发。");
+    console.log("🔍 检查 currentRedPacket 数据:", currentRedPacket);
+    if (!currentRedPacket) {
+        console.error("❌ 错误：currentRedPacket 为空！函数提前退出。"); // <--- 添加这行错误提示
+        return;
+    }
+
+    const openBtn = document.getElementById('rpOpenBtn');
+    openBtn.classList.add('spinning');
+
+    // 模拟网络延迟和动画效果
+    setTimeout(() => {
+        // 1. 更新UI显示
+        document.getElementById('rpOpenedAmount').textContent = currentRedPacket.message.content.amount;
+        document.getElementById('rpOpenedGreeting').textContent = currentRedPacket.message.content.greeting;
+
+        const openerCard = document.getElementById('rpOpenerCard');
+        openerCard.classList.add('is-opened');
+        openBtn.classList.remove('spinning');
+
+        // 2. 更新红包状态
+        updateRedPacketState();
+
+    }, 1500); // 旋转1.5秒
+}
+
+/**
+ * 更新红包状态（数据持久化和UI刷新）
+ */
+function updateRedPacketState() {
+    if (!currentRedPacket) return;
+
+    const {contactId, messageIndex, message} = currentRedPacket;
+
+    // a. 更新本地存储中的消息状态
+    const chatHistory = JSON.parse(localStorage.getItem('phoneSweetheartChatHistory') || '{}');
+    if (chatHistory[contactId]?.[messageIndex]) {
+        chatHistory[contactId][messageIndex].content.status = 'opened';
+        localStorage.setItem('phoneSweetheartChatHistory', JSON.stringify(chatHistory));
+    }
+
+    // b. 更新聊天界面中的红包气泡样式
+    // 通过消息的 timestamp 找到对应的DOM元素
+    const messageRow = document.querySelector(`.message-row[data-timestamp="${message.timestamp}"]`);
+    if (messageRow) {
+        const bubble = messageRow.querySelector('.red-packet-bubble');
+        if (bubble) {
+            bubble.classList.add('opened');
+        }
+    }
+
+    // c. 在聊天中追加一条“你领取了红包”的系统消息
+    const senderName = message.sender === 'user' ? userProfile.name : currentSweetheartChatContact.name;
+    const systemMessageText = `你领取了${senderName}的红包`;
+    const systemMessageObj = {
+        sender: 'system',
+        type: 'notice',
+        text: systemMessageText,
+        timestamp: Date.now()
+    };
+
+    const newIndex = saveSweetheartMessage(contactId, systemMessageObj);
+    const messagesEl = document.getElementById('sweetheartChatMessages');
+    const systemMessageRow = _createMessageDOM(contactId, systemMessageObj, newIndex);
+    messagesEl.appendChild(systemMessageRow);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+// --- 4. 最终集成 ---
+
+/**
+ * 这是一个辅助函数，用于创建系统提示消息 (如"领取了红包")
+ * @param {object} messageObj
+ * @returns {HTMLElement}
+ */
+function createSystemNotice(messageObj) {
+    const notice = document.createElement('div');
+    notice.className = 'system-notice'; // 你可以为此类添加CSS样式
+    notice.textContent = messageObj.text;
+    notice.style.textAlign = 'center';
+    notice.style.fontSize = '12px';
+    notice.style.color = '#BCAAA4';
+    notice.style.margin = '10px 0';
+    return notice;
+}
+
+
+// ▲▲▲ JavaScript代码粘贴结束 ▲▲▲
 
 
 function initializeApp() {
@@ -13326,7 +13726,7 @@ function initializeApp() {
             }
 
             if (button.id !== 'sweetheartRegenerateMessageBtn') {
-            hideSweetheartMessageActionSheet();
+                hideSweetheartMessageActionSheet();
             }
         });
     }
@@ -13382,7 +13782,7 @@ function initializeApp() {
             updateMemoryRounds(memoryInput.value);
         });
     }
-        // 新增：全局点击事件，用于收回已滑开的联系人项
+    // 新增：全局点击事件，用于收回已滑开的联系人项
     document.addEventListener('click', (e) => {
         // 检查点击的目标是否在任何一个滑动容器内部
         if (!e.target.closest('.contact-item-wrapper, .sweetheart-item-wrapper')) {
@@ -13438,12 +13838,12 @@ function initializeApp() {
         });
     }
 
-        // 联系人库头像上传监听
-    document.getElementById('library-avatar-input').addEventListener('change', function(event) {
+    // 联系人库头像上传监听
+    document.getElementById('library-avatar-input').addEventListener('change', function (event) {
         const file = event.target.files[0];
         if (file) {
             const reader = new FileReader();
-            reader.onload = function(e) {
+            reader.onload = function (e) {
                 document.getElementById('library-avatar-preview').src = e.target.result;
             };
             reader.readAsDataURL(file);
