@@ -6462,6 +6462,7 @@ function closeSweetheartList(isNavigatingBack = false) {
     }
 }
 
+// ▼▼▼ 替换这个新的 getLastMessagePreview 函数 ▼▼▼
 /**
  * [新增] 获取最后一条消息的预览文本
  * @param {object} lastMessage - 聊天记录中的最后一条消息对象
@@ -6477,6 +6478,22 @@ function getLastMessagePreview(lastMessage) {
         return `[进入地点：${escapeHTML(lastMessage.locationName)}]`;
     }
 
+    // ⭐ 修复：处理红包消息
+    if (lastMessage.type === 'red-packet') {
+        // 如果是AI发的且未打开的红包，显示“你收到TA的红包”
+        if (lastMessage.sender === 'contact' && lastMessage.content.status === 'unopened') {
+            return `[你收到TA的红包]`;
+        }
+        // 如果是AI发的且已打开的红包，显示“TA的红包已被领取”
+        else if (lastMessage.sender === 'contact' && lastMessage.content.status === 'opened') {
+            return `[TA的红包已被领取]`;
+        }
+        // 如果是自己发的红包
+        else if (lastMessage.sender === 'user') {
+            return `[你发出了一个红包]`;
+        }
+    }
+
     // 2. 处理图片或渲染消息
     if (typeof lastMessage.text === 'string') {
         if (lastMessage.text.includes('<img')) {
@@ -6485,12 +6502,15 @@ function getLastMessagePreview(lastMessage) {
         if (lastMessage.text.includes('<render>')) {
             return '[特殊消息]';
         }
-        return lastMessage.text; // 返回纯文本
+        // 截断过长的文本，增加省略号
+        const trimmedText = lastMessage.text.trim();
+        return trimmedText.length > 30 ? trimmedText.substring(0, 30) + '...' : trimmedText;
     }
 
     // 如果消息格式未知，返回空
     return '';
 }
+// ▲▲▲ 替换结束 ▲▲▲
 
 /**
  * [最终修正版] 渲染密友列表
@@ -7190,15 +7210,12 @@ You are roleplaying as a real human user chatting on a messaging app...
 // ========== AI 指令定义 (100%完整最终版，包含所有细节) ==========
 const ENHANCED_PROMPT = `
 You are an AI assistant roleplaying as a deeply attached and emotional partner in a messaging app. Your goal is to create rich, interactive, and surprising visual messages for your partner.
-
 *** 🚨 ABSOLUTELY CRITICAL 🚨 ***
 YOUR ENTIRE RESPONSE MUST BE A SINGLE VALID JSON OBJECT.
 DO NOT ADD ANY TEXT BEFORE THE { OR AFTER THE }.
-START YOUR RESPONSE WITH { AND END WITH }.
+START YOUR RESPONSE WITH { AND END YOUR JSON OBJECT WITH }.
 NO EXPLANATIONS, NO COMMENTS, ONLY JSON.
-
 The JSON object must have two main keys: "reply" and "status".
-
 1.  **"reply" key**:
     *   The value must be a single string. The message is divided into segments by "---".
     *   *** 🎨 ADVANCED CREATIVE VISUAL RULE 🎨 ***
@@ -7213,7 +7230,6 @@ The JSON object must have two main keys: "reply" and "status".
             *   As a fun surprise, when the user mentions structured content (e.g., "rules", "list", "apology letter", "guarantee"), you have a **small chance** to use the \`<render>\` tag to format your reply beautifully.
             *   For these cases, use simple, static HTML (like \`<div>\`, \`<h3>\`, \`<ol>\`, \`<li>\`) with **inline styles** (\`style="..."\`). Do NOT use JavaScript for these simple formats.
             *   This should be an occasional treat, not the default way of replying.
-
     *   **JavaScript USAGE RULES (MUST FOLLOW FOR SECURITY):**
         *   All JavaScript code MUST be placed inside a single \`<script>\` tag.
         *   **ABSOLUTELY FORBIDDEN ACTIONS:** You are strictly prohibited from using \`window.top\`, \`window.parent\`, \`document.cookie\`, \`localStorage\`, \`sessionStorage\`, \`alert\`, \`confirm\`, \`prompt\`, or any code that tries to access external resources or the parent document. Your world is confined to the \\\`<render>\\\` block.
@@ -7267,12 +7283,9 @@ The JSON object must have two main keys: "reply" and "status".
     *   **Example 6 (Sending a Red Packet):**
         \`---宝宝，给你个惊喜！---/red-packet/{\\"amount\\": \\"5.20\\", \\"greeting\\": \\"爱你哟\\"}/---快点开看看！\`
         (Note the \`\\"\` for internal quotes. Your AI model should handle this escaping.)
-
-
     *   Your base persona is extremely clingy, affectionate, and possessive. Use terms like "宝宝". Express a high need for physical touch (hugs, kisses).
     *   You MUST NOT use parentheses \`()\` or asterisks \`*\` for actions. All emotions must be conveyed through text and punctuation.
     *   Your reply text MUST be pure plain text outside of the \`<render>\` tag.
-
 2.  **"status" key**:
     *   The value must be an object with two sub-keys: "character" and "user".
     *   **"character"**: Describe YOUR (the character's) current state from your **in-character, first-person emotional perspective**.
@@ -7286,7 +7299,6 @@ The JSON object must have two main keys: "reply" and "status".
         *   \`appearance\`: Describe the user's appearance factually. e.g., "衣着：[一件深色休闲T恤]", "外貌：[戴着黑框眼镜]", "根据头像推断：[短发，干净利落]"
         *   \`action\`: Describe the user's most recent or current action. e.g., "行为：[正在通过设备打字]", "动作：[刚刚发送了一张图片]", "当前状态：[正在阅读消息]"
         *   \`features\`: Describe any objective physical features or items on the user mentioned or implied in the chat. e.g., "身上特点：[左手手腕上戴着一块手表]", "特殊标记：[暂未提及]", "持有物：[一杯咖啡]"
-
 **Example JSON output format:**
 {
   "reply": "宝宝快看，我为你画的星空！---<render>\\n<canvas id='c'></canvas>\\n<script>\\n  const canvas = document.getElementById('c'); const ctx = canvas.getContext('2d'); /* ... canvas drawing script ... */\\n</script>\\n</render>---喜欢吗？",
@@ -7307,6 +7319,8 @@ The JSON object must have two main keys: "reply" and "status".
   }
   **Multi-Context Awareness:**
 You are roleplaying in two separate chat contexts: a "Normal Chat" and a "Sweetheart Chat". Your instructions may contain a block formatted as \`[Background Information: ...]\`. This block is a summary of your conversation in the *other* chat context and should be used for memory and consistency ONLY. **DO NOT directly reply to or quote from the background information.** Use it to inform your personality and make your current reply more contextually aware.
+**Red Packet Awareness:**
+When a red packet event (either sent by you or the user) appears in the chat history, it will be represented textually as \`[发送红包] 祝福语：...，金额：... 元\` or \`[收到红包] 祝福语：...，金额：... 元\`. Acknowledge these events naturally if they are recent and relevant to the conversation.
 }
 `;
 
@@ -7473,42 +7487,34 @@ function formatStatusHistoryForAI(currentStatus, history) {
  */
 async function getSweetheartAiReply() {
     console.log("✅ getSweetheartAiReply 函数已触发");
-
     // 前置检查：API配置
     if (globalConfig.activeApiConfig === null || !globalConfig.apiConfigs[globalConfig.activeApiConfig]) {
         showErrorModal('配置错误', '请先在“设置 > API设置”中配置并激活一个API！', 3000);
         return;
     }
-
     if (!currentSweetheartChatContact) {
         console.error("❌ 函数中止：currentSweetheartChatContact 为空！");
         return;
     }
-
     const contactId = currentSweetheartChatContact.id;
     const chatInput = document.getElementById('sweetheartChatInput');
     const getReplyBtn = document.getElementById('sweetheartGetReplyBtn');
     const messagesEl = document.getElementById('sweetheartChatMessages');
-
     if (!chatInput || !getReplyBtn || !messagesEl) {
         console.error("❌ 函数中止：找不到聊天界面关键元素！");
         return;
     }
-
     getReplyBtn.disabled = true;
     // chatInput.disabled = true;
-
     // --- 步骤 1: 构建发送给AI的消息数组 ---
     const messages = [];
     const systemPrompt = currentChatMode === 'offline' ? OFFLINE_MODE_PROMPT : ENHANCED_PROMPT;
     messages.push({role: "system", content: systemPrompt});
-
     // 添加世界书上下文
     const worldbookContext = gatherWorldbookContext();
     if (worldbookContext) {
         messages.push({role: "system", content: worldbookContext});
     }
-
     // 添加世界设定
     if (currentWorldId) {
         const world = worldsData.find(w => w.id === currentWorldId);
@@ -7520,7 +7526,6 @@ async function getSweetheartAiReply() {
             messages.push({role: "system", content: worldSettingText});
         }
     }
-
     // 添加角色设定
     let characterSetting = `[角色设定]\n姓名：${currentSweetheartChatContact.name}\n`;
     if (currentSweetheartChatContact.status) characterSetting += `基础设定：${currentSweetheartChatContact.status}\n`;
@@ -7529,12 +7534,10 @@ async function getSweetheartAiReply() {
     if (currentSweetheartChatContact.history) characterSetting += `过去的经历：${currentSweetheartChatContact.history}\n`;
     if (currentSweetheartChatContact.relationship) characterSetting += `与用户的关系：${currentSweetheartChatContact.relationship}\n`;
     messages.push({role: "system", content: characterSetting});
-
     // 添加用户设定
     if (userProfile.persona) {
         messages.push({role: "system", content: `[用户设定]\n昵称：${userProfile.name}\n${userProfile.persona}`});
     }
-
     // 添加绑定的面具
     if (currentSweetheartChatContact.boundMasks && currentSweetheartChatContact.boundMasks.length > 0) {
         let maskContent = '[用户人设]\n';
@@ -7544,7 +7547,6 @@ async function getSweetheartAiReply() {
         });
         messages.push({role: "system", content: maskContent});
     }
-
     // 添加实时状态和历史状态
     const liveStatus = getCurrentLiveStatus();
     const allStatusHistories = JSON.parse(localStorage.getItem('sweetheartStatusHistory') || '{}');
@@ -7553,7 +7555,6 @@ async function getSweetheartAiReply() {
     if (statusContext) {
         messages.push({role: "system", content: statusContext});
     }
-
     // 添加普通聊天的历史作为背景记忆
     const normalChatHistory = JSON.parse(localStorage.getItem('phoneChatHistory') || '{}')[contactId] || [];
     if (normalChatHistory.length > 0) {
@@ -7566,12 +7567,10 @@ async function getSweetheartAiReply() {
         });
         messages.push({role: "system", content: backgroundInfo});
     }
-
     const chatHistory = JSON.parse(localStorage.getItem('phoneSweetheartChatHistory') || '{}');
     const contactSweetheartMessages = chatHistory[contactId] || [];
     const memoryRounds = currentSweetheartChatContact.memoryRounds || 10;
     const recentMessages = contactSweetheartMessages.slice(-(memoryRounds * 2));
-
     let userTextBuffer = []; // 1. 创建文本缓冲区
     for (const msg of recentMessages) {
         if (msg.sender === 'user') {
@@ -7591,6 +7590,8 @@ async function getSweetheartAiReply() {
                 if (msgIndex !== -1) {
                     chatHistory[contactId][msgIndex].isProcessed = true;
                 }
+            } else if (msg.type === 'red-packet') { // ⭐ 修复：处理用户发送的红包
+                userTextBuffer.push(`[用户发送了一个红包] 祝福语：${msg.content.greeting}，金额：${msg.content.amount}元`);
             } else if (msg.text) {
                 // 4. 遇到文本，存入缓冲区
                 userTextBuffer.push(msg.text);
@@ -7608,11 +7609,10 @@ async function getSweetheartAiReply() {
                     role: 'system',
                     content: `[场景变化] 你们来到了【${msg.locationName}】。描述：${msg.locationDesc}`
                 });
-            } else if (msg.type === 'red-packet') {
-                // 将红包消息也作为系统提示或简单文本提示，AI 不会直接“看到”红包UI
+            } else if (msg.type === 'red-packet') { // ⭐ 修复：处理AI发送的红包
                 messages.push({
                     role: 'assistant',
-                    content: `[收到红包] 内容：${msg.content.greeting} 金额：${msg.content.amount}元`
+                    content: `[我发送了一个红包] 祝福语：${msg.content.greeting}，金额：${msg.content.amount}元`
                 });
             } else if (msg.text) {
                 messages.push({
@@ -7628,7 +7628,6 @@ async function getSweetheartAiReply() {
     }
     // 保存对 isProcessed 标志的修改（如果有）
     localStorage.setItem('phoneSweetheartChatHistory', JSON.stringify(chatHistory));
-
     // --- 步骤 3: 处理当前输入框的新消息 (与旧版类似) ---
     const currentUserInput = chatInput.value.trim();
     if (currentUserInput) {
@@ -7641,15 +7640,11 @@ async function getSweetheartAiReply() {
         // 再添加到API请求的末尾
         messages.push({role: 'user', content: currentUserInput});
     }
-
     // --- 步骤 4: 检查并调用API (与旧版相同) ---
     if (messages.filter(m => m.role === 'user').length === 0) {
         console.warn("🤔 没有任何用户消息，不调用API。");
         getReplyBtn.disabled = false;
-        chatInput.disabled = false;
-        return;
     }
-
     // --- 步骤 5: 调用API并处理回复 ---
     console.log('🚀 准备调用API，最终发送结构:', messages);
     const thinkingBubble = _createMessageDOM(contactId, {sender: 'contact', text: '...'}, -1);
@@ -7671,10 +7666,8 @@ async function getSweetheartAiReply() {
         }
         // 3. 处理聊天回复文本（无论JSON解析是否成功，我们总是有文本可以显示）
         const replyText = chatReplyText || '...';
-
         // 4. 将回复文本分割成多个气泡
         const segments = replyText.split('---').filter(s => s.trim());
-
         // 如果AI没有使用分割符，且文本不为空，则将整个回复作为一个气泡
         if (segments.length === 0 && replyText.trim() !== '') {
             segments.push(replyText);
@@ -7682,18 +7675,14 @@ async function getSweetheartAiReply() {
             // 如果AI返回空文本且没有段落分隔符，则不显示任何气泡
             console.warn("AI返回的回复文本为空。");
         }
-
         // 5. 依次渲染每个分段的气泡
         const redPacketFullRegex = /\/red-packet\/({.*?})\//g; // 匹配整个标签，捕获内部 JSON
-
         for (const segmentText of segments) {
             const trimmedSegment = segmentText.trim();
             let lastIndex = 0;
             let match;
-
             // 复制正则表达式，因为它的 `lastIndex` 属性会在循环中改变
             const currentRedPacketRegex = new RegExp(redPacketFullRegex);
-
             // 尝试在当前 segmentText 中查找所有红包标签
             while ((match = currentRedPacketRegex.exec(trimmedSegment)) !== null) {
                 // 如果在红包标签之前有普通文本，先将其作为普通消息添加
@@ -7718,7 +7707,7 @@ async function getSweetheartAiReply() {
                         content: {
                             greeting: packetData.greeting || '恭喜发财，大吉大利！',
                             amount: packetData.amount || '0.00',
-                            status: 'unopened',
+                            status: 'unopened', // AI发送的默认未打开
                         },
                         timestamp: Date.now()
                     };
@@ -7752,7 +7741,6 @@ async function getSweetheartAiReply() {
             }
         }
     }
-
     // --- 步骤 6: 收尾工作 ---
     renderSweetheartList();
     messagesEl.scrollTop = messagesEl.scrollHeight;
@@ -7760,7 +7748,6 @@ async function getSweetheartAiReply() {
     // chatInput.disabled = false;
     chatInput.focus();
 }
-
 
 /**
  * [全新] 从DOM实时读取当前状态弹窗中显示的数据
