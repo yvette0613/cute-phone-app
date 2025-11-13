@@ -267,7 +267,6 @@ body {
     line-height: 1.2;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
     word-break: break-word;
-    white-space: pre-wrap;
     display: flex; /* 1. 声明为 Flex 容器 */
     flex-direction: column; /* 2. 设置主轴为垂直方向 */
     gap: 8px;
@@ -2441,14 +2440,14 @@ input:checked + .slider:before {
 
 /* 2. pre 元素样式 - 作为按钮的定位容器 */
 .code-block-wrapper pre {
-    /* 重要：pre 需要作为定位容器 */
-    position: relative;
+    /*!* 重要：pre 需要作为定位容器 *!*/
+    /*position: relative;*/
 
     /* 基础样式 */
     background-color: #1e1e1e;
     color: #d4d4d4;
     /* 增加顶部内边距，为按钮留出空间 */
-    padding: 45px 12px 12px 12px; /* 从36px增加到45px */
+    padding: 36px 12px 12px 12px; /* 从36px增加到45px */
     border-radius: 8px;
     font-family: 'Consolas', 'Monaco', 'Menlo', monospace;
     font-size: 13px;
@@ -2472,14 +2471,14 @@ input:checked + .slider:before {
 .copy-code-btn {
     /* 绝对定位在 pre 内部的右上角 */
     position: absolute;
-    top: 10px; /* 距离顶部的距离 */
-    right: 12px; /* 距离右边的距离，与pre的padding对齐 */
+    top: 8px; /* 距离顶部的距离 */
+    right: 8px; /* 距离右边的距离，与pre的padding对齐 */
     z-index: 10;
 
     /* 调大按钮尺寸 */
     min-width: auto;
     height: auto;
-    padding: 8px 14px; /* 从 6px 10px 增加到 8px 14px */
+    padding: 6px 8px; /* 从 6px 10px 增加到 8px 14px */
 
     /* 外观样式 */
     background: rgba(255, 255, 255, 0.12); /* 稍微提高不透明度 */
@@ -2491,7 +2490,7 @@ input:checked + .slider:before {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px; /* 增加图标和文字的间距 */
+    gap: 6px; /* 增加图标和文字的间距 */
 
     /* 调大字体 */
     font-size: 14px !important; /* 从12px增加到14px */
@@ -2535,8 +2534,7 @@ input:checked + .slider:before {
 }
 
 /* 6. 鼠标悬停显示按钮 */
-.code-block-wrapper:hover .copy-code-btn,
-.code-block-wrapper pre:hover .copy-code-btn {
+.code-block-wrapper:hover .copy-code-btn {
     opacity: 1;
 }
 
@@ -5506,6 +5504,12 @@ body.code-scrolling-enabled .code-block-wrapper {
 .chat-bubble .code-block-wrapper:first-child {
     margin-top: 0;
 }
+
+/* 针对特定父元素内部的直接子级 <br> 标签进行隐藏 */
+.code-block-wrapper > br {
+    display: none;
+}
+
 
 /* ========== 密友设置界面样式 ========== */
 .sweetheart-settings-page {
@@ -9768,7 +9772,6 @@ body.code-scrolling-enabled .code-block-wrapper {
 
 /* 5. ✅ 也让发送者名称显示出来（可选，如果需要的话）*/
 .sweetheart-chat-page.show-avatars .message-sender-name {
-    display: block !important;
     font-size: 12px;
     color: #999;
     margin-bottom: 4px;

@@ -910,8 +910,12 @@ function formatMessageText(text) {
         const lang = language || 'plaintext';
         const escapedCode = escapeHTML(code.trim());
 
-        // 只创建代码块结构，不包含复制按钮
+        // ⭐ 核心修改：将复制按钮的 HTML 直接放在 wrapper 内部，pre 的前面
         return `<div class="code-block-wrapper">
+            <button class="copy-code-btn" type="button">
+                <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"></path></svg>
+                <span>复制</span>
+            </button>
             <pre><code class="language-${lang}">${escapedCode}</code></pre>
         </div>`;
     });
@@ -1001,95 +1005,95 @@ function copyCodeToClipboard(button) {
     });
 }
 
-// // 修改后的创建复制按钮函数
-function createCopyButton(preElement) {
-    // 检查是否已经有按钮
-    if (preElement.querySelector('.copy-code-btn')) {
-        return;
-    }
+// // // 修改后的创建复制按钮函数
+// function createCopyButton(preElement) {
+//     // 检查是否已经有按钮
+//     if (preElement.querySelector('.copy-code-btn')) {
+//         return;
+//     }
+//
+//     const button = document.createElement('button');
+//     button.className = 'copy-code-btn';
+//     button.setAttribute('type', 'button');
+//
+//     // 创建 SVG 图标（调整尺寸）
+//     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+//     svg.setAttribute('viewBox', '0 0 24 24');
+//     svg.setAttribute('width', '16');  // 调大
+//     svg.setAttribute('height', '16'); // 调大
+//
+//     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+//     path.setAttribute('d', 'M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z');
+//     svg.appendChild(path);
+//
+//     // 创建文本
+//     const span = document.createElement('span');
+//     span.textContent = '复制';
+//
+//     // 组装按钮
+//     button.appendChild(svg);
+//     button.appendChild(span);
+//
+//     // 复制功能
+//     button.onclick = async function () {
+//         const code = preElement.textContent || preElement.innerText;
+//
+//         try {
+//             await navigator.clipboard.writeText(code);
+//
+//             // 成功反馈
+//             button.classList.add('copied');
+//             span.textContent = '已复制';
+//
+//             // 3秒后恢复
+//             setTimeout(() => {
+//                 button.classList.remove('copied');
+//                 span.textContent = '复制';
+//             }, 3000);
+//         } catch (err) {
+//             console.error('复制失败:', err);
+//             alert('复制失败，请手动选择复制');
+//         }
+//     };
+//
+//     // 将按钮插入到 pre 元素内部的开头
+//     preElement.insertBefore(button, preElement.firstChild);
+//
+//     return button;
+// }
 
-    const button = document.createElement('button');
-    button.className = 'copy-code-btn';
-    button.setAttribute('type', 'button');
+// // 为所有代码块添加复制按钮
+// document.addEventListener('DOMContentLoaded', function () {
+//     // 查找所有代码块
+//     const codeBlocks = document.querySelectorAll('.code-block-wrapper pre');
+//
+//     codeBlocks.forEach(preElement => {
+//         createCopyButton(preElement);
+//     });
+// });
 
-    // 创建 SVG 图标（调整尺寸）
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('viewBox', '0 0 24 24');
-    svg.setAttribute('width', '16');  // 调大
-    svg.setAttribute('height', '16'); // 调大
+// // 如果使用 MutationObserver 监听动态内容
+// const observer = new MutationObserver(function (mutations) {
+//     mutations.forEach(function (mutation) {
+//         mutation.addedNodes.forEach(function (node) {
+//             if (node.nodeType === 1) { // Element node
+//                 const preElements = node.querySelectorAll?.('.code-block-wrapper pre') || [];
+//                 preElements.forEach(pre => createCopyButton(pre));
+//
+//                 // 如果添加的节点本身就是 pre
+//                 if (node.matches?.('.code-block-wrapper pre')) {
+//                     createCopyButton(node);
+//                 }
+//             }
+//         });
+//     });
+// });
 
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    path.setAttribute('d', 'M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z');
-    svg.appendChild(path);
-
-    // 创建文本
-    const span = document.createElement('span');
-    span.textContent = '复制';
-
-    // 组装按钮
-    button.appendChild(svg);
-    button.appendChild(span);
-
-    // 复制功能
-    button.onclick = async function () {
-        const code = preElement.textContent || preElement.innerText;
-
-        try {
-            await navigator.clipboard.writeText(code);
-
-            // 成功反馈
-            button.classList.add('copied');
-            span.textContent = '已复制';
-
-            // 3秒后恢复
-            setTimeout(() => {
-                button.classList.remove('copied');
-                span.textContent = '复制';
-            }, 3000);
-        } catch (err) {
-            console.error('复制失败:', err);
-            alert('复制失败，请手动选择复制');
-        }
-    };
-
-    // 将按钮插入到 pre 元素内部的开头
-    preElement.insertBefore(button, preElement.firstChild);
-
-    return button;
-}
-
-// 为所有代码块添加复制按钮
-document.addEventListener('DOMContentLoaded', function () {
-    // 查找所有代码块
-    const codeBlocks = document.querySelectorAll('.code-block-wrapper pre');
-
-    codeBlocks.forEach(preElement => {
-        createCopyButton(preElement);
-    });
-});
-
-// 如果使用 MutationObserver 监听动态内容
-const observer = new MutationObserver(function (mutations) {
-    mutations.forEach(function (mutation) {
-        mutation.addedNodes.forEach(function (node) {
-            if (node.nodeType === 1) { // Element node
-                const preElements = node.querySelectorAll?.('.code-block-wrapper pre') || [];
-                preElements.forEach(pre => createCopyButton(pre));
-
-                // 如果添加的节点本身就是 pre
-                if (node.matches?.('.code-block-wrapper pre')) {
-                    createCopyButton(node);
-                }
-            }
-        });
-    });
-});
-
-// 开始观察
-observer.observe(document.body, {
-    childList: true,
-    subtree: true
-});
+// // 开始观察
+// observer.observe(document.body, {
+//     childList: true,
+//     subtree: true
+// });
 
 
 /**
@@ -1286,6 +1290,31 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
 
     // 绑定事件
     bindMessageEvents(bubble, contactId, messageIndex, isSweetheartChatActive);
+
+    setTimeout(() => {
+        const codeBlockWrappers = messageRow.querySelectorAll('.code-block-wrapper');
+        codeBlockWrappers.forEach(wrapper => {
+            const preElement = wrapper.querySelector('pre code'); // 获取实际的代码内容
+            const copyButton = wrapper.querySelector('.copy-code-btn');
+            if (preElement && copyButton) {
+                copyButton.onclick = async () => {
+                    const codeContent = preElement.textContent || preElement.innerText;
+                    try {
+                        await navigator.clipboard.writeText(codeContent);
+                        copyButton.classList.add('copied');
+                        copyButton.querySelector('span').textContent = '已复制';
+                        setTimeout(() => {
+                            copyButton.classList.remove('copied');
+                            copyButton.querySelector('span').textContent = '复制';
+                        }, 2000);
+                    } catch (err) {
+                        console.error('复制失败:', err);
+                        alert('复制失败，请手动复制');
+                    }
+                };
+            }
+        });
+    }, 0); // 使用 setTimeout 让事件绑定在 DOM 更新后执行
 
     return messageRow;
 
@@ -1670,16 +1699,6 @@ async function regenerateAiResponse(contactId, messageIndex) {
 }
 
 // ========== 密友消息操作函数 ==========
-
-/**
- * 显示密友消息操作菜单
- */
-function showSweetheartMessageActionSheet(contactId, index) {
-    const actionSheet = document.getElementById('sweetheartMessageActionSheet');
-    actionSheet.dataset.contactId = contactId;
-    actionSheet.dataset.index = index;
-    actionSheet.classList.add('show');
-}
 
 /**
  * 删除密友消息
@@ -2930,6 +2949,31 @@ function createSettingsPageHTML() {
                     </div>
                     <div class="settings-arrow">›</div>
                 </div>
+            </div>
+            
+            <!-- 新增：数据管理 -->
+            <div class="settings-section">
+                <div class="section-title">数据管理</div>
+                <!-- 导出所有数据 -->
+                <div class="settings-item" onclick="exportAppData()">
+                    <div class="settings-icon" style="background: linear-gradient(135deg, #FFD700, #FFA500);">📤</div>
+                    <div class="settings-info">
+                        <div class="settings-label">导出所有数据</div>
+                        <div class="settings-desc">备份所有设置、联系人、聊天记录等</div>
+                    </div>
+                    <div class="settings-arrow">›</div>
+                </div>
+                <!-- 导入数据 -->
+                <div class="settings-item" onclick="importAppData()">
+                    <div class="settings-icon" style="background: linear-gradient(135deg, #98FB98, #66CDAA);">📥</div>
+                    <div class="settings-info">
+                        <div class="settings-label">导入数据</div>
+                        <div class="settings-desc">从备份文件恢复所有设置和数据</div>
+                    </div>
+                    <div class="settings-arrow">›</div>
+                </div>
+                <!-- 隐藏的文件输入元素，用于导入 -->
+                <input type="file" id="importFileInput" accept=".json" style="display: none;" onchange="handleFileImport(event)">
             </div>
         </div>
     </div>
@@ -5303,7 +5347,11 @@ function editCurrentSweetheartContact() {
 
     // 渲染面具列表，并勾选已绑定的
     renderSweetheartMasksList(contact.boundMasks || []);
-
+    const modal = document.getElementById('sweetheartCardModal');
+    modal.style.display = 'flex'; // <-- 关键：确保弹窗显示为 flex，以便触发后续动画
+    requestAnimationFrame(() => {
+        modal.classList.add('show'); // <-- 关键：在浏览器下一帧再添加类，确保动画触发
+    });
     document.getElementById('sweetheartCardModal').classList.add('show');
 }
 
@@ -8345,13 +8393,7 @@ function cancelSweetheartQuote() {
     previewEl.classList.remove('show');
 }
 
-/**
- * 隐藏密友消息操作菜单
- */
-function hideSweetheartMessageActionSheet() {
-    const actionSheet = document.getElementById('sweetheartMessageActionSheet');
-    actionSheet.classList.remove('show');
-}
+
 
 /**
  * [最终修复版] 初始化密友聊天输入框
@@ -13675,6 +13717,121 @@ function applySweetheartChatAvatarsSetting(isEnabled) {
     }
 }
 
+// ====== 新增：数据导入导出功能 ======
+
+/**
+ * 导出所有应用数据到 JSON 文件。
+ * 遍历 localStorage，收集所有键值对。
+ */
+function exportAppData() {
+    const appData = {};
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        try {
+            // 尝试解析JSON字符串，如果成功则存储为对象，否则存储原始字符串
+            const value = localStorage.getItem(key);
+            appData[key] = JSON.parse(value);
+        } catch (e) {
+            // 如果不是有效的JSON，则存储原始字符串
+            appData[key] = localStorage.getItem(key);
+        }
+    }
+
+    const jsonString = JSON.stringify(appData, null, 2); // 格式化JSON字符串，方便阅读
+    const blob = new Blob([jsonString], {type: 'application/json'});
+
+    // 创建下载链接
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+
+    // 生成文件名，包含日期和时间
+    const now = new Date();
+    const dateStr = now.toISOString().slice(0, 10).replace(/-/g, ''); // YYYYMMDD
+    const timeStr = now.toTimeString().slice(0, 8).replace(/:/g, ''); // HHMMSS
+    a.download = `yetta_app_data_${dateStr}_${timeStr}.json`;
+
+    // 模拟点击下载
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    showSuccessModal('导出成功', '所有数据已成功导出为JSON文件！');
+    console.log('所有应用数据已导出。');
+}
+
+/**
+ * 触发隐藏的文件输入框，让用户选择导入文件。
+ */
+function importAppData() {
+    document.getElementById('importFileInput').click();
+}
+
+/**
+ * 处理文件导入，读取并解析用户选择的JSON文件。
+ * @param {Event} event - 文件输入框的 change 事件对象。
+ */
+function handleFileImport(event) {
+    const file = event.target.files[0];
+    if (!file) {
+        return;
+    }
+
+    if (file.type !== 'application/json') {
+        showErrorModal('导入失败', '请选择有效的JSON文件 (.json)！');
+        return;
+    }
+
+    const reader = new FileReader();
+
+    reader.onload = function (e) {
+        try {
+            const importedData = JSON.parse(e.target.result);
+            if (confirm('确定要导入此文件中的数据吗？现有数据将被文件内容覆盖，此操作不可撤销。')) {
+                applyImportedData(importedData);
+                showSuccessModal('导入成功', '数据已成功导入，应用将重新加载！', 2000);
+                // 延迟重新加载，给用户看到提示的时间
+                setTimeout(() => location.reload(), 2000);
+            }
+        } catch (error) {
+            showErrorModal('导入失败', '文件内容格式不正确，不是有效的JSON！', 3000);
+            console.error('导入文件解析失败:', error);
+        } finally {
+            // 清空文件输入框，以便用户可以再次选择相同文件
+            event.target.value = '';
+        }
+    };
+
+    reader.onerror = function () {
+        showErrorModal('导入失败', '无法读取文件。', 3000);
+        console.error('文件读取失败:', reader.error);
+    };
+
+    reader.readAsText(file);
+}
+
+/**
+ * 将导入的数据应用到 localStorage。
+ * @param {object} data - 从JSON文件解析出的数据对象。
+ */
+function applyImportedData(data) {
+    // ⚠️ 警告：导入操作将完全覆盖现有数据。
+    // 如果需要合并数据而不是覆盖，则需要更复杂的逻辑。
+    // 目前，为简化和明确备份/恢复的意图，选择直接覆盖。
+    localStorage.clear(); // 清空所有现有数据
+
+    for (const key in data) {
+        if (data.hasOwnProperty(key)) {
+            // 将对象类型的数据重新JSON化存储，以保持数据一致性
+            const value = typeof data[key] === 'object' && data[key] !== null
+                ? JSON.stringify(data[key])
+                : String(data[key]);
+            localStorage.setItem(key, value);
+        }
+    }
+    console.log('数据已覆盖到 localStorage。');
+}
 
 
 function initializeApp() {
