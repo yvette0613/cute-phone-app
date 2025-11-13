@@ -2306,53 +2306,6 @@ input:checked + .slider:before {
     transform: translateY(0);
 }
 
-/* style.css */
-
-/* 新增：隐藏头像时的样式 */
-.sweetheart-chat-page.hide-avatars .message-chat-avatar {
-    display: none !important; /* 强制隐藏头像 */
-}
-
-/* 当头像隐藏时，调整消息气泡的对齐和间距 */
-.sweetheart-chat-page.hide-avatars .message-row {
-    gap: 0; /* 移除头像和消息气泡之间的间距 */
-}
-
-/* 当头像隐藏时，确保发送者名称也隐藏，因为头像隐藏通常意味着要更简洁 */
-.sweetheart-chat-page.hide-avatars .message-sender-name {
-    display: none !important;
-}
-
-/* 如果头像隐藏且是用户发送的消息 (sent)，消息气泡靠右对齐 */
-.sweetheart-chat-page.hide-avatars .message-row.sent {
-    justify-content: flex-end; /* 使发送的消息靠右 */
-    padding-right: 0; /* 确保右侧没有额外空间 */
-    /* 如果多选复选框在左侧，需要调整消息内容向右浮动 */
-    /* .message-row.multi-select-mode 规则会覆盖此项 */
-}
-
-/* 如果头像隐藏且是对方接收的消息 (received)，消息气泡靠左对齐 */
-.sweetheart-chat-page.hide-avatars .message-row.received {
-    justify-content: flex-start; /* 使接收的消息靠左 */
-    padding-left: 0; /* 确保左侧没有额外空间 */
-}
-
-/* 确保多选模式下的复选框不会因为头像隐藏而错位 */
-.sweetheart-chat-page.hide-avatars .message-row.multi-select-mode {
-    padding-left: 40px; /* 和未隐藏头像时保持一致，为复选框留出的空间 */
-}
-
-/* 如果头像隐藏且在多选模式下，头像的隐藏不应该影响复选框的位置 */
-.sweetheart-chat-page.hide-avatars .message-row.multi-select-mode .message-checkbox-container {
-    left: 8px; /* 保持复选框的左侧定位 */
-}
-
-/* 在简洁模式且隐藏头像时，仍然要显示发件人姓名 */
-.sweetheart-chat-page.simple-style.hide-avatars .message-sender-name {
-    display: block !important; /* Forces the display property to block */
-}
-
-
 /* ========== 密友聊天的消息操作菜单 ========== */
 .sweetheart-chat-page .message-action-sheet {
     position: absolute;

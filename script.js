@@ -6510,7 +6510,6 @@ function getLastMessagePreview(lastMessage) {
     // 如果消息格式未知，返回空
     return '';
 }
-
 // ▲▲▲ 替换结束 ▲▲▲
 
 /**
@@ -6690,9 +6689,6 @@ function openSweetheartChat(contact) {
         setupSweetheartAttachmentMenu(); // 初始化附件菜单功能
 
         loadAndApplyStatusData(contact.id);
-        // [新增] 在打开聊天时，应用头像隐藏设置
-        const savedHideAvatarsSetting = localStorage.getItem('hideSweetheartAvatars') === 'true';
-        applyHideSweetheartAvatarsSetting(savedHideAvatarsSetting);
     });
 }
 
@@ -7608,7 +7604,7 @@ async function getSweetheartAiReply() {
             }
             // 6. 再添加 AI 的回复
             if (msg.type === 'location') {
-                // 确保 location 消息作为 system 角色发送，因为它不是对话的一部分
+                 // 确保 location 消息作为 system 角色发送，因为它不是对话的一部分
                 messages.push({
                     role: 'system',
                     content: `[场景变化] 你们来到了【${msg.locationName}】。描述：${msg.locationDesc}`
@@ -13541,34 +13537,7 @@ function createSystemNotice(messageObj) {
 
 
 // ▲▲▲ JavaScript代码粘贴结束 ▲▲▲
-/**
- * 根据用户的设置，应用隐藏/显示密友头像的CSS类。
- * @param {boolean} hideAvatars - true 表示隐藏头像，false 表示显示头像。
- */
-function applyHideSweetheartAvatarsSetting(hideAvatars) {
-    const sweetheartChatPage = document.getElementById('sweetheartChatPage');
-    if (sweetheartChatPage) {
-        if (hideAvatars) {
-            sweetheartChatPage.classList.add('hide-avatars');
-        } else {
-            sweetheartChatPage.classList.remove('hide-avatars');
-        }
-    }
-    // 每次应用设置后，如果当前在密友聊天页面且已显示，需要刷新消息以确保布局正常，
-    // 尤其是在多选模式下，复选框位置可能受影响。
-    if (currentSweetheartChatContact && sweetheartChatPage.classList.contains('show')) {
-        // 如果当前是多选模式，退出多选再进入一次，可以强制刷新消息行布局
-        if (isSweetheartMultiSelectMode) {
-            exitSweetheartMultiSelectMode(); // 退出多选会自动重新渲染消息
-            // 延迟一小段再进入，确保退出动画完成
-            setTimeout(() => enterSweetheartMultiSelectMode(), 50);
-        } else {
-            // 如果不是多选模式，则调用 openSweetheartChat 刷新整个聊天界面
-            // 这样可以确保所有消息元素重新根据新的CSS类进行渲染和布局
-            openSweetheartChat(currentSweetheartChatContact);
-        }
-    }
-}
+
 
 function initializeApp() {
     // ▼▼▼ 在这里粘贴全局错误处理代码 ▼▼▼
@@ -13873,21 +13842,6 @@ function initializeApp() {
             reader.readAsDataURL(file);
         }
     });
-
-    const hideSweetheartAvatarsToggle = document.getElementById('hideSweetheartAvatarsToggle');
-    if (hideSweetheartAvatarsToggle) {
-        // 1. 加载保存的设置
-        const savedSetting = localStorage.getItem('hideSweetheartAvatars') === 'true';
-        hideSweetheartAvatarsToggle.checked = savedSetting;
-        applyHideSweetheartAvatarsSetting(savedSetting); // 首次加载时应用设置
-        // 2. 监听开关变化
-        hideSweetheartAvatarsToggle.addEventListener('change', function () {
-            const isChecked = this.checked;
-            applyHideSweetheartAvatarsSetting(isChecked); // 应用设置
-            localStorage.setItem('hideSweetheartAvatars', isChecked); // 保存设置到 localStorage
-            console.log(`密友头像隐藏状态已更新为: ${isChecked}`);
-        });
-    }
 
 
     console.log('%c🎉 应用初始化完成！', 'color: #667eea; font-size: 16px; font-weight: bold;');
