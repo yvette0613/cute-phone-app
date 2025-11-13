@@ -1031,35 +1031,36 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
                 <p>${escapeHTML(messageObj.locationDesc || '无描述')}</p>
             </div>
         `;
+        // 事件绑定到 notice 元素本身
         bindMessageEvents(locationNotice, contactId, messageIndex, isSweetheartChatActive);
         return locationNotice;
     }
 
-    /* ▼▼▼ 使用这个【绝对修正版】的红包渲染逻辑进行替换 ▼▼▼ */
     if (messageObj.type === 'red-packet') {
         const messageRow = document.createElement('div');
         messageRow.className = 'message-row ' + (messageObj.sender === 'user' ? 'sent' : 'received');
         messageRow.dataset.timestamp = messageObj.timestamp; // 记录时间戳
 
-        // 1. 【新增】创建正确的头像DOM
+        // 1. 创建正确的头像DOM
         const avatarEl = document.createElement('div');
         avatarEl.className = 'message-chat-avatar';
-        const contactData = document.getElementById('sweetheartChatPage').classList.contains('show') ? currentSweetheartChatContact : currentChatContact;
+        // 根据当前聊天模式获取联系人数据
+        const contactData = isSweetheartChatActive ? currentSweetheartChatContact : currentChatContact;
         const avatarSrc = messageObj.sender === 'user' ? (userProfile?.avatar || '👤') : (contactData?.avatar || '💬');
         const isUrl = avatarSrc.startsWith('http') || avatarSrc.startsWith('data:');
         avatarEl.innerHTML = isUrl ? `<img src="${avatarSrc}" alt="avatar">` : `<div class="initials">${avatarSrc}</div>`;
 
-        // 2. 【新增】创建 message-content 容器
+        // 2. 【核心修复】创建 message-content 容器
         const messageContent = document.createElement('div');
         messageContent.className = 'message-content';
 
         // 3. 创建红包气泡并绑定事件
         const bubble = createRedPacketBubble(messageObj);
 
-        // 4. 【核心】将气泡放入 message-content 容器
+        // 4. 【核心修复】将气泡放入 message-content 容器
         messageContent.appendChild(bubble);
 
-        // 5. 【核心】根据发送者，决定头像和内容的顺序
+        // 5. 【核心修复】根据发送者，决定头像和内容的顺序
         if (messageObj.sender === 'user') {
             messageRow.appendChild(messageContent);
             messageRow.appendChild(avatarEl);
@@ -1069,12 +1070,10 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
         }
 
         // 绑定长按等事件到气泡上（保持和其他消息一致的体验）
-        const isSweetheartChatActive = document.getElementById('sweetheartChatPage').classList.contains('show');
         bindMessageEvents(bubble, contactId, messageIndex, isSweetheartChatActive);
 
         return messageRow;
     }
-    /* ▲▲▲ 替换结束 ▲▲▲ */
 
     if (messageObj.type === 'notice') {
         return createSystemNotice(messageObj);
@@ -1124,7 +1123,6 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
         bubble.classList.add('render-bubble');
         const iframe = document.createElement('iframe');
         iframe.className = 'render-iframe';
-        // 关键：iframe 的 sandbox 属性，这里设置为允许必要的交互，但限制了对父页面的访问
         iframe.sandbox = 'allow-scripts allow-forms allow-pointer-lock allow-popups allow-same-origin allow-top-navigation-by-user-activation';
 
         const renderContent = renderMatch[1];
@@ -1140,9 +1138,6 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
         const eventCaptureLayer = document.createElement('div');
         eventCaptureLayer.className = 'iframe-event-capture-layer'; // 新的类名
         bubble.appendChild(eventCaptureLayer);
-
-        // 移除所有 iframe 自身对事件的拦截，完全交给 bubble 外部的 capture layer 处理
-        // iframe.addEventListener('touchstart', ...); 等逻辑全部移除
 
     } else if (messageObj.imageUrl) {
         // --- B. 处理图片消息 ---
@@ -1163,8 +1158,8 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
 
             contentHTML += `
                 <div class="quoted-message-wrapper">
-                    <div class="quoted-sender">${escapeHTML(messageObj.quote.senderName)}</div>
-                    <div class="quoted-text">${escapeHTML(quotedText)}</div>
+                    <strong class="quoted-sender">${escapeHTML(messageObj.quote.senderName)}</strong>
+                    <span class="quoted-text">${escapeHTML(quotedText)}</span>
                 </div>`;
         }
 
@@ -1172,7 +1167,6 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
         if (formattedText) {
             contentHTML += `<div class="main-message-text">${formattedText}</div>`;
         }
-
         bubble.innerHTML = contentHTML;
     }
 
@@ -1215,7 +1209,7 @@ function bindMessageEvents(element, contactId, messageIndex, isSweetheart) {
 
     // ==================== 辅助函数 START ====================
     const getCoords = (e) => {
-        if (e.touches && e.touches[0]) return {x: e.touches[0].clientX, y: e.touches[0].clientY};
+        if (e.touches && typeof e.touches[0] !== 'undefined') return {x: e.touches[0].clientX, y: e.touches[0].clientY};
         return {x: e.clientX, y: e.clientY};
     };
 
@@ -1294,26 +1288,20 @@ function bindMessageEvents(element, contactId, messageIndex, isSweetheart) {
         if (longPressTimer) {
             clearTimeout(longPressTimer);
             if (!isMoving) { // 确保是点击，而不是滑动
-                if (element.classList.contains('red-packet-bubble')) {
-                    // 如果点击的是红包，就调用开红包函数
-                    handleRedPacketClick(contactId, messageIndex);
+                // 确保在多选模式下，点击消息是选择，而不是触发红包或 iframe 交互
+                const currentMultiSelectMode = isSweetheart ? isSweetheartMultiSelectMode : isNormalMultiSelectMode;
+                if (!currentMultiSelectMode) {
+                    if (element.classList.contains('red-packet-bubble')) {
+                        // 如果点击的是红包，就调用开红包函数
+                        handleRedPacketClick(contactId, messageIndex);
+                    } else if (element.classList.contains('render-bubble')) {
+                        // 如果是 iframe 消息，且是短点击，那么就让 iframe 进入交互模式
+                        // 这里的策略是：短点击不打开菜单，长按才开菜单。
+                        // iframe 自身的点击事件会由其内部处理，无需额外模拟
+                    }
                 }
-                // 这里可以为其他类型的元素添加点击逻辑...
             }
             longPressTimer = null;
-
-            // 只有当没有移动过，才模拟点击行为（例如：打开 iframe 交互）
-            // 注意：这里需要考虑与多选模式的兼容性，多选模式下点击消息是选择，而不是模拟点击。
-            if (!isMoving && (!isSweetheart && !isNormalMultiSelectMode) && (isSweetheart && !isSweetheartMultiSelectMode)) {
-                // 如果是 iframe 消息，且是短点击，那么就让 iframe 进入交互模式
-                const iframe = element.querySelector('.render-iframe');
-                if (iframe) {
-                    // 可以在这里触发 iframe 的某种交互，例如让它获得焦点或者触发内部模拟点击
-                    // 然而，直接操作 iframe 内部是不允许的，只能通过 pointer-events 间接控制
-                    // 这里的策略是：短点击不打开菜单，长按才开菜单。
-                    // iframe 自身的点击事件会由其内部处理，无需额外模拟
-                }
-            }
         }
         resetState(); // 总是清除状态
     };
@@ -4953,7 +4941,7 @@ async function getAiReply() {
     if (!chatInput || !getReplyBtn || !messagesEl) return;
 
     getReplyBtn.disabled = true;
-    chatInput.disabled = true;
+    // chatInput.disabled = true;
 
     // === 构建发送给AI的消息数组 ===
     const messages = [];
@@ -5100,7 +5088,7 @@ async function getAiReply() {
     renderContacts(contactsData);
     messagesEl.scrollTop = messagesEl.scrollHeight;
     getReplyBtn.disabled = false;
-    chatInput.disabled = false;
+    // chatInput.disabled = false;
     chatInput.focus();
 }
 
@@ -7508,7 +7496,7 @@ async function getSweetheartAiReply() {
     }
 
     getReplyBtn.disabled = true;
-    chatInput.disabled = true;
+    // chatInput.disabled = true;
 
     // --- 步骤 1: 构建发送给AI的消息数组 ---
     const messages = [];
@@ -7580,9 +7568,9 @@ async function getSweetheartAiReply() {
     }
 
     const chatHistory = JSON.parse(localStorage.getItem('phoneSweetheartChatHistory') || '{}');
-    const contactMessages = chatHistory[contactId] || [];
+    const contactSweetheartMessages = chatHistory[contactId] || [];
     const memoryRounds = currentSweetheartChatContact.memoryRounds || 10;
-    const recentMessages = contactMessages.slice(-(memoryRounds * 2));
+    const recentMessages = contactSweetheartMessages.slice(-(memoryRounds * 2));
 
     let userTextBuffer = []; // 1. 创建文本缓冲区
     for (const msg of recentMessages) {
@@ -7599,7 +7587,7 @@ async function getSweetheartAiReply() {
                 messages.push({role: 'user', content: contentArray});
                 userTextBuffer = []; // 3. 清空缓冲区
                 // 标记图片为“已处理”并立即保存
-                const msgIndex = contactMessages.findIndex(m => m.timestamp === msg.timestamp);
+                const msgIndex = contactSweetheartMessages.findIndex(m => m.timestamp === msg.timestamp);
                 if (msgIndex !== -1) {
                     chatHistory[contactId][msgIndex].isProcessed = true;
                 }
@@ -7607,18 +7595,24 @@ async function getSweetheartAiReply() {
                 // 4. 遇到文本，存入缓冲区
                 userTextBuffer.push(msg.text);
             }
-        } else {
-            // 当消息是AI发送时
-            // 5. 先“冲刷”缓冲区里用户的文本
+        } else { // AI 发送的消息
+            // 5. 先“冲刷”缓冲区里用户的文本（在 AI 回复之前，确保所有的用户输入都被发出）
             if (userTextBuffer.length > 0) {
                 messages.push({role: 'user', content: userTextBuffer.join('\n')});
                 userTextBuffer = [];
             }
-            // 6. 再添加AI的回复
+            // 6. 再添加 AI 的回复
             if (msg.type === 'location') {
+                 // 确保 location 消息作为 system 角色发送，因为它不是对话的一部分
                 messages.push({
                     role: 'system',
                     content: `[场景变化] 你们来到了【${msg.locationName}】。描述：${msg.locationDesc}`
+                });
+            } else if (msg.type === 'red-packet') {
+                // 将红包消息也作为系统提示或简单文本提示，AI 不会直接“看到”红包UI
+                messages.push({
+                    role: 'assistant',
+                    content: `[收到红包] 内容：${msg.content.greeting} 金额：${msg.content.amount}元`
                 });
             } else if (msg.text) {
                 messages.push({
@@ -7627,14 +7621,14 @@ async function getSweetheartAiReply() {
                 });
             }
         }
-
     }
     // 7. 循环结束后，冲刷最后剩余的用户文本
     if (userTextBuffer.length > 0) {
         messages.push({role: 'user', content: userTextBuffer.join('\n')});
     }
-    // 保存对 isProcessed 标志的修改
+    // 保存对 isProcessed 标志的修改（如果有）
     localStorage.setItem('phoneSweetheartChatHistory', JSON.stringify(chatHistory));
+
     // --- 步骤 3: 处理当前输入框的新消息 (与旧版类似) ---
     const currentUserInput = chatInput.value.trim();
     if (currentUserInput) {
@@ -7676,24 +7670,32 @@ async function getSweetheartAiReply() {
             console.log('✅ 状态已成功更新！');
         }
         // 3. 处理聊天回复文本（无论JSON解析是否成功，我们总是有文本可以显示）
-        //    我们不再需要在这里分割 '---'，因为 render 逻辑会处理
         const replyText = chatReplyText || '...';
 
         // 4. 将回复文本分割成多个气泡
         const segments = replyText.split('---').filter(s => s.trim());
 
-        // 如果AI没有使用分割符，则将整个回复作为一个气泡
+        // 如果AI没有使用分割符，且文本不为空，则将整个回复作为一个气泡
         if (segments.length === 0 && replyText.trim() !== '') {
             segments.push(replyText);
+        } else if (segments.length === 0 && replyText.trim() === '') {
+            // 如果AI返回空文本且没有段落分隔符，则不显示任何气泡
+            console.warn("AI返回的回复文本为空。");
         }
+
         // 5. 依次渲染每个分段的气泡
         const redPacketFullRegex = /\/red-packet\/({.*?})\//g; // 匹配整个标签，捕获内部 JSON
+
         for (const segmentText of segments) {
             const trimmedSegment = segmentText.trim();
             let lastIndex = 0;
             let match;
+
+            // 复制正则表达式，因为它的 `lastIndex` 属性会在循环中改变
+            const currentRedPacketRegex = new RegExp(redPacketFullRegex);
+
             // 尝试在当前 segmentText 中查找所有红包标签
-            while ((match = redPacketFullRegex.exec(trimmedSegment)) !== null) {
+            while ((match = currentRedPacketRegex.exec(trimmedSegment)) !== null) {
                 // 如果在红包标签之前有普通文本，先将其作为普通消息添加
                 if (match.index > lastIndex) {
                     const preText = trimmedSegment.substring(lastIndex, match.index).trim();
@@ -7733,9 +7735,8 @@ async function getSweetheartAiReply() {
                     const messageRow = _createMessageDOM(contactId, errorMessageObj, newIndex);
                     messagesEl.appendChild(messageRow);
                     messagesEl.scrollTop = messagesEl.scrollHeight;
-                    await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 400));
                 }
-                lastIndex = redPacketFullRegex.lastIndex;
+                lastIndex = currentRedPacketRegex.lastIndex;
             }
             // 处理红包标签之后可能存在的普通文本
             if (lastIndex < trimmedSegment.length) {
@@ -7750,14 +7751,13 @@ async function getSweetheartAiReply() {
                 }
             }
         }
-        // ▲▲▲▲▲ 核心改造到这里结束 ▲▲▲▲▲
     }
 
     // --- 步骤 6: 收尾工作 ---
     renderSweetheartList();
     messagesEl.scrollTop = messagesEl.scrollHeight;
     getReplyBtn.disabled = false;
-    chatInput.disabled = false;
+    // chatInput.disabled = false;
     chatInput.focus();
 }
 
