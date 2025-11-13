@@ -713,9 +713,113 @@ const globalConfig = {
     },
     customIcons: {},
     savedWidgets: [],
-    dockIcons: ['https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760103483956_qdqqd_ufc76a.png', 'https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760095214931_qdqqd_cud7dm.png', 'https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760094934930_qdqqd_5lvg07.png', 'https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760103414729_qdqqd_t8eu22.png']
+    dockIcons: ['https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760103483956_qdqqd_ufc76a.png', 'https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760095214931_qdqqd_cud7dm.png', 'https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760094934930_qdqqd_5lvg07.png', 'https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760103414729_qdqqd_t8eu22.png'],
+    showAvatarsInSweetheartChat: false
 };
 
+// ========== 密友聊天头像显示控制 - 完整版 ==========
+
+/**
+ * 🆕 初始化头像开关的事件监听
+ * 这个函数会在页面加载时被调用
+ */
+function initAvatarToggle() {
+    const checkbox = document.getElementById('showAvatarsToggle');
+    if (!checkbox) {
+        console.warn('⚠️ 找不到头像开关元素 #showAvatarsToggle');
+        return;
+    }
+
+    // 1. 设置checkbox的初始状态（根据配置）
+    checkbox.checked = globalConfig.showAvatarsInSweetheartChat;
+
+    // 2. 监听checkbox的变化事件
+    checkbox.addEventListener('change', function() {
+        console.log(`💖 用户${this.checked ? '开启' : '关闭'}了头像显示`);
+        toggleSweetheartAvatars();
+    });
+
+    console.log('✅ 头像开关已初始化，当前状态：' + (checkbox.checked ? '开启' : '关闭'));
+}
+
+/**
+ * 从localStorage加载头像显示设置
+ * 这个函数在页面启动时调用
+ */
+function loadSweetheartAvatarSetting() {
+    try {
+        const saved = localStorage.getItem('showAvatarsInSweetheartChat');
+        if (saved !== null) {
+            globalConfig.showAvatarsInSweetheartChat = JSON.parse(saved);
+            console.log('📂 已加载头像设置：' + (globalConfig.showAvatarsInSweetheartChat ? '显示' : '隐藏'));
+        } else {
+            console.log('📂 未找到保存的头像设置，使用默认值：隐藏');
+        }
+    } catch (e) {
+        console.error('❌ 加载头像设置失败:', e);
+        // 出错时使用默认值
+        globalConfig.showAvatarsInSweetheartChat = false;
+    }
+
+    // 立即应用设置到页面
+    updateSweetheartAvatarDisplay();
+}
+
+/**
+ * 切换密友聊天中的头像显示
+ * 这个函数会在用户点击开关时被调用
+ */
+function toggleSweetheartAvatars() {
+    // 1. 切换配置状态
+    globalConfig.showAvatarsInSweetheartChat = !globalConfig.showAvatarsInSweetheartChat;
+
+    // 2. 保存到localStorage
+    try {
+        localStorage.setItem('showAvatarsInSweetheartChat', JSON.stringify(globalConfig.showAvatarsInSweetheartChat));
+        console.log(`💾 头像设置已保存：${globalConfig.showAvatarsInSweetheartChat ? '显示' : '隐藏'}`);
+    } catch (e) {
+        console.error('❌ 保存头像设置失败:', e);
+    }
+
+    // 3. 更新UI显示
+    updateSweetheartAvatarDisplay();
+
+    // 4. 同步checkbox状态（防止状态不一致）
+    const checkbox = document.getElementById('showAvatarsToggle');
+    if (checkbox) {
+        checkbox.checked = globalConfig.showAvatarsInSweetheartChat;
+    }
+
+    // 5. 如果当前正在密友聊天界面，立即刷新消息显示
+    if (currentSweetheartChatContact) {
+        console.log('🔄 正在刷新密友聊天界面...');
+        openSweetheartChat(currentSweetheartChatContact);
+    }
+
+    // 6. 显示用户友好的提示
+    const statusText = globalConfig.showAvatarsInSweetheartChat ? '已开启' : '已关闭';
+    showSuccessModal('设置成功', `密友聊天头像显示${statusText} 💖`, 1500);
+}
+
+/**
+ * 更新密友聊天页面的头像显示类
+ * 这个函数会在设置改变时被调用
+ */
+function updateSweetheartAvatarDisplay() {
+    const sweetheartChatPage = document.getElementById('sweetheartChatPage');
+    if (!sweetheartChatPage) {
+        console.warn('⚠️ 找不到密友聊天页面元素');
+        return;
+    }
+
+    if (globalConfig.showAvatarsInSweetheartChat) {
+        sweetheartChatPage.classList.add('show-avatars');
+        console.log('✅ 已为密友聊天页面添加 .show-avatars 类');
+    } else {
+        sweetheartChatPage.classList.remove('show-avatars');
+        console.log('✅ 已从密友聊天页面移除 .show-avatars 类');
+    }
+}
 // ========== 开始：请用这个【修正版】函数替换旧的 openCharacterCardPage 函数 ==========
 
 function openCharacterCardPage() {
@@ -1170,21 +1274,21 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
         bubble.innerHTML = contentHTML;
     }
 
+    // 组装消息内容
     messageContent.appendChild(senderName);
     messageContent.appendChild(bubble);
 
-    if (messageObj.sender === 'user') {
-        messageRow.appendChild(messageContent);
-        messageRow.appendChild(avatarEl);
-    } else {
-        messageRow.appendChild(avatarEl);
-        messageRow.appendChild(messageContent);
-    }
+    // 🔥🔥🔥 核心修复：确保无论sent还是received，都正确添加头像和内容 🔥🔥🔥
+    // ✅ 统一使用：先头像，后内容（通过CSS的flex属性和order控制最终布局）
 
-    // 绑定事件到气泡本身
+    messageRow.appendChild(avatarEl);      // 1. 先添加头像
+    messageRow.appendChild(messageContent); // 2. 再添加内容
+
+    // 绑定事件
     bindMessageEvents(bubble, contactId, messageIndex, isSweetheartChatActive);
 
     return messageRow;
+
 }
 
 
@@ -6643,6 +6747,9 @@ function openSweetheartChat(contact) {
     // 使用 requestAnimationFrame 来确保类名添加在下一个渲染周期前完成
     requestAnimationFrame(() => {
         chatPage.classList.add('show');
+        // ▼▼▼ 新增：应用头像显示设置 ▼▼▼
+        applySweetheartChatAvatarsSetting(globalConfig.showAvatarsInSweetheartChat);
+        // ▲▲▲ 新增结束 ▼▼▼
 
         // 加载聊天记录
         const chatHistory = JSON.parse(localStorage.getItem('phoneSweetheartChatHistory') || '{}');
@@ -13535,8 +13642,39 @@ function createSystemNotice(messageObj) {
     return notice;
 }
 
+/**
+ * 切换密友聊天中是否显示头像
+ * @param {boolean} isEnabled - 是否显示头像
+ */
+function toggleSweetheartChatAvatars(isEnabled) {
+    globalConfig.showAvatarsInSweetheartChat = isEnabled;
+    localStorage.setItem('showAvatarsInSweetheartChat', isEnabled.toString());
+    applySweetheartChatAvatarsSetting(isEnabled);
+    showSuccessModal('头像显示设置', isEnabled ? '已开启头像显示' : '已关闭头像显示');
 
-// ▲▲▲ JavaScript代码粘贴结束 ▲▲▲
+    // 如果密友聊天页面当前是打开状态，需要刷新以应用新设置
+    const sweetheartChatPage = document.getElementById('sweetheartChatPage');
+    if (sweetheartChatPage && sweetheartChatPage.classList.contains('show') && currentSweetheartChatContact) {
+        // 重新打开当前聊天，会触发消息重新渲染，从而应用新的CSS类
+        openSweetheartChat(currentSweetheartChatContact);
+    }
+}
+
+/**
+ * 应用密友聊天显示头像的设置
+ * @param {boolean} isEnabled - 是否显示头像
+ */
+function applySweetheartChatAvatarsSetting(isEnabled) {
+    const sweetheartChatPage = document.getElementById('sweetheartChatPage');
+    if (sweetheartChatPage) {
+        if (isEnabled) {
+            sweetheartChatPage.classList.add('show-avatars');
+        } else {
+            sweetheartChatPage.classList.remove('show-avatars');
+        }
+    }
+}
+
 
 
 function initializeApp() {
@@ -13592,6 +13730,22 @@ function initializeApp() {
     setupSummarizeButton();
     setupTestButton();
     updateTestButtonState(); // 初始化测试按钮状态
+    loadSweetheartAvatarSetting();
+    initAvatarToggle();
+
+    // ▼▼▼ 新增：密友聊天显示头像功能初始化 ▼▼▼
+    const showAvatarsToggle = document.getElementById('showAvatarsToggle');
+    if (showAvatarsToggle) {
+        // 从 localStorage 加载设置，默认为 false
+        globalConfig.showAvatarsInSweetheartChat = localStorage.getItem('showAvatarsInSweetheartChat') === 'true';
+        showAvatarsToggle.checked = globalConfig.showAvatarsInSweetheartChat;
+        // 添加事件监听器
+        showAvatarsToggle.addEventListener('change', function () {
+            toggleSweetheartChatAvatars(this.checked);
+        });
+        // 首次加载应用此设置
+        applySweetheartChatAvatarsSetting(globalConfig.showAvatarsInSweetheartChat);
+    }
 
     // ===== 第六步：加载联系人数据 =====
     const savedContacts = localStorage.getItem('phoneContactsData');

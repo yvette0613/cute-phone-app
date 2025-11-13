@@ -89,10 +89,7 @@ body {
 }
 
 /* 默认隐藏头像和名字，只在简洁模式下显示 */
-.message-chat-avatar,
-.message-sender-name {
-    display: none;
-}
+
 
 .chat-page.simple-style .message-chat-avatar,
 .chat-page.simple-style .message-sender-name {
@@ -120,6 +117,10 @@ body {
     font-size: 16px;
     font-weight: bold;
     color: white;
+}
+
+.message-chat-avatar, .message-sender-name {
+    display: none;
 }
 
 /* ========== 结束：【最终修正版】简洁聊天样式 ========== */
@@ -3932,7 +3933,7 @@ body.code-scrolling-enabled .code-block-wrapper {
     overflow-y: auto; /* 保持：当内容超出时滚动 */
     min-height: 0; /* ✨ 这是解决问题的关键！允许此区域收缩 */
     /* ... 其他样式保持不变 ... */
-    padding: 20px;
+    padding: 10px;
     display: flex;
     flex-direction: column;
     background-color: #FDF6F8;
@@ -4083,6 +4084,7 @@ body.code-scrolling-enabled .code-block-wrapper {
 .chat-page.simple-style .message-content {
     gap: 4px;
 }
+
 
 
 /* ========== 世界选择页面样式 ========== */
@@ -9728,3 +9730,138 @@ body.code-scrolling-enabled .code-block-wrapper {
 }
 
 /* ▲▲▲ CSS代码粘贴结束 ▲▲▲ */
+/* ========== [最高优先级版本] 密友聊天头像显示控制 ========== */
+
+/* 1. 默认隐藏头像和发送者名称（降低优先级，方便被覆盖）*/
+.sweetheart-chat-page .message-chat-avatar,
+.sweetheart-chat-page .message-sender-name {
+    display: none;
+}
+
+/* 2. ✅ 开启头像显示时，使用更高的优先级强制显示 */
+.sweetheart-chat-page.show-avatars .message-chat-avatar {
+    display: flex !important; /* 使用 !important 确保优先级最高 */
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    overflow: hidden;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    background: #FFF0F5;
+    border: 2px solid #FFE8E8;
+}
+
+/* 3. 头像内的图片样式 */
+.sweetheart-chat-page.show-avatars .message-chat-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* 4. 头像内的emoji/文字样式 */
+.sweetheart-chat-page.show-avatars .message-chat-avatar .initials {
+    font-size: 18px;
+    line-height: 1;
+    color: #D4A5A5;
+}
+
+/* 5. ✅ 也让发送者名称显示出来（可选，如果需要的话）*/
+.sweetheart-chat-page.show-avatars .message-sender-name {
+    display: block !important;
+    font-size: 12px;
+    color: #999;
+    margin-bottom: 4px;
+}
+
+/* 6. 消息行的基础flex布局 */
+.sweetheart-chat-page.show-avatars .message-row {
+    display: flex !important;
+    align-items: flex-end !important;
+    gap: 8px !important;
+    margin-bottom: 12px;
+    padding: 0 2px;
+    width: 100%;
+}
+
+/* 7. ✅ 接收的消息（对方）：头像在左，内容在右 */
+.sweetheart-chat-page.show-avatars .message-row.received {
+    justify-content: flex-start !important;
+    flex-direction: row !important;
+}
+
+/* 8. ✅ 发送的消息（自己）：通过order让头像显示在右侧 */
+.sweetheart-chat-page.show-avatars .message-row.sent {
+    justify-content: flex-end !important;
+    flex-direction: row !important;
+}
+
+/* 9. ✅ 核心技巧：使用CSS的order属性调整sent消息的视觉顺序 */
+/* 因为DOM顺序统一为：头像 → 内容，所以用order让sent消息的头像显示在后面 */
+.sweetheart-chat-page.show-avatars .message-row.sent .message-chat-avatar {
+    order: 2; /* 头像排在后面（右侧）*/
+}
+
+.sweetheart-chat-page.show-avatars .message-row.sent .message-content {
+    order: 1; /* 内容排在前面（左侧）但整体靠右 */
+}
+
+/* 10. 接收消息保持默认order（头像在左，内容在右）*/
+.sweetheart-chat-page.show-avatars .message-row.received .message-chat-avatar {
+    order: 1;
+}
+
+.sweetheart-chat-page.show-avatars .message-row.received .message-content {
+    order: 2;
+}
+
+/* 11. 消息内容容器的样式 */
+.sweetheart-chat-page.show-avatars .message-content {
+    max-width: calc(100% - 50px);
+    display: flex;
+    flex-direction: column;
+}
+
+/* 12. 接收消息的内容左对齐 */
+.sweetheart-chat-page.show-avatars .message-row.received .message-content {
+    align-items: flex-start;
+}
+
+/* 13. 发送消息的内容右对齐 */
+.sweetheart-chat-page.show-avatars .message-row.sent .message-content {
+    align-items: flex-end;
+}
+
+/* 14. 气泡自适应内容，不超出容器 */
+.sweetheart-chat-page.show-avatars .chat-bubble {
+    max-width: 100%;
+    word-wrap: break-word;
+    word-break: break-word;
+}
+
+/* 15. 红包消息的宽度限制 */
+.sweetheart-chat-page.show-avatars .red-packet-bubble {
+    max-width: 220px;
+}
+
+/* 16. 图片消息的特殊处理 */
+.sweetheart-chat-page.show-avatars .chat-bubble.image-only {
+    max-width: 200px;
+    padding: 0;
+    background: transparent;
+}
+
+.sweetheart-chat-page.show-avatars .chat-bubble.image-only img {
+    border-radius: 8px;
+}
+
+/* 17. 代码块的宽度限制 */
+.sweetheart-chat-page.show-avatars .code-block-wrapper {
+    max-width: calc(100vw - 120px);
+}
+
+/* 18. iframe消息的特殊处理 */
+.sweetheart-chat-page.show-avatars .render-bubble {
+    max-width: 280px;
+    min-width: 200px;
+}
