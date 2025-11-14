@@ -1206,6 +1206,8 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
         return messageRow;
     }
 
+    // ... (之前的代码)
+
     // =======================================================================
     // ▼▼▼ 核心修改区域：语音条逻辑重构 ▼▼▼
     // =======================================================================
@@ -1221,7 +1223,7 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
         avatarEl.className = 'message-chat-avatar';
         let avatarSrc = messageObj.sender === 'user' ? (userProfile?.avatar || '👤') : (contactData?.avatar || '💬');
         const isUrl = avatarSrc.startsWith('http') || avatarSrc.startsWith('data:');
-        avatarEl.innerHTML = isUrl ? `<img src="${avatarSrc}" alt="avatar">` : `<div class="initials">${avatarSrc}</div>`;
+        avatarEl.innerHTML = isUrl ? `<img src="${avatarSrc}" alt="avatar">` : `<div class="initials">${escapeHTML(avatarSrc)}</div>`;
 
         const messageContent = document.createElement('div');
         messageContent.className = 'message-content';
@@ -1274,38 +1276,52 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
             }
         }
 
-        // ▼ ▼ ▼ 核心修改部分 ▼ ▼ ▼
+        // ▼ ▼ ▼ 核心修改部分：点击播放和展开/收起文字 ▼ ▼ ▼
+        // 重置状态变量，防止上一次播放的状态影响这一次
         let touchStartX = 0;
         let touchStartY = 0;
         let isMovingDuringTouch = false;
+        let longPressPlayTimer = null; // 新增：用于区分播放按钮的短按和长按，防止长按后也触发播放
+
         const triggerPlay = async (e) => {
             // 阻止长按事件的默认行为，防止菜单意外弹出
             if (e.cancelable) {
                 e.preventDefault();
             }
-            e.stopPropagation(); // 阻止事件冒泡到父元素（如整个气泡的长按事件）
+            e.stopPropagation(); // 阻止事件冒泡到父元素（如整个气泡的长按事件或文字展开事件）
+
+            clearTimeout(longPressPlayTimer); // 清除长按播放的判断计时器
+
+            // 只有当不是拖动触摸时才触发播放
+            if (e.type === 'touchend' && isMovingDuringTouch) {
+                return; // 如果是滑动，则不触发播放
+            }
+
             const voiceConfig = globalConfig.minimaxVoice;
             if (!voiceConfig.apiUrl || !voiceConfig.apiKey || !voiceConfig.groupId || !voiceConfig.ttsModel) {
                 showErrorModal('语音配置不完整', '请在“设置 > 语音设置”中完整配置 Minimax TTS。');
                 return;
             }
+
             // 如果当前有音频正在播放
             if (currentAudio) {
                 const wasPlayingThis = currentPlayingButton === playIcon;
                 // 暂停当前播放的音频，这会触发 onpause 事件，从而重置UI
                 currentAudio.pause();
+                currentAudio = null; // 确保清除
+                currentPlayingButton = null;
                 if (wasPlayingThis) {
                     // 如果点击的是正在播放的按钮，暂停后直接返回，不重新播放
-                    currentAudio = null; // 确保清除
-                    currentPlayingButton = null;
                     return;
                 }
             }
+
             const textToSynthesize = messageObj.content.text || '';
             if (!textToSynthesize) {
                 showErrorModal('无法播放', '该语音消息没有转写文本。');
                 return;
             }
+
             let voiceId = '';
             if (messageObj.sender === 'user') {
                 voiceId = userProfile.userVoiceId || 'male-qn-qingse';
@@ -1315,10 +1331,12 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
                     : contactsData.find(c => c.id === contactId);
                 voiceId = contact?.voiceId || 'female-qn-yuxin';
             }
+
             // --- UI: 设置为加载状态 ---
             playIcon.disabled = true;
             playIcon.classList.add('loading');
             playIcon.innerHTML = `<svg class="spinner" viewBox="0 0 50 50"><circle class="path" cx="25" cy="25" r="20" fill="none" stroke-width="5"></circle></svg>`;
+
             try {
                 // --- API 调用 ---
                 const response = await fetch(`${voiceConfig.apiUrl}?GroupId=${voiceConfig.groupId}`, {
@@ -1332,21 +1350,27 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
                         voice_setting: {voice_id: voiceId, speed: 1, vol: 1, pitch: 0}
                     })
                 });
+
                 if (!response.ok) {
                     const errData = await response.json().catch(() => ({}));
                     throw new Error(`API请求失败: ${response.status} - ${errData.base_resp?.status_msg || response.statusText}`);
                 }
+
                 const data = await response.json();
                 if (data.base_resp.status_code !== 0 || !data.data?.audio) {
                     throw new Error(`语音合成失败: ${data.base_resp?.status_msg || '未知错误'}`);
                 }
+
                 // --- 音频处理与播放 ---
                 const audioBytes = hexToUint8Array(data.data.audio);
                 const audioBlob = new Blob([audioBytes], {type: 'audio/mpeg'});
+                // ... (接上文 `const audioBytes = hexToUint8Array(data.data.audio);` 之后)
+
                 const audioObjectUrl = URL.createObjectURL(audioBlob);
                 const audio = new Audio(audioObjectUrl);
-                currentAudio = audio;
-                currentPlayingButton = playIcon;
+                currentAudio = audio;        // 存储为全局变量，方便控制
+                currentPlayingButton = playIcon; // 记录当前正在播放的按钮
+
                 // 【核心】将UI更新与真实音频事件绑定
                 audio.onplay = () => {
                     playIcon.disabled = false;
@@ -1355,29 +1379,34 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
                     playIcon.innerHTML = `<svg viewBox="0 0 24 24"><path fill="currentColor" d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>`;
                     voiceBubble.classList.add('is-playing');
                 };
+
                 audio.ontimeupdate = () => {
                     if (audio.duration > 0) {
                         progressBar.style.width = `${(audio.currentTime / audio.duration) * 100}%`;
                     }
                 };
+
                 const resetUI = () => {
                     playIcon.classList.remove('playing', 'loading');
                     playIcon.innerHTML = `<svg viewBox="0 0 24 24"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>`;
                     voiceBubble.classList.remove('is-playing');
                     progressBar.style.width = '0%';
-                    URL.revokeObjectURL(audioObjectUrl);
-                    if (currentAudio === playIcon) { // 注意这里是 currentAudio === playIcon，原始代码是 currentPlayingButton === playIcon，但 currentAudio 存储的是 Audio 对象，不是 DOM 按钮
+                    URL.revokeObjectURL(audioObjectUrl); // 释放内存
+                    if (currentAudio === audio) { // 确保清除的是当前正在播放的这个Audio对象
                          currentAudio = null;
                          currentPlayingButton = null;
                     }
                 };
+
                 audio.onpause = resetUI;
                 audio.onended = resetUI;
                 audio.onerror = () => {
                     showErrorModal('播放失败', '音频文件损坏或无法播放。');
                     resetUI();
                 };
+
                 audio.play();
+
             } catch (error) {
                 console.error('播放语音条失败:', error);
                 showErrorModal('语音合成错误', error.message);
@@ -1386,7 +1415,9 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
                 playIcon.innerHTML = `<svg viewBox="0 0 24 24"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>`;
             }
         };
+
         // --- 【新增或修改】事件监听器部分 ---
+
         // 触摸开始（Mobile）
         playIcon.addEventListener('touchstart', (e) => {
             // 记录触摸起始位置，用于判断是否是滑动
@@ -1416,27 +1447,40 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
                 triggerPlay(e);
             }
         }, {passive: false}); // passive: false 允许阻止默认行为
+
         // 鼠标点击（Desktop）
         playIcon.addEventListener('click', triggerPlay);
-        // 点击气泡本身，切换转写文字的显示/隐藏（此功能保留）
+
+
+        // --- 【新增】语音气泡主体的点击事件，用于展开/收起转写文字 ---
+        // 这个事件应该绑定在 voiceBubble 本身，但要阻止来自 playIcon 的事件冒泡，
+        // 这样点击播放按钮时就不会同时展开/收起文字。
         voiceBubble.addEventListener('click', (e) => {
             // 如果点击的是播放按钮区域，则不触发转写显示隐藏
-            if (e.target.closest('.voice-play-icon')) return;
+            if (e.target.closest('.voice-play-icon')) {
+                return;
+            }
+            // 否则，切换转写文字的显示状态
             const transcriptionEl = voiceBubble.querySelector('.voice-transcription');
             if (transcriptionEl) {
                 transcriptionEl.style.display = transcriptionEl.style.display === 'none' ? 'block' : 'none';
             }
         });
+
         messageContent.appendChild(senderName);
         messageContent.appendChild(voiceBubble);
+
+        // 如果是密友聊天且开启头像显示，则添加头像
         if (isSweetheartChatActive && globalConfig.showAvatarsInSweetheartChat) {
             messageRow.appendChild(avatarEl);
         }
         messageRow.appendChild(messageContent); // 修正：确保内容总是附加
+
         // 这里的 bindMessageEvents 仍然需要，因为它处理的是长按菜单
         bindMessageEvents(voiceBubble, contactId, messageIndex, isSweetheartChatActive);
         return messageRow;
     }
+
     // ===================================
     // ▲▲▲ 核心修改区域结束 ▲▲▲
     // ===================================
@@ -1660,7 +1704,6 @@ async function playTtsMessage(sender, contactId, messageIndex, isSweetheart = fa
     }
 }
 
-
 /**
  * [终极修复版] 为指定消息元素绑定长按和右键菜单事件
  * - 确保事件被目标元素精确捕获，并全面阻止浏览器默认行为。
@@ -1673,7 +1716,7 @@ async function playTtsMessage(sender, contactId, messageIndex, isSweetheart = fa
  */
 function bindMessageEvents(element, contactId, messageIndex, isSweetheart) {
     if (!element.addEventListener) return;
-    console.log(`💡 Binding events for message index ${messageIndex} (Sweetheart: ${isSweetheart})`);
+    console.log(`💡 Binding message context menu events for message index ${messageIndex} (Sweetheart: ${isSweetheart})`);
 
     let longPressTimer = null;
     let startPos = {x: 0, y: 0};
@@ -1697,6 +1740,9 @@ function bindMessageEvents(element, contactId, messageIndex, isSweetheart) {
         clearTimeout(longPressTimer);
         longPressTimer = null;
         isMoving = false;
+        // 如果是render bubble，显示菜单时要禁用iframe事件捕获层
+        const renderOverlay = element.querySelector('.iframe-event-capture-layer');
+        if (renderOverlay) renderOverlay.style.pointerEvents = 'auto'; // 重新激活捕获层
     };
 
     const resetState = () => {
@@ -1704,6 +1750,9 @@ function bindMessageEvents(element, contactId, messageIndex, isSweetheart) {
         longPressTimer = null;
         isMoving = false;
         hasMenuShown = false;
+        // 恢复render bubble的iframe事件捕获层
+        const renderOverlay = element.querySelector('.iframe-event-capture-layer');
+        if (renderOverlay) renderOverlay.style.pointerEvents = 'none'; // 禁用捕获层，允许iframe交互
     };
     // ==================== 辅助函数 END ====================
 
@@ -1716,6 +1765,16 @@ function bindMessageEvents(element, contactId, messageIndex, isSweetheart) {
             e.preventDefault();
         }
         e.stopPropagation(); // 阻止事件冒泡到父元素（如可滚动的 chat-messages 区域）
+
+        // 如果是iframe的事件层，不处理长按菜单
+        if (e.target.classList.contains('iframe-event-capture-layer')) {
+            return;
+        }
+
+        // 如果是语音消息的播放按钮，不处理长按菜单（语音播放按钮有自己的长按处理）
+        if (e.target.closest('.voice-play-icon')) {
+            return;
+        }
 
         resetState(); // 重置所有状态
 
@@ -1730,6 +1789,7 @@ function bindMessageEvents(element, contactId, messageIndex, isSweetheart) {
     };
 
     const handleMove = (e) => {
+        // 如果菜单已经显示，或者没有长按计时器，则不处理移动
         if (!longPressTimer || hasMenuShown) return;
 
         const currentCoords = getCoords(e);
@@ -1807,6 +1867,7 @@ function bindMessageEvents(element, contactId, messageIndex, isSweetheart) {
 }
 
 
+
 /**
  * 辅助函数：创建一条降级显示的消息，用于处理渲染错误
  * @param {object} messageObj - 原始消息对象
@@ -1827,19 +1888,6 @@ function createFallbackMessage(messageObj) {
     messageContent.appendChild(bubble);
 
     row.appendChild(messageContent);
-    return row;
-}
-
-
-// ✅ 新增：降级函数
-function createFallbackMessage(messageObj) {
-    const row = document.createElement('div');
-    row.className = 'message-row ' + (messageObj.sender === 'user' ? 'sent' : 'received');
-    const bubble = document.createElement('div');
-    bubble.className = 'chat-bubble';
-    bubble.textContent = messageObj.text || '[渲染失败]';
-    bubble.style.cssText = 'background:#fff3cd;color:#856404;border-left:3px solid #ffc107';
-    row.appendChild(bubble);
     return row;
 }
 
