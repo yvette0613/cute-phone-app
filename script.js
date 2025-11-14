@@ -697,6 +697,14 @@ function updateTime() {
 
 updateTime();
 setInterval(updateTime, 60000);
+// script.js
+// ... (您的现有代码)
+
+let currentSimulationTimer = null; // 全局计时器，用于停止其他模拟播放
+let currentPlayingSimulatedVoiceBubble = null; // 当前正在模拟播放的语音条DOM元素
+
+// ... (您的其他全局变量和配置)
+
 const globalConfig = {
     apiConfigs: [],
     activeApiConfig: null,
@@ -734,7 +742,7 @@ function initAvatarToggle() {
     checkbox.checked = globalConfig.showAvatarsInSweetheartChat;
 
     // 2. 监听checkbox的变化事件
-    checkbox.addEventListener('change', function() {
+    checkbox.addEventListener('change', function () {
         console.log(`💖 用户${this.checked ? '开启' : '关闭'}了头像显示`);
         toggleSweetheartAvatars();
     });
@@ -820,6 +828,7 @@ function updateSweetheartAvatarDisplay() {
         console.log('✅ 已从密友聊天页面移除 .show-avatars 类');
     }
 }
+
 // ========== 开始：请用这个【修正版】函数替换旧的 openCharacterCardPage 函数 ==========
 
 function openCharacterCardPage() {
@@ -1182,6 +1191,159 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
 
         return messageRow;
     }
+
+    // ▼▼▼ 以下是处理 voice 消息的新代码 ▼▼▼
+    if (messageObj.type === 'voice') {
+        console.log('Rendering voice messageObj:', messageObj);
+        const messageRow = document.createElement('div');
+        messageRow.className = 'message-row ' + (messageObj.sender === 'user' ? 'sent' : 'received');
+        messageRow.dataset.timestamp = messageObj.timestamp;
+        messageRow.dataset.index = messageIndex;
+        let contactData = isSweetheartChatActive ? currentSweetheartChatContact : currentChatContact;
+        const avatarEl = document.createElement('div');
+        avatarEl.className = 'message-chat-avatar';
+        let avatarSrc = messageObj.sender === 'user' ? (userProfile?.avatar || '👤') : (contactData?.avatar || '💬');
+        const isUrl = avatarSrc.startsWith('http') || avatarSrc.startsWith('data:');
+        avatarEl.innerHTML = isUrl ? `<img src="${avatarSrc}" alt="avatar">` : `<div class="initials">${avatarSrc}</div>`;
+        const messageContent = document.createElement('div');
+        messageContent.className = 'message-content';
+        const senderName = document.createElement('div');
+        senderName.className = 'message-sender-name';
+        senderName.textContent = messageObj.sender === 'user' ? (userProfile.name || '我') : (contactData?.name || '联系人');
+        const voiceBubble = document.createElement('div');
+        voiceBubble.className = 'voice-message-bubble chat-bubble';
+        voiceBubble.classList.add(messageObj.sender === 'user' ? 'voice-sent' : 'voice-received');
+        const transcriptionText = escapeHTML(messageObj.content.text || '...');
+        const duration = messageObj.content.duration || '0'; // 获取语音模拟总时长
+        voiceBubble.innerHTML = `
+            <div class="voice-main-content">
+                <div class="voice-play-icon">
+                    <svg viewBox="0 0 24 24"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>
+                </div>
+                <div class="voice-bar">
+                    <div class="voice-progress-fill"></div>
+                </div>
+                <div class="voice-duration" data-duration="${duration}">${duration}"</div>
+            </div>
+            <div class="voice-transcription" style="display: none;">
+                <span class="disclosure-arrow">▲</span>
+                <div class="voice-text">${transcriptionText}</div>
+            </div>
+        `;
+        const playIcon = voiceBubble.querySelector('.voice-play-icon');
+        const voiceBar = voiceBubble.querySelector('.voice-bar');
+        const progressBar = voiceBubble.querySelector('.voice-progress-fill');
+        const disclosureArrow = voiceBubble.querySelector('.disclosure-arrow'); // 获取三角形元素
+        const totalDurationSeconds = parseFloat(duration);
+        let startTime = 0;
+        let animationFrameId = null;
+        // 动画启动/重置函数
+        const startVoiceAnimation = () => {
+            const voiceBarWidth = voiceBar.offsetWidth; // 获取 voice-bar 的实际宽度
+            const arrowInitialTransformX = -50; // disclosure-arrow 的初始 translateX(-50%)
+            // 目标位置是从 voice-bar 的 0% 到 100%，考虑 disclosure-arrow 自身的宽度居中
+            // 最终位置 = voiceBarWidth + 初始的 -50% 自身宽度偏移
+            const targetTransformX = voiceBarWidth;
+            // 设置 transition 属性和 transform 目标
+            // 先清除之前的任何 transition 效果，立即将位置设置到起点
+            disclosureArrow.style.transition = 'transform 0s linear';
+            disclosureArrow.style.transform = `translateX(-50%) rotate(180deg)`;
+            // 强制回流，确保DOM刷新，然后应用新的transition和transform
+            void disclosureArrow.offsetWidth; // 触发回流
+
+            disclosureArrow.style.transition = `transform ${totalDurationSeconds}s linear`;
+            disclosureArrow.style.transform = `translateX(calc(${targetTransformX}px - 50%)) rotate(180deg)`;
+            // 注意：这里 calc() 是为了抵消自身宽度，让中心点移动到最右侧
+
+            voiceBubble.classList.add('is-playing'); // 添加类名，如果需要其他样式联动
+        };
+        const resetVoiceAnimation = () => {
+            cancelAnimationFrame(animationFrameId); // 停止模拟进度
+            voiceBubble.classList.remove('is-playing'); // 移除类名
+            playIcon.classList.remove('playing');
+            progressBar.style.width = '0%'; // 进度条回0
+            // 立即将三角形重置到初始位置
+            disclosureArrow.style.transition = 'transform 0s linear'; // 先去除过渡，立即跳回
+            disclosureArrow.style.transform = `translateX(-50%) rotate(180deg)`; // 回到 voice-bar 的起始位置
+        };
+        const updateSimulationProgress = () => {
+            const currentTime = Date.now();
+            let elapsedMs = currentTime - startTime;
+            const progressPercentage = (elapsedMs / (totalDurationSeconds * 1000)) * 100;
+            progressBar.style.width = `${Math.min(100, progressPercentage)}%`;
+            if (elapsedMs >= (totalDurationSeconds * 1000)) {
+                // 模拟播放结束
+                resetVoiceAnimation(); // 结束时重置动画
+            } else {
+                animationFrameId = requestAnimationFrame(updateSimulationProgress);
+            }
+        };
+        // 点击播放事件
+        playIcon.addEventListener('click', (e) => {
+            e.stopPropagation();
+            // 如果有其他模拟音频正在播放，先停止它
+            if (currentPlayingSimulatedVoiceBubble && currentPlayingSimulatedVoiceBubble !== voiceBubble) {
+                // 停止上一个的模拟
+                clearInterval(currentSimulationTimer);
+                cancelAnimationFrame(animationFrameId);
+                const prevPlayIcon = currentPlayingSimulatedVoiceBubble.querySelector('.voice-play-icon');
+                const prevProgressBar = currentPlayingSimulatedVoiceBubble.querySelector('.voice-progress-fill');
+                if (prevPlayIcon) prevPlayIcon.classList.remove('playing');
+                if (prevProgressBar) prevProgressBar.style.width = '0%';
+                // 确保也要重置上一个的动画
+                currentPlayingSimulatedVoiceBubble.classList.remove('is-playing'); // 这行已经有了
+                disclosureArrow.style.transition = 'transform 0s linear'; // 重置上一个的过渡
+                disclosureArrow.style.transform = `translateX(-50%) rotate(180deg)`;
+                const prevDisclosureArrow = currentPlayingSimulatedVoiceBubble.querySelector('.disclosure-arrow');
+                if (prevDisclosureArrow) {
+                    prevDisclosureArrow.style.transition = 'transform 0s linear';
+                    prevDisclosureArrow.style.transform = `translateX(-50%) rotate(180deg)`;
+                }
+                // 这里需要显式调用上一个动画的 resetVoiceAnimation 或类似逻辑来重置其状态
+                // 这里需要更健壮的重置上一个语音的方法。
+                // 临时的修复可以是直接执行 resetVoiceAnimation 的核心逻辑
+                if (prevPlayIcon && currentPlayingSimulatedVoiceBubble.classList.contains('is-playing')) {
+                     currentPlayingSimulatedVoiceBubble.classList.remove('is-playing');
+                     const prevProgressBar = currentPlayingSimulatedVoiceBubble.querySelector('.voice-progress-fill');
+                     if(prevProgressBar) prevProgressBar.style.width = '0%';
+                     prevPlayIcon.classList.remove('playing');
+                }
+            }
+            // 更新全局状态
+            currentPlayingSimulatedVoiceBubble = voiceBubble; // 设置当前播放的语音条
+            // 检查是否正在播放 (通过is-playing类)
+            if (!voiceBubble.classList.contains('is-playing')) {
+                // 开始模拟播放
+                startTime = Date.now();
+                playIcon.classList.add('playing');
+                startVoiceAnimation(); // 启动三角形的过渡动画
+                animationFrameId = requestAnimationFrame(updateSimulationProgress);
+            } else {
+                // 停止播放并重置
+                resetVoiceAnimation();
+            }
+        });
+        // 点击事件：切换转写文字显示/隐藏 (保持不变)
+        voiceBubble.addEventListener('click', function (e) {
+            e.stopPropagation();
+            const transcriptionEl = this.querySelector('.voice-transcription');
+            if (transcriptionEl) {
+                transcriptionEl.style.display = transcriptionEl.style.display === 'none' ? 'block' : 'none';
+            }
+        });
+        messageContent.appendChild(senderName);
+        messageContent.appendChild(voiceBubble);
+        if (isSweetheartChatActive && globalConfig.showAvatarsInSweetheartChat) {
+            messageRow.appendChild(avatarEl);
+            messageRow.appendChild(messageContent);
+        } else {
+            messageRow.appendChild(avatarEl); // 头像DOM仍需要，但CSS会隐藏
+            messageRow.appendChild(messageContent);
+        }
+        bindMessageEvents(voiceBubble, contactId, messageIndex, isSweetheartChatActive);
+        return messageRow;
+    }
+    // ▲▲▲ 新增：处理语音条消息 结束 ▲▲▲
 
     if (messageObj.type === 'notice') {
         return createSystemNotice(messageObj);
@@ -2989,9 +3151,7 @@ function initializeSettingsPageListeners() {
     const fullscreenToggle = document.getElementById('fullscreenToggle');
     if (fullscreenToggle) {
         // 读取并应用保存的设置
-        const savedFullscreenSetting = localStorage.getItem('fullscreenEnabled') === 'true';
-        fullscreenToggle.checked = savedFullscreenSetting;
-        applyFullscreenSetting(savedFullscreenSetting); // 确保 apply 函数能正确处理初始状态
+        fullscreenToggle.checked = localStorage.getItem('fullscreenEnabled') === 'true';
 
         // 添加事件监听
         fullscreenToggle.addEventListener('change', function () {
@@ -3003,15 +3163,12 @@ function initializeSettingsPageListeners() {
     // ===== 悬浮球开关 =====
     const floatingBallToggle = document.getElementById('floatingBallToggle');
     if (floatingBallToggle) {
-        // 读取并应用保存的设置
-        const savedFloatingBallSetting = localStorage.getItem('floatingBallEnabled') === 'true';
-        floatingBallToggle.checked = savedFloatingBallSetting;
-        applyFloatingBallSetting(savedFloatingBallSetting);
-
-        // 添加事件监听
+        // 同样地，直接赋值，避免冗余变量
+        floatingBallToggle.checked = localStorage.getItem('floatingBallEnabled') === 'true';
         floatingBallToggle.addEventListener('change', function () {
-            applyFloatingBallSetting(this.checked);
-            localStorage.setItem('floatingBallEnabled', this.checked);
+            const isEnabled = this.checked;
+            applyFloatingBallSetting(isEnabled);
+            localStorage.setItem('floatingBallEnabled', isEnabled);
         });
     }
 }
@@ -6662,6 +6819,7 @@ function getLastMessagePreview(lastMessage) {
     // 如果消息格式未知，返回空
     return '';
 }
+
 // ▲▲▲ 替换结束 ▲▲▲
 
 /**
@@ -7084,8 +7242,13 @@ function saveSweetheartMessage(contactId, message) {
     }
 
     // ✅ 核心修复：为每条消息添加唯一的 `timestamp`
-    const messageToSave = {...message, timestamp: Date.now()};
-
+    // 确保 content 字段是深拷贝，避免引用问题
+    const messageToSave = {
+        ...message,
+        timestamp: Date.now(),
+        // 如果消息有 content 字段（如红包或语音条），则深拷贝它
+        content: message.content ? JSON.parse(JSON.stringify(message.content)) : undefined
+    };
     chatHistory[contactId].push(messageToSave);
 
     try {
@@ -7438,6 +7601,10 @@ The JSON object must have two main keys: "reply" and "status".
     *   **Example 6 (Sending a Red Packet):**
         \`---宝宝，给你个惊喜！---/red-packet/{\\"amount\\": \\"5.20\\", \\"greeting\\": \\"爱你哟\\"}/---快点开看看！\`
         (Note the \`\\"\` for internal quotes. Your AI model should handle this escaping.)
+    *   **To send a voice message**, you MUST use a special tag format:**\`/voice/{"duration": "DURATION_SECONDS", "text": "TRANSCRIPTION_TEXT"}/\`.**The duration should be a string representing seconds, like "8".** The voice message should always appear as a standalone segment, separated by \`---\` from other text.
+    *   **Example 7 (Sending a Voice Message):**
+        \`---喂，宝宝你在忙什么呀？---/voice/{\"duration\":\"8\",\"text\":\"我刚刚在想你呢，想给你发条语音，又怕打扰到你。\"}/---如果方便的话，回我一下哦。\`
+        (The \`text\` within \`duration\` represents the transcription that will appear when tapping the voice message.)
     *   Your base persona is extremely clingy, affectionate, and possessive. Use terms like "宝宝". Express a high need for physical touch (hugs, kisses).
     *   You MUST NOT use parentheses \`()\` or asterisks \`*\` for actions. All emotions must be conveyed through text and punctuation.
     *   Your reply text MUST be pure plain text outside of the \`<render>\` tag.
@@ -7660,16 +7827,19 @@ async function getSweetheartAiReply() {
         return;
     }
     getReplyBtn.disabled = true;
-    // chatInput.disabled = true;
+    // chatInput.disabled = true; // 暂时禁用输入框，等待AI回复
+
     // --- 步骤 1: 构建发送给AI的消息数组 ---
     const messages = [];
     const systemPrompt = currentChatMode === 'offline' ? OFFLINE_MODE_PROMPT : ENHANCED_PROMPT;
     messages.push({role: "system", content: systemPrompt});
+
     // 添加世界书上下文
     const worldbookContext = gatherWorldbookContext();
     if (worldbookContext) {
         messages.push({role: "system", content: worldbookContext});
     }
+
     // 添加世界设定
     if (currentWorldId) {
         const world = worldsData.find(w => w.id === currentWorldId);
@@ -7681,6 +7851,7 @@ async function getSweetheartAiReply() {
             messages.push({role: "system", content: worldSettingText});
         }
     }
+
     // 添加角色设定
     let characterSetting = `[角色设定]\n姓名：${currentSweetheartChatContact.name}\n`;
     if (currentSweetheartChatContact.status) characterSetting += `基础设定：${currentSweetheartChatContact.status}\n`;
@@ -7689,10 +7860,12 @@ async function getSweetheartAiReply() {
     if (currentSweetheartChatContact.history) characterSetting += `过去的经历：${currentSweetheartChatContact.history}\n`;
     if (currentSweetheartChatContact.relationship) characterSetting += `与用户的关系：${currentSweetheartChatContact.relationship}\n`;
     messages.push({role: "system", content: characterSetting});
+
     // 添加用户设定
     if (userProfile.persona) {
         messages.push({role: "system", content: `[用户设定]\n昵称：${userProfile.name}\n${userProfile.persona}`});
     }
+
     // 添加绑定的面具
     if (currentSweetheartChatContact.boundMasks && currentSweetheartChatContact.boundMasks.length > 0) {
         let maskContent = '[用户人设]\n';
@@ -7702,6 +7875,7 @@ async function getSweetheartAiReply() {
         });
         messages.push({role: "system", content: maskContent});
     }
+
     // 添加实时状态和历史状态
     const liveStatus = getCurrentLiveStatus();
     const allStatusHistories = JSON.parse(localStorage.getItem('sweetheartStatusHistory') || '{}');
@@ -7710,80 +7884,86 @@ async function getSweetheartAiReply() {
     if (statusContext) {
         messages.push({role: "system", content: statusContext});
     }
+
     // 添加普通聊天的历史作为背景记忆
     const normalChatHistory = JSON.parse(localStorage.getItem('phoneChatHistory') || '{}')[contactId] || [];
     if (normalChatHistory.length > 0) {
         const recentNormalChat = normalChatHistory.slice(-10);
         let backgroundInfo = `[背景信息：以下是你和用户在"学习模式"中的最近对话记录，仅供你参考，不要直接回复这些内容]\n\n`;
+
         recentNormalChat.forEach((msg) => {
             const sender = msg.sender === 'user' ? '用户' : currentSweetheartChatContact.name;
-            const textContent = (msg.text || '').replace(/<[^>]+>/g, '[多媒体内容]');
+            const textContent = (msg.text || '').replace(/<[^>]+>/g, '[多媒体内容]'); // 替换HTML标签
             backgroundInfo += `${sender}: ${textContent}\n`;
         });
         messages.push({role: "system", content: backgroundInfo});
     }
+
+    // 构建聊天历史
     const chatHistory = JSON.parse(localStorage.getItem('phoneSweetheartChatHistory') || '{}');
     const contactSweetheartMessages = chatHistory[contactId] || [];
     const memoryRounds = currentSweetheartChatContact.memoryRounds || 10;
     const recentMessages = contactSweetheartMessages.slice(-(memoryRounds * 2));
-    let userTextBuffer = []; // 1. 创建文本缓冲区
+
+    let userTextBuffer = []; // 用于收集和打包用户的文本消息
+    // 遍历最近的消息，构建API请求
     for (const msg of recentMessages) {
         if (msg.sender === 'user') {
             // 当消息是用户发送时
             if (msg.imageUrl && !msg.isProcessed) {
-                // 2. 遇到未处理的图片，打包缓冲区和图片
-                console.log("🖼️ 顺序处理到一张图片，打包发送...");
-                const contentArray = [];
+                // 如果遇到未处理的图片，且缓冲区有文本，先发送文本
                 if (userTextBuffer.length > 0) {
-                    contentArray.push({type: 'text', text: userTextBuffer.join('\n')});
+                    messages.push({role: 'user', content: userTextBuffer.join('\n')});
+                    userTextBuffer = []; // 清空缓冲区
                 }
-                contentArray.push({type: 'image_url', image_url: {url: msg.imageUrl}});
-                messages.push({role: 'user', content: contentArray});
-                userTextBuffer = []; // 3. 清空缓冲区
+                // 然后发送图片
+                messages.push({
+                    role: 'user',
+                    content: [{type: 'image_url', image_url: {url: msg.imageUrl}}]
+                });
                 // 标记图片为“已处理”并立即保存
                 const msgIndex = contactSweetheartMessages.findIndex(m => m.timestamp === msg.timestamp);
                 if (msgIndex !== -1) {
                     chatHistory[contactId][msgIndex].isProcessed = true;
                 }
-            } else if (msg.type === 'red-packet') { // ⭐ 修复：处理用户发送的红包
+            } else if (msg.type === 'red-packet') {
                 userTextBuffer.push(`[用户发送了一个红包] 祝福语：${msg.content.greeting}，金额：${msg.content.amount}元`);
             } else if (msg.text) {
-                // 4. 遇到文本，存入缓冲区
-                userTextBuffer.push(msg.text);
+                userTextBuffer.push(String(msg.text)); // 将文本添加到缓冲区，强制转为字符串
             }
         } else { // AI 发送的消息
-            // 5. 先“冲刷”缓冲区里用户的文本（在 AI 回复之前，确保所有的用户输入都被发出）
+            // 如果遇到AI回复，先冲刷用户文本缓冲区
             if (userTextBuffer.length > 0) {
                 messages.push({role: 'user', content: userTextBuffer.join('\n')});
                 userTextBuffer = [];
             }
-            // 6. 再添加 AI 的回复
+            // 然后添加AI的消息
             if (msg.type === 'location') {
-                 // 确保 location 消息作为 system 角色发送，因为它不是对话的一部分
+                 // 将 location 消息作为 system 角色发送给AI，因为它描述的是场景而非对话
                 messages.push({
                     role: 'system',
                     content: `[场景变化] 你们来到了【${msg.locationName}】。描述：${msg.locationDesc}`
                 });
-            } else if (msg.type === 'red-packet') { // ⭐ 修复：处理AI发送的红包
+            } else if (msg.type === 'red-packet') {
                 messages.push({
                     role: 'assistant',
                     content: `[我发送了一个红包] 祝福语：${msg.content.greeting}，金额：${msg.content.amount}元`
                 });
             } else if (msg.text) {
-                messages.push({
-                    role: 'assistant',
-                    content: msg.text.replace(/<render>[\s\S]*?<\/render>/g, '')
-                });
+                // 移除 <render> 标签的内容，AI不需要看到这个，否则会误以为是普通文本
+                messages.push({role: 'assistant', content: String(msg.text).replace(/<render>[\s\S]*?<\/render>/g, '')});
             }
         }
     }
-    // 7. 循环结束后，冲刷最后剩余的用户文本
+    // 循环结束后，冲刷最后剩余的用户文本
     if (userTextBuffer.length > 0) {
         messages.push({role: 'user', content: userTextBuffer.join('\n')});
     }
+
     // 保存对 isProcessed 标志的修改（如果有）
     localStorage.setItem('phoneSweetheartChatHistory', JSON.stringify(chatHistory));
-    // --- 步骤 3: 处理当前输入框的新消息 (与旧版类似) ---
+
+    // --- 步骤 3: 处理当前输入框的新消息 ---
     const currentUserInput = chatInput.value.trim();
     if (currentUserInput) {
         // 先在UI上渲染出来
@@ -7791,60 +7971,73 @@ async function getSweetheartAiReply() {
         const newIndex = saveSweetheartMessage(contactId, messageObj);
         const messageRow = _createMessageDOM(contactId, messageObj, newIndex);
         messagesEl.appendChild(messageRow);
-        chatInput.value = '';
+        chatInput.value = ''; // 清空输入框
+        document.querySelector('.sweetheart-chat-input-area').classList.remove('has-text'); // 移除 has-text 类
+
         // 再添加到API请求的末尾
         messages.push({role: 'user', content: currentUserInput});
     }
-    // --- 步骤 4: 检查并调用API (与旧版相同) ---
+
+    // --- 步骤 4: 检查并调用API ---
     if (messages.filter(m => m.role === 'user').length === 0) {
         console.warn("🤔 没有任何用户消息，不调用API。");
         getReplyBtn.disabled = false;
+        // chatInput.disabled = false;
+        return; // 如果没有用户输入，则不调用API
     }
+
     // --- 步骤 5: 调用API并处理回复 ---
     console.log('🚀 准备调用API，最终发送结构:', messages);
     const thinkingBubble = _createMessageDOM(contactId, {sender: 'contact', text: '...'}, -1);
     messagesEl.appendChild(thinkingBubble);
     messagesEl.scrollTop = messagesEl.scrollHeight;
+
     const result = await callApi(messages);
-    thinkingBubble.remove();
+    thinkingBubble.remove(); // 移除思考中气泡
+
     if (!result.success) {
         showErrorModal('API 响应错误', result.message);
     } else {
-        // ▼▼▼▼▼ 核心改造从这里开始 ▼▼▼▼▼
         // 1. 使用我们新的、更强大的解析器
         const {chatReplyText, statusData} = parseAiJsonResponse(result.message);
+
         // 2. 如果成功解析出 status 数据，就立即更新UI并保存
         if (statusData) {
             updateStatusPopup(statusData);
             saveStatusData(contactId, statusData);
             console.log('✅ 状态已成功更新！');
         }
+
         // 3. 处理聊天回复文本（无论JSON解析是否成功，我们总是有文本可以显示）
         const replyText = chatReplyText || '...';
+
         // 4. 将回复文本分割成多个气泡
-        const segments = replyText.split('---').filter(s => s.trim());
-        // 如果AI没有使用分割符，且文本不为空，则将整个回复作为一个气泡
-        if (segments.length === 0 && replyText.trim() !== '') {
-            segments.push(replyText);
-        } else if (segments.length === 0 && replyText.trim() === '') {
-            // 如果AI返回空文本且没有段落分隔符，则不显示任何气泡
-            console.warn("AI返回的回复文本为空。");
-        }
+        // 使用更智能的分隔方式，确保 --- 或特殊标签能被正确识别为段落分隔
+        // 这里的正则表达式需要能匹配 `---` 或者 `/voice/` 和 `/red-packet/` 标签
+        // `fullTagRegex` 已经可以在文本中找到标签，现在我们需要一个类似的反向操作：
+        // 1. 先按 `---` 分割
+        // 2. 然后对每个 `segment`，用 `fullTagRegex` 进一步解析其中的特殊标签
+        const rawSegments = replyText.split(/---\s*/).filter(s => s.trim() !== '');
+
         // 5. 依次渲染每个分段的气泡
-        const redPacketFullRegex = /\/red-packet\/({.*?})\//g; // 匹配整个标签，捕获内部 JSON
-        for (const segmentText of segments) {
-            const trimmedSegment = segmentText.trim();
-            let lastIndex = 0;
+        // 定义一个用于匹配所有特殊标签的全局正则表达式
+        // 注意这里的正则改动：现在它能捕获两种标签类型，并且整个标签是被捕获组包围的
+        const fullTagRegexWithCapture = /(\/(red-packet|voice)\/({(?:[^"}]|"(?:\\.|[^"\\])*"|{[^}]*})*})\/)/g;
+
+
+        const processSegment = async (segmentText) => { // 重命名参数以避免混淆
+            let currentCursor = 0; // 用于跟踪当前处理到的字符串位置
             let match;
-            // 复制正则表达式，因为它的 `lastIndex` 属性会在循环中改变
-            const currentRedPacketRegex = new RegExp(redPacketFullRegex);
-            // 尝试在当前 segmentText 中查找所有红包标签
-            while ((match = currentRedPacketRegex.exec(trimmedSegment)) !== null) {
-                // 如果在红包标签之前有普通文本，先将其作为普通消息添加
-                if (match.index > lastIndex) {
-                    const preText = trimmedSegment.substring(lastIndex, match.index).trim();
-                    if (preText) {
-                        const messageObj = {sender: 'contact', text: preText};
+
+            fullTagRegexWithCapture.lastIndex = 0; // 确保每次从头开始匹配
+
+            // 遍历segmentText中的所有匹配项
+            while ((match = fullTagRegexWithCapture.exec(segmentText)) !== null) {
+                // 处理特殊标签前的普通文本部分
+                if (match.index > currentCursor) {
+                    const preTagText = segmentText.substring(currentCursor, match.index).trim();
+                    if (preTagText) {
+                        const messageObj = {sender: 'contact', text: preTagText};
                         const newIndex = saveSweetheartMessage(contactId, messageObj);
                         const messageRow = _createMessageDOM(contactId, messageObj, newIndex);
                         messagesEl.appendChild(messageRow);
@@ -7852,41 +8045,65 @@ async function getSweetheartAiReply() {
                         await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 400));
                     }
                 }
-                // 处理捕获到的红包标签
+
+                // 处理捕获到的特殊标签
+                const fullTag = match[1]; // 整个标签字符串，如 /voice/{...}/
+                const tagType = match[2]; // 'red-packet' 或 'voice'
+                 const jsonStringWithEscapes = match[3]; // 捕获到的 JSON 字符串，包含转义引号
+
                 try {
-                    // match[1] 应该就是红包标签内部的 JSON 字符串
-                    const packetData = JSON.parse(match[1]);
-                    const redPacketMessageObj = {
-                        sender: 'contact', // AI发的
-                        type: 'red-packet',
-                        content: {
-                            greeting: packetData.greeting || '恭喜发财，大吉大利！',
-                            amount: packetData.amount || '0.00',
-                            status: 'unopened', // AI发送的默认未打开
-                        },
-                        timestamp: Date.now()
-                    };
-                    const newIndex = saveSweetheartMessage(contactId, redPacketMessageObj);
-                    const messageRow = _createMessageDOM(contactId, redPacketMessageObj, newIndex);
-                    messagesEl.appendChild(messageRow);
-                    messagesEl.scrollTop = messagesEl.scrollHeight;
-                    await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 400));
+                    // 替换转义的引号，以便 JSON.parse 能够处理
+                    const cleanJsonString = jsonStringWithEscapes.replace(/\\"/g, '"');
+                    const parsedData = JSON.parse(cleanJsonString);
+
+                    let messageObj;
+                    if (tagType === 'voice') {
+                        messageObj = {
+                            sender: 'contact',
+                            type: 'voice',
+                            content: {
+                                duration: String(parsedData.duration),
+                                text: parsedData.text
+                            },
+                        };
+                    } else if (tagType === 'red-packet') {
+                        messageObj = {
+                            sender: 'contact',
+                            type: 'red-packet',
+                            content: {
+                                greeting: parsedData.greeting || '恭喜发财',
+                                amount: parsedData.amount || '0.00',
+                                status: 'unopened',
+                            },
+                        };
+                    }
+
+                    if (messageObj) {
+                        const newIndex = saveSweetheartMessage(contactId, messageObj);
+                        const messageRow = _createMessageDOM(contactId, messageObj, newIndex);
+                        messagesEl.appendChild(messageRow);
+                        messagesEl.scrollTop = messagesEl.scrollHeight;
+                        await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 400));
+                    }
                 } catch (e) {
-                    console.error("解析AI红包JSON失败，将其作为普通文本处理:", e, "JSON字符串:", match[1]);
-                    // 如果JSON解析失败，整个红包标签就当作普通文本处理
-                    const errorMessageObj = {sender: 'contact', text: match[0]};
+                    console.error(`解析AI ${tagType} JSON失败，将其作为普通文本处理:`, e, "JSON字符串:", fullTag);
+                    // 如果解析失败，将整个标签作为普通文本处理
+                    const errorMessageObj = {sender: 'contact', text: fullTag};
                     const newIndex = saveSweetheartMessage(contactId, errorMessageObj);
                     const messageRow = _createMessageDOM(contactId, errorMessageObj, newIndex);
                     messagesEl.appendChild(messageRow);
                     messagesEl.scrollTop = messagesEl.scrollHeight;
+                    await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 400));
                 }
-                lastIndex = currentRedPacketRegex.lastIndex;
+
+                currentCursor = fullTagRegexWithCapture.lastIndex; // 更新游标位置
             }
-            // 处理红包标签之后可能存在的普通文本
-            if (lastIndex < trimmedSegment.length) {
-                const postText = trimmedSegment.substring(lastIndex).trim();
-                if (postText) {
-                    const messageObj = {sender: 'contact', text: postText};
+
+            // 处理特殊标签后的所有剩余文本
+            if (currentCursor < segmentText.length) {
+                const postTagText = segmentText.substring(currentCursor).trim();
+                if (postTagText) {
+                    const messageObj = {sender: 'contact', text: postTagText};
                     const newIndex = saveSweetheartMessage(contactId, messageObj);
                     const messageRow = _createMessageDOM(contactId, messageObj, newIndex);
                     messagesEl.appendChild(messageRow);
@@ -7894,15 +8111,24 @@ async function getSweetheartAiReply() {
                     await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 400));
                 }
             }
+        };
+
+        for (const segment of rawSegments) {
+            await processSegment(segment);
+            // 确保每个段落之间有一个小延迟，模拟真实对话
+            await new Promise(resolve => setTimeout(resolve, 100 + Math.random() * 200));
         }
+
     }
     // --- 步骤 6: 收尾工作 ---
-    renderSweetheartList();
-    messagesEl.scrollTop = messagesEl.scrollHeight;
-    getReplyBtn.disabled = false;
-    // chatInput.disabled = false;
-    chatInput.focus();
+    renderSweetheartList(); // 渲染密友列表
+    messagesEl.scrollTop = messagesEl.scrollHeight; // 滚动到底部
+    getReplyBtn.disabled = false; // 重新启用信封按钮
+    // chatInput.disabled = false; // 重新启用输入框
+    chatInput.focus(); // 聚焦输入框
 }
+
+
 
 /**
  * [全新] 从DOM实时读取当前状态弹窗中显示的数据
@@ -8392,7 +8618,6 @@ function cancelSweetheartQuote() {
     const previewEl = document.getElementById('sweetheartQuotePreview');
     previewEl.classList.remove('show');
 }
-
 
 
 /**
@@ -13862,6 +14087,12 @@ function initializeApp() {
         console.error('❌ 关键元素未找到，请检查HTML结构');
         return;
     }
+
+
+    // 【新增代码】在应用程序初始化时，立即应用全屏设置
+    const savedFullscreenSettingOnLoad = localStorage.getItem('fullscreenEnabled') === 'true';
+    applyFullscreenSetting(savedFullscreenSettingOnLoad);
+
     chatInputArea.classList.remove('has-text');
     loadWorldsData();
     currentWorldId = localStorage.getItem('currentWorldId');

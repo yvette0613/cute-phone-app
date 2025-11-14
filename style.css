@@ -4083,6 +4083,215 @@ body.code-scrolling-enabled .code-block-wrapper {
     gap: 4px;
 }
 
+/* ====================================
+   语音条消息样式
+   ==================================== */
+
+/* 语音气泡容器 - 继承 chat-bubble 的基础样式 */
+.voice-message-bubble {
+    padding: 8px 14px;
+    border-radius: 20px;
+    cursor: pointer;
+    max-width: 80%;
+    transition: background-color 0.2s ease-in-out;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden; /* 确保进度条不会溢出气泡圆角 */
+    position: relative; /* 为进度条的绝对定位提供参考 */
+}
+
+/* 语音消息主体内容（播放图标、波形、时长） */
+.voice-main-content {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    position: relative; /* 确保voice-bar的定位正常 */
+    z-index: 1; /* 确保内容在进度条之上 */
+    height: 28px; /* 确保有足够高度，防止被遮挡 */
+}
+
+/* 播放图标 */
+.voice-play-icon {
+    width: 28px; /* 稍微大一点 */
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: transform 0.2s; /* 播放/暂停图标切换动画 */
+}
+
+.voice-play-icon svg {
+    width: 20px; /* 稍微大一点 */
+    height: 20px;
+    transition: transform 0.2s; /* 播放/暂停图标本身的动画 */
+}
+
+/* 播放状态的图标动画 */
+.voice-play-icon.playing svg path {
+    /* 暂停图标的路径 */
+    d: path('M6 19h4V5H6v14zm8-14v14h4V5h-4z');
+    transition: d 0.2s ease-in-out; /* 路径变换动画 */
+}
+
+/* 模拟语音波形条 */
+/* 语音波形条容器 */
+.voice-bar {
+    flex: 1;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    position: relative; /* 确保.voice-bar是disclosure-arrow的定位父元素 */
+    overflow: hidden;
+    border-radius: 5px;
+    background: transparent;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+    z-index: 1; /* 确保在disclosure-arrow下方 */
+}
+
+.voice-bar::before { /* 静态波形图的背景 (未播放部分) */
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    /* 默认波形颜色 */
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 20"><rect x="0" y="5" width="4" height="10" fill="%23ccc"/><rect x="7" y="2" width="4" height="16" fill="%23ccc"/><rect x="14" y="8" width="4" height="4" fill="%23ccc"/><rect x="21" y="0" width="4" height="20" fill="%23ccc"/><rect x="28" y="6" width="4" height="8" fill="%23ccc"/><rect x="35" y="4" width="4" height="12" fill="%23ccc"/><rect x="42" y="10" width="4" height="0" fill="%23ccc"/><rect x="49" y="3" width="4" height="14" fill="%23ccc"/><rect x="56" y="7" width="4" height="6" fill="%23ccc"/><rect x="63" y="1" width="4" height="18" fill="%23ccc"/><rect x="70" y="9" width="4" height="2" fill="%23ccc"/><rect x="77" y="5" width="4" height="10" fill="%23ccc"/><rect x="84" y="2" width="4" height="16" fill="%23ccc"/><rect x="91" y="8" width="4" height="4" fill="%23ccc"/></svg>');
+    background-size: contain;
+    background-repeat: repeat-x;
+    opacity: 0.5; /* 静态波形图淡一点 */
+}
+
+/* 接收消息的静态波形图颜色 */
+.message-row.received .voice-bar::before {
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 20"><rect x="0" y="5" width="4" height="10" fill="%23666"/><rect x="7" y="2" width="4" height="16" fill="%23666"/><rect x="14" y="8" width="4" height="4" fill="%23666"/><rect x="21" y="0" width="4" height="20" fill="%23666"/><rect x="28" y="6" width="4" height="8" fill="%23666"/><rect x="35" y="4" width="4" height="12" fill="%23666"/><rect x="42" y="10" width="4" height="0" fill="%23666"/><rect x="49" y="3" width="4" height="14" fill="%23666"/><rect x="56" y="7" width="4" height="6" fill="%23666"/><rect x="63" y="1" width="4" height="18" fill="%23666"/><rect x="70" y="9" width="4" height="2" fill="%23666"/><rect x="77" y="5" width="4" height="10" fill="%23666"/><rect x="84" y="2" width="4" height="16" fill="%23666"/><rect x="91" y="8" width="4" height="4" fill="%23666"/></svg>');
+}
+
+/* 接收消息的进度条颜色 */
+.message-row.received .voice-progress-fill {
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 20"><rect x="0" y="5" width="4" height="10" fill="%23000"/><rect x="7" y="2" width="4" height="16" fill="%23000"/><rect x="14" y="8" width="4" height="4" fill="%23000"/><rect x="21" y="0" width="4" height="20" fill="%23000"/><rect x="28" y="6" width="4" height="8" fill="%23000"/><rect x="35" y="4" width="4" height="12" fill="%23000"/><rect x="42" y="10" width="4" height="0" fill="%23000"/><rect x="49" y="3" width="4" height="14" fill="%23000"/><rect x="56" y="7" width="4" height="6" fill="%23000"/><rect x="63" y="1" width="4" height="18" fill="%23000"/><rect x="70" y="9" width="4" height="2" fill="%23000"/><rect x="77" y="5" width="4" height="10" fill="%23000"/><rect x="84" y="2" width="4" height="16" fill="%23000"/><rect x="91" y="8" width="4" height="4" fill="%23000"/></svg>');
+}
+
+/* 语音时长 */
+.voice-duration {
+    font-size: 13px;
+    font-weight: 500;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 1; /* 确保内容在进度条之上 */
+}
+
+/* 密友聊天主题下的语音条样式 */
+.sweetheart-chat-page .message-row.sent .voice-message-bubble {
+    background: linear-gradient(135deg, #FFB6C1, #FF9AAD);
+    color: white;
+    box-shadow: 0 3px 8px rgba(255, 182, 193, 0.3);
+}
+.sweetheart-chat-page .message-row.sent .voice-play-icon svg {
+    fill: white;
+}
+/* 密友发送的静态语音条的颜色 */
+.sweetheart-chat-page .message-row.sent .voice-bar::before {
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 20"><rect x="0" y="5" width="4" height="10" fill="%23fff"/><rect x="7" y="2" width="4" height="16" fill="%23fff"/><rect x="14" y="8" width="4" height="4" fill="%23fff"/><rect x="21" y="0" width="4" height="20" fill="%23fff"/><rect x="28" y="6" width="4" height="8" fill="%23fff"/><rect x="35" y="4" width="4" height="12" fill="%23fff"/><rect x="42" y="10" width="4" height="0" fill="%23fff"/><rect x="49" y="3" width="4" height="14" fill="%23fff"/><rect x="56" y="7" width="4" height="6" fill="%23fff"/><rect x="63" y="1" width="4" height="18" fill="%23fff"/><rect x="70" y="9" width="4" height="2" fill="%23fff"/><rect x="77" y="5" width="4" height="10" fill="%23fff"/><rect x="84" y="2" width="4" height="16" fill="%23fff"/><rect x="91" y="8" width="4" height="4" fill="%23fff"/></svg>');
+}
+/* 密友发送的进度条颜色 */
+.sweetheart-chat-page .message-row.sent .voice-progress-fill {
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 20"><rect x="0" y="5" width="4" height="10" fill="%23FFC0D9"/><rect x="7" y="2" width="4" height="16" fill="%23FFC0D9"/><rect x="14" y="8" width="4" height="4" fill="%23FFC0D9"/><rect x="21" y="0" width="4" height="20" fill="%23FFC0D9"/><rect x="28" y="6" width="4" height="8" fill="%23FFC0D9"/><rect x="35" y="4" width="4" height="12" fill="%23FFC0D9"/><rect x="42" y="10" width="4" height="0" fill="%23FFC0D9"/><rect x="49" y="3" width="4" height="14" fill="%23FFC0D9"/><rect x="56" y="7" width="4" height="6" fill="%23FFC0D9"/><rect x="63" y="1" width="4" height="18" fill="%23FFC0D9"/><rect x="70" y="9" width="4" height="2" fill="%23FFC0D9"/><rect x="77" y="5" width="4" height="10" fill="%23FFC0D9"/><rect x="84" y="2" width="4" height="16" fill="%23FFC0D9"/><rect x="91" y="8" width="4" height="4" fill="%23FFC0D9"/></svg>');
+}
+.sweetheart-chat-page .message-row.received .voice-message-bubble {
+    background: #FFFFFF;
+    color: #8D6E63;
+    border: 1px solid #FFE4E9;
+    box-shadow: 0 2px 6px rgba(161, 136, 127, 0.08);
+}
+.sweetheart-chat-page .message-row.received .voice-play-icon svg {
+    fill: #8D6E63;
+}
+/* 密友接收的静态语音条的颜色 */
+.sweetheart-chat-page .message-row.received .voice-bar::before {
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 20"><rect x="0" y="5" width="4" height="10" fill="%238D6E63"/><rect x="7" y="2" width="4" height="16" fill="%238D6E63"/><rect x="14" y="8" width="4" height="4" fill="%238D6E63"/><rect x="21" y="0" width="4" height="20" fill="%238D6E63"/><rect x="28" y="6" width="4" height="8" fill="%238D6E63"/><rect x="35" y="4" width="4" height="12" fill="%238D6E63"/><rect x="42" y="10" width="4" height="0" fill="%238D6E63"/><rect x="49" y="3" width="4" height="14" fill="%238D6E63"/><rect x="56" y="7" width="4" height="6" fill="%238D6E63"/><rect x="63" y="1" width="4" height="18" fill="%238D6E63"/><rect x="70" y="9" width="4" height="2" fill="%238D6E63"/><rect x="77" y="5" width="4" height="10" fill="%238D6E63"/><rect x="84" y="2" width="4" height="16" fill="%238D6E63"/><rect x="91" y="8" width="4" height="4" fill="%238D6E63"/></svg>');
+}
+/* 密友接收的进度条颜色 */
+.sweetheart-chat-page .message-row.received .voice-progress-fill {
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 20"><rect x="0" y="5" width="4" height="10" fill="%23BCAAA4"/><rect x="7" y="2" width="4" height="16" fill="%23BCAAA4"/><rect x="14" y="8" width="4" height="4" fill="%23BCAAA4"/><rect x="21" y="0" width="4" height="20" fill="%23BCAAA4"/><rect x="28" y="6" width="4" height="8" fill="%23BCAAA4"/><rect x="35" y="4" width="4" height="12" fill="%23BCAAA4"/><rect x="42" y="10" width="4" height="0" fill="%23BCAAA4"/><rect x="49" y="3" width="4" height="14" fill="%23BCAAA4"/><rect x="56" y="7" width="4" height="6" fill="%23BCAAA4"/><rect x="63" y="1" width="4" height="18" fill="%23BCAAA4"/><rect x="70" y="9" width="4" height="2" fill="%23BCAAA4"/><rect x="77" y="5" width="4" height="10" fill="%23BCAAA4"/><rect x="84" y="2" width="4" height="16" fill="%23BCAAA4"/><rect x="91" y="8" width="4" height="4" fill="%23BCAAA4"/></svg>');
+}
+
+/* 转写文字区域 */
+.voice-transcription {
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px dashed rgba(255, 255, 255, 0.4);
+    font-size: 13px;
+    line-height: 1.5;
+    position: relative;
+    /* 这里很重要：设置position: relative; 使得三角形可以相对定位到这个区域，并且允许文字内容正常显示 */
+}
+
+/* 显示/隐藏转写文字的箭头 */
+.disclosure-arrow {
+    position: absolute;
+    bottom: 50px; /* 定位在 voice-transcription 底部，稍微突出 */
+    left: 35px; /* 从最左边开始 */
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.9); /* 指针颜色稍微亮一些 */
+    transform: translateX(-50%) rotate(180deg); /* 旋转180度，让三角形的尖朝上，并调整中心点 */
+    z-index: 10; /* 确保在所有内容之上 */
+    pointer-events: none; /* 确保它不阻挡点击事件 */
+    /* *** 关键改变：使用 transition 来控制移动 *** */
+    transition: transform 0s linear; /* 默认0s，JS会动态设置时长 */
+    /* animation-fill-mode: forwards; /* 这个就不需要了，因为是 transition */
+    /* animation-play-state: paused; */ /* 这个也不需要了 */
+}
+
+/* 当语音播放时，启动动画 */
+.voice-message-bubble.is-playing .disclosure-arrow {
+    animation-name: disclosureArrowSlide; /* 应用滑动的动画 */
+    animation-play-state: running; /* 动画运行 */
+    animation-timing-function: linear; /* 匀速播放 */
+    /* animation-duration 将通过 JavaScript 动态设置 */
+}
+
+/* AI 接收到的语音条样式 */
+.message-row.received .voice-message-bubble {
+    background: #e9e9eb; /* 接收消息气泡色 */
+    color: #333;
+}
+.message-row.received .voice-play-icon svg {
+    fill: #333;
+}
+.message-row.received .voice-transcription {
+    border-top-color: rgba(0, 0, 0, 0.2);
+    color: #333;
+}
+.message-row.received .disclosure-arrow {
+    color: rgba(0, 0, 0, 0.8);
+}
+
+
+/* 用户发送的语音条样式 */
+.message-row.sent .voice-message-bubble {
+    background: linear-gradient(135deg, #0A84FF, #0066CC); /* 发送消息气泡色 */
+    color: white;
+}
+.message-row.sent .voice-play-icon svg {
+    fill: white;
+}
+.message-row.sent .voice-transcription {
+    border-top-color: rgba(255, 255, 255, 0.4);
+    color: white;
+}
+.message-row.sent .disclosure-arrow {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.voice-message-bubble:active {
+    filter: brightness(0.9);
+}
+
+
+
+/* 可以添加一个当语音消息在播放时停止动画的样式，如果需要的话 */
+.voice-message-bubble.playing .disclosure-arrow {
+    animation-play-state: paused; /* 播放时暂停动画，只在打开隐藏内容时才动 */
+}
 
 
 /* ========== 世界选择页面样式 ========== */
