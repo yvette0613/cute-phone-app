@@ -155,7 +155,8 @@ function loadLocationSettings() {
 let userProfile = {
     name: '我',
     avatar: '👤',
-    persona: '我是一名用户，请以简洁友好的方式与我对话。' // 新增用户设定字段
+    persona: '我是一名用户，请以简洁友好的方式与我对话。',// 新增用户设定字段
+    userVoiceId: '' // <<< 新增：保存用户自己的 Voice ID
 };
 let currentAvatarTarget = null;
 
@@ -168,8 +169,11 @@ function loadUserProfile() {
     if (savedProfile) {
         try {
             const loadedProfile = JSON.parse(savedProfile);
-            // 确保旧的用户数据也能兼容新的persona字段
             userProfile = {...userProfile, ...loadedProfile};
+            // 确保 userVoiceId 有值，否则给个默认
+            if (!userProfile.userVoiceId) {
+                userProfile.userVoiceId = 'male-qn-qingse'; // 默认值
+            }
             console.log('成功从 localStorage 加载用户个人信息。');
         } catch (e) {
             console.error('解析用户个人信息失败:', e);
@@ -206,6 +210,7 @@ function saveAllCharacterData() {
 
     const contactPersona = document.getElementById('char-persona').value.trim();
     const contactAvatar = document.getElementById('avatar-preview').src;
+    const contactVoiceId = document.getElementById('char-voice-id').value.trim(); // <<< 新增：获取 Voice ID
     // ▼▼▼ 第4步：在这里粘贴新增的JS代码 ▼▼▼
     // [新增] 获取绑定的世界书ID
     const boundWorldbooks = [];
@@ -234,6 +239,7 @@ function saveAllCharacterData() {
         contactToEditOrCreate.name = contactName;
         contactToEditOrCreate.status = contactPersona || '这个角色很神秘，还没有设定...';
         contactToEditOrCreate.avatar = contactAvatar;
+        contactToEditOrCreate.voiceId = contactVoiceId; // <<< 新增：保存 Voice ID
         contactToEditOrCreate.boundWorldbooks = boundWorldbooks;
         contactToEditOrCreate.boundMasks = boundMasks;
     } else {
@@ -243,6 +249,7 @@ function saveAllCharacterData() {
             name: contactName,
             status: contactPersona || '这个角色很神秘，还没有设定...',
             avatar: contactAvatar,
+            voiceId: contactVoiceId, // <<< 新增：保存 Voice ID
             boundWorldbooks: boundWorldbooks,
         };
         contactsData.push(contactToEditOrCreate); // 添加到总联系人列表
@@ -420,6 +427,7 @@ function saveSweetheartCardData() {
     const catchphrase = document.getElementById('sweetheart-catchphrase').value.trim();
     const history = document.getElementById('sweetheart-history').value.trim();
     const relationship = document.getElementById('sweetheart-relationship').value.trim();
+    const voiceId = document.getElementById('sweetheart-voice-id').value.trim(); // <<< 新增：获取 Voice ID
 
     // 3. 获取头像
     const avatar = document.getElementById('sweetheart-avatar-preview').src;
@@ -449,6 +457,7 @@ function saveSweetheartCardData() {
         catchphrase,
         history,
         relationship,
+        voiceId, // <<< 新增：保存 Voice ID
         boundWorldbooks,
         boundMasks
     };
@@ -702,12 +711,23 @@ setInterval(updateTime, 60000);
 
 let currentSimulationTimer = null; // 全局计时器，用于停止其他模拟播放
 let currentPlayingSimulatedVoiceBubble = null; // 当前正在模拟播放的语音条DOM元素
+let currentPlayingAudio = null; // 全局变量，跟踪当前播放的 Audio 对象
+let currentMediaElement = null; // 全局变量，跟踪当前播放的 Audio 或 Element
+let currentAudio = null; // 全局变量，跟踪当前播放的 Audio 对象
+let currentPlayingButton = null; // 跟踪当前正在播放的按钮
 
 // ... (您的其他全局变量和配置)
 
 const globalConfig = {
     apiConfigs: [],
     activeApiConfig: null,
+    minimaxVoice: { // <<< 新增：Minimax 语音设置
+        apiUrl: 'https://api.minimaxi.com/v1/t2a_v2',
+        apiKey: '',
+        groupId: '',
+        ttsModel: '',
+        availableModels: [], // 存储拉取到的模型列表
+    },
     database: {
         supabaseUrl: '',
         supabaseKey: '',
@@ -1118,10 +1138,13 @@ function escapeHTML(str) {
 
 
 let messageLongPressTimer = null; // 用于检测长按的计时器
+
 /**
- * [终极修复版] 创建消息的DOM元素
- * - 确保所有消息类型（包括iframe）的长按/右键菜单能够被准确捕捉并触发。
- * - 全面解决 iframe 消息的事件捕获问题。
+ * [终极修正版] 创建消息的DOM元素
+ * - 核心：重构了 type: 'voice' 消息的逻辑，使其能调用TTS API播放真实音频并同步进度条。
+ * - 修复了旧模拟动画的逻辑，直接与真实Audio对象事件绑定。
+ * - 统一了全局音频播放控制，防止音频重叠。
+ * - 保留了普通文本消息的TTS按钮功能，并使其能与语音条播放互不干扰。
  *
  * @param {string} contactId - 联系人ID
  * @param {object} messageObj - 消息对象
@@ -1133,7 +1156,7 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
         console.warn(`⚠️ 消息渲染失败：消息对象为空 (Index: ${messageIndex})`);
         return createFallbackMessage({sender: 'system'});
     }
-    // 核心修正：在消息创建时，动态获取当前页面的类型
+
     const sweetheartChatPageEl = document.getElementById('sweetheartChatPage');
     const isSweetheartChatActive = sweetheartChatPageEl && sweetheartChatPageEl.classList.contains('show');
 
@@ -1141,6 +1164,7 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
         const locationNotice = document.createElement('div');
         locationNotice.className = 'location-notice';
         locationNotice.dataset.index = messageIndex;
+        locationNotice.dataset.timestamp = messageObj.timestamp;
         locationNotice.innerHTML = `
             <div class="location-notice-icon">🗺️</div>
             <div class="location-notice-text">
@@ -1148,7 +1172,6 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
                 <p>${escapeHTML(messageObj.locationDesc || '无描述')}</p>
             </div>
         `;
-        // 事件绑定到 notice 元素本身
         bindMessageEvents(locationNotice, contactId, messageIndex, isSweetheartChatActive);
         return locationNotice;
     }
@@ -1156,28 +1179,22 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
     if (messageObj.type === 'red-packet') {
         const messageRow = document.createElement('div');
         messageRow.className = 'message-row ' + (messageObj.sender === 'user' ? 'sent' : 'received');
-        messageRow.dataset.timestamp = messageObj.timestamp; // 记录时间戳
+        messageRow.dataset.timestamp = messageObj.timestamp;
+        messageRow.dataset.index = messageIndex;
 
-        // 1. 创建正确的头像DOM
         const avatarEl = document.createElement('div');
         avatarEl.className = 'message-chat-avatar';
-        // 根据当前聊天模式获取联系人数据
         const contactData = isSweetheartChatActive ? currentSweetheartChatContact : currentChatContact;
         const avatarSrc = messageObj.sender === 'user' ? (userProfile?.avatar || '👤') : (contactData?.avatar || '💬');
         const isUrl = avatarSrc.startsWith('http') || avatarSrc.startsWith('data:');
         avatarEl.innerHTML = isUrl ? `<img src="${avatarSrc}" alt="avatar">` : `<div class="initials">${avatarSrc}</div>`;
 
-        // 2. 【核心修复】创建 message-content 容器
         const messageContent = document.createElement('div');
         messageContent.className = 'message-content';
 
-        // 3. 创建红包气泡并绑定事件
         const bubble = createRedPacketBubble(messageObj);
-
-        // 4. 【核心修复】将气泡放入 message-content 容器
         messageContent.appendChild(bubble);
 
-        // 5. 【核心修复】根据发送者，决定头像和内容的顺序
         if (messageObj.sender === 'user') {
             messageRow.appendChild(messageContent);
             messageRow.appendChild(avatarEl);
@@ -1185,36 +1202,41 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
             messageRow.appendChild(avatarEl);
             messageRow.appendChild(messageContent);
         }
-
-        // 绑定长按等事件到气泡上（保持和其他消息一致的体验）
         bindMessageEvents(bubble, contactId, messageIndex, isSweetheartChatActive);
-
         return messageRow;
     }
 
-    // ▼▼▼ 以下是处理 voice 消息的新代码 ▼▼▼
+    // =======================================================================
+    // ▼▼▼ 核心修改区域：语音条逻辑重构 ▼▼▼
+    // =======================================================================
     if (messageObj.type === 'voice') {
-        console.log('Rendering voice messageObj:', messageObj);
         const messageRow = document.createElement('div');
         messageRow.className = 'message-row ' + (messageObj.sender === 'user' ? 'sent' : 'received');
         messageRow.dataset.timestamp = messageObj.timestamp;
         messageRow.dataset.index = messageIndex;
-        let contactData = isSweetheartChatActive ? currentSweetheartChatContact : currentChatContact;
+
+        const contactData = isSweetheartChatActive ? currentSweetheartChatContact : currentChatContact;
+
         const avatarEl = document.createElement('div');
         avatarEl.className = 'message-chat-avatar';
         let avatarSrc = messageObj.sender === 'user' ? (userProfile?.avatar || '👤') : (contactData?.avatar || '💬');
         const isUrl = avatarSrc.startsWith('http') || avatarSrc.startsWith('data:');
         avatarEl.innerHTML = isUrl ? `<img src="${avatarSrc}" alt="avatar">` : `<div class="initials">${avatarSrc}</div>`;
+
         const messageContent = document.createElement('div');
         messageContent.className = 'message-content';
+
         const senderName = document.createElement('div');
         senderName.className = 'message-sender-name';
         senderName.textContent = messageObj.sender === 'user' ? (userProfile.name || '我') : (contactData?.name || '联系人');
+
         const voiceBubble = document.createElement('div');
         voiceBubble.className = 'voice-message-bubble chat-bubble';
         voiceBubble.classList.add(messageObj.sender === 'user' ? 'voice-sent' : 'voice-received');
+
         const transcriptionText = escapeHTML(messageObj.content.text || '...');
-        const duration = messageObj.content.duration || '0'; // 获取语音模拟总时长
+        const duration = messageObj.content.duration || '0';
+
         voiceBubble.innerHTML = `
             <div class="voice-main-content">
                 <div class="voice-play-icon">
@@ -1223,164 +1245,183 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
                 <div class="voice-bar">
                     <div class="voice-progress-fill"></div>
                 </div>
-                <div class="voice-duration" data-duration="${duration}">${duration}"</div>
+                <div class="voice-duration">${duration}"</div>
             </div>
             <div class="voice-transcription" style="display: none;">
                 <span class="disclosure-arrow">▲</span>
                 <div class="voice-text">${transcriptionText}</div>
             </div>
         `;
+
         const playIcon = voiceBubble.querySelector('.voice-play-icon');
-        const voiceBar = voiceBubble.querySelector('.voice-bar');
         const progressBar = voiceBubble.querySelector('.voice-progress-fill');
-        const disclosureArrow = voiceBubble.querySelector('.disclosure-arrow'); // 获取三角形元素
-        const totalDurationSeconds = parseFloat(duration);
-        let startTime = 0;
-        let animationFrameId = null;
-        // 动画启动/重置函数
-        const startVoiceAnimation = () => {
-            const voiceBarWidth = voiceBar.offsetWidth; // 获取 voice-bar 的实际宽度
-            const arrowInitialTransformX = -50; // disclosure-arrow 的初始 translateX(-50%)
-            // 目标位置是从 voice-bar 的 0% 到 100%，考虑 disclosure-arrow 自身的宽度居中
-            // 最终位置 = voiceBarWidth + 初始的 -50% 自身宽度偏移
-            const targetTransformX = voiceBarWidth;
-            // 设置 transition 属性和 transform 目标
-            // 先清除之前的任何 transition 效果，立即将位置设置到起点
-            disclosureArrow.style.transition = 'transform 0s linear';
-            disclosureArrow.style.transform = `translateX(-50%) rotate(180deg)`;
-            // 强制回流，确保DOM刷新，然后应用新的transition和transform
-            void disclosureArrow.offsetWidth; // 触发回流
 
-            disclosureArrow.style.transition = `transform ${totalDurationSeconds}s linear`;
-            disclosureArrow.style.transform = `translateX(calc(${targetTransformX}px - 50%)) rotate(180deg)`;
-            // 注意：这里 calc() 是为了抵消自身宽度，让中心点移动到最右侧
-
-            voiceBubble.classList.add('is-playing'); // 添加类名，如果需要其他样式联动
-        };
-        const resetVoiceAnimation = () => {
-            cancelAnimationFrame(animationFrameId); // 停止模拟进度
-            voiceBubble.classList.remove('is-playing'); // 移除类名
-            playIcon.classList.remove('playing');
-            progressBar.style.width = '0%'; // 进度条回0
-            // 立即将三角形重置到初始位置
-            disclosureArrow.style.transition = 'transform 0s linear'; // 先去除过渡，立即跳回
-            disclosureArrow.style.transform = `translateX(-50%) rotate(180deg)`; // 回到 voice-bar 的起始位置
-        };
-        const updateSimulationProgress = () => {
-            const currentTime = Date.now();
-            let elapsedMs = currentTime - startTime;
-            const progressPercentage = (elapsedMs / (totalDurationSeconds * 1000)) * 100;
-            progressBar.style.width = `${Math.min(100, progressPercentage)}%`;
-            if (elapsedMs >= (totalDurationSeconds * 1000)) {
-                // 模拟播放结束
-                resetVoiceAnimation(); // 结束时重置动画
-            } else {
-                animationFrameId = requestAnimationFrame(updateSimulationProgress);
-            }
-        };
-        // 点击播放事件
-        playIcon.addEventListener('click', (e) => {
+        // 【全新点击事件处理器】
+        playIcon.addEventListener('click', async (e) => {
             e.stopPropagation();
-            // 如果有其他模拟音频正在播放，先停止它
-            if (currentPlayingSimulatedVoiceBubble && currentPlayingSimulatedVoiceBubble !== voiceBubble) {
-                // 停止上一个的模拟
-                clearInterval(currentSimulationTimer);
-                cancelAnimationFrame(animationFrameId);
-                const prevPlayIcon = currentPlayingSimulatedVoiceBubble.querySelector('.voice-play-icon');
-                const prevProgressBar = currentPlayingSimulatedVoiceBubble.querySelector('.voice-progress-fill');
-                if (prevPlayIcon) prevPlayIcon.classList.remove('playing');
-                if (prevProgressBar) prevProgressBar.style.width = '0%';
-                // 确保也要重置上一个的动画
-                currentPlayingSimulatedVoiceBubble.classList.remove('is-playing'); // 这行已经有了
-                disclosureArrow.style.transition = 'transform 0s linear'; // 重置上一个的过渡
-                disclosureArrow.style.transform = `translateX(-50%) rotate(180deg)`;
-                const prevDisclosureArrow = currentPlayingSimulatedVoiceBubble.querySelector('.disclosure-arrow');
-                if (prevDisclosureArrow) {
-                    prevDisclosureArrow.style.transition = 'transform 0s linear';
-                    prevDisclosureArrow.style.transform = `translateX(-50%) rotate(180deg)`;
-                }
-                // 这里需要显式调用上一个动画的 resetVoiceAnimation 或类似逻辑来重置其状态
-                // 这里需要更健壮的重置上一个语音的方法。
-                // 临时的修复可以是直接执行 resetVoiceAnimation 的核心逻辑
-                if (prevPlayIcon && currentPlayingSimulatedVoiceBubble.classList.contains('is-playing')) {
-                     currentPlayingSimulatedVoiceBubble.classList.remove('is-playing');
-                     const prevProgressBar = currentPlayingSimulatedVoiceBubble.querySelector('.voice-progress-fill');
-                     if(prevProgressBar) prevProgressBar.style.width = '0%';
-                     prevPlayIcon.classList.remove('playing');
-                }
+
+            const voiceConfig = globalConfig.minimaxVoice;
+            if (!voiceConfig.apiUrl || !voiceConfig.apiKey || !voiceConfig.groupId || !voiceConfig.ttsModel) {
+                showErrorModal('语音配置不完整', '请在“设置 > 语音设置”中完整配置 Minimax TTS。');
+                return;
             }
-            // 更新全局状态
-            currentPlayingSimulatedVoiceBubble = voiceBubble; // 设置当前播放的语音条
-            // 检查是否正在播放 (通过is-playing类)
-            if (!voiceBubble.classList.contains('is-playing')) {
-                // 开始模拟播放
-                startTime = Date.now();
-                playIcon.classList.add('playing');
-                startVoiceAnimation(); // 启动三角形的过渡动画
-                animationFrameId = requestAnimationFrame(updateSimulationProgress);
+
+            // 如果当前有音频正在播放
+            if (currentAudio) {
+                const wasPlayingThis = currentPlayingButton === playIcon;
+                currentAudio.pause(); // 暂停会触发onpause事件，从而重置UI
+                if (wasPlayingThis) return; // 如果点击的是正在播放的按钮，暂停后直接返回
+            }
+
+            const textToSynthesize = messageObj.content.text || '';
+            if (!textToSynthesize) {
+                showErrorModal('无法播放', '该语音消息没有转写文本。');
+                return;
+            }
+
+            let voiceId = '';
+            if (messageObj.sender === 'user') {
+                voiceId = userProfile.userVoiceId || 'male-qn-qingse';
             } else {
-                // 停止播放并重置
-                resetVoiceAnimation();
+                const contact = isSweetheartChatActive
+                    ? sweetheartContactsData.find(c => c.id === contactId)
+                    : contactsData.find(c => c.id === contactId);
+                voiceId = contact?.voiceId || 'female-qn-yuxin';
+            }
+
+            // --- UI: 设置为加载状态 ---
+            playIcon.disabled = true;
+            playIcon.classList.add('loading');
+            playIcon.innerHTML = `<svg class="spinner" viewBox="0 0 50 50"><circle class="path" cx="25" cy="25" r="20" fill="none" stroke-width="5"></circle></svg>`;
+
+            try {
+                // --- API 调用 ---
+                const response = await fetch(`${voiceConfig.apiUrl}?GroupId=${voiceConfig.groupId}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${voiceConfig.apiKey}`},
+                    body: JSON.stringify({
+                        model: voiceConfig.ttsModel,
+                        text: textToSynthesize,
+                        stream: false,
+                        output_format: 'hex',
+                        voice_setting: {voice_id: voiceId, speed: 1, vol: 1, pitch: 0}
+                    })
+                });
+
+                if (!response.ok) {
+                    const errData = await response.json().catch(() => ({}));
+                    throw new Error(`API请求失败: ${response.status} - ${errData.base_resp?.status_msg || response.statusText}`);
+                }
+
+                const data = await response.json();
+                if (data.base_resp.status_code !== 0 || !data.data?.audio) {
+                    throw new Error(`语音合成失败: ${data.base_resp?.status_msg || '未知错误'}`);
+                }
+
+                // --- 音频处理与播放 ---
+                const audioBytes = hexToUint8Array(data.data.audio);
+                const audioBlob = new Blob([audioBytes], {type: 'audio/mpeg'});
+                const audioObjectUrl = URL.createObjectURL(audioBlob);
+
+                const audio = new Audio(audioObjectUrl);
+                currentAudio = audio;
+                currentPlayingButton = playIcon;
+
+                // 【核心】将UI更新与真实音频事件绑定
+                audio.onplay = () => {
+                    playIcon.disabled = false;
+                    playIcon.classList.remove('loading');
+                    playIcon.classList.add('playing');
+                    playIcon.innerHTML = `<svg viewBox="0 0 24 24"><path fill="currentColor" d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>`;
+                    voiceBubble.classList.add('is-playing');
+                };
+
+                audio.ontimeupdate = () => {
+                    if (audio.duration > 0) {
+                        progressBar.style.width = `${(audio.currentTime / audio.duration) * 100}%`;
+                    }
+                };
+
+                const resetUI = () => {
+                    playIcon.classList.remove('playing', 'loading');
+                    playIcon.innerHTML = `<svg viewBox="0 0 24 24"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>`;
+                    voiceBubble.classList.remove('is-playing');
+                    progressBar.style.width = '0%';
+                    URL.revokeObjectURL(audioObjectUrl);
+                    if (currentPlayingButton === playIcon) {
+                        currentAudio = null;
+                        currentPlayingButton = null;
+                    }
+                };
+
+                audio.onpause = resetUI;
+                audio.onended = resetUI;
+                audio.onerror = () => {
+                    showErrorModal('播放失败', '音频文件损坏或无法播放。');
+                    resetUI();
+                };
+
+                audio.play();
+
+            } catch (error) {
+                console.error('播放语音条失败:', error);
+                showErrorModal('语音合成错误', error.message);
+                playIcon.disabled = false;
+                playIcon.classList.remove('loading');
+                playIcon.innerHTML = `<svg viewBox="0 0 24 24"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>`;
             }
         });
-        // 点击事件：切换转写文字显示/隐藏 (保持不变)
-        voiceBubble.addEventListener('click', function (e) {
-            e.stopPropagation();
-            const transcriptionEl = this.querySelector('.voice-transcription');
+
+        // 点击气泡本身，切换转写文字的显示/隐藏（此功能保留）
+        voiceBubble.addEventListener('click', (e) => {
+            if (e.target.closest('.voice-play-icon')) return; // 如果点的是播放按钮，则不触发
+            const transcriptionEl = voiceBubble.querySelector('.voice-transcription');
             if (transcriptionEl) {
                 transcriptionEl.style.display = transcriptionEl.style.display === 'none' ? 'block' : 'none';
             }
         });
+
         messageContent.appendChild(senderName);
         messageContent.appendChild(voiceBubble);
         if (isSweetheartChatActive && globalConfig.showAvatarsInSweetheartChat) {
             messageRow.appendChild(avatarEl);
-            messageRow.appendChild(messageContent);
-        } else {
-            messageRow.appendChild(avatarEl); // 头像DOM仍需要，但CSS会隐藏
-            messageRow.appendChild(messageContent);
         }
+        messageRow.appendChild(messageContent); // 修正：确保内容总是附加
+
         bindMessageEvents(voiceBubble, contactId, messageIndex, isSweetheartChatActive);
         return messageRow;
     }
-    // ▲▲▲ 新增：处理语音条消息 结束 ▲▲▲
+    // ===================================
+    // ▲▲▲ 核心修改区域结束 ▲▲▲
+    // ===================================
 
     if (messageObj.type === 'notice') {
         return createSystemNotice(messageObj);
     }
 
-    const hasContent = messageObj.text || messageObj.imageUrl;
-    if (!hasContent) {
-        console.warn(`⚠️ 消息渲染失败：消息内容为空 (Index: ${messageIndex})`, messageObj);
-        return createFallbackMessage(messageObj);
-    }
-
     const messageRow = document.createElement('div');
-    messageRow.className = 'message-row';
-    messageRow.classList.add(messageObj.sender === 'user' ? 'sent' : 'received');
+    messageRow.className = 'message-row ' + (messageObj.sender === 'user' ? 'sent' : 'received');
+    messageRow.dataset.timestamp = messageObj.timestamp;
+    messageRow.dataset.index = messageIndex;
 
     const avatarEl = document.createElement('div');
     avatarEl.className = 'message-chat-avatar';
+    const contactData = isSweetheartChatActive ? currentSweetheartChatContact : currentChatContact;
+    let avatarSrc = messageObj.sender === 'user' ? (userProfile?.avatar || '👤') : (contactData?.avatar || '💬');
 
-    let contactData = isSweetheartChatActive ? currentSweetheartChatContact : currentChatContact;
-
-    let avatarSrc = messageObj.sender === 'user'
-        ? (userProfile?.avatar || '👤')
-        : (contactData?.avatar || '💬');
+    if (avatarSrc === 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=' || avatarSrc === '') {
+        avatarSrc = (messageObj.sender === 'user') ? '👤' : (contactData?.name ? contactData.name.charAt(0) : '💬');
+    }
 
     const isUrl = avatarSrc.startsWith('http') || avatarSrc.startsWith('data:');
-    avatarEl.innerHTML = isUrl
-        ? `<img src="${avatarSrc}" alt="avatar">`
-        : `<div class="initials">${avatarSrc}</div>`;
+    avatarEl.innerHTML = isUrl ? `<img src="${avatarSrc}" alt="avatar">` : `<div class="initials">${escapeHTML(avatarSrc)}</div>`;
 
     const messageContent = document.createElement('div');
     messageContent.className = 'message-content';
 
     const senderName = document.createElement('div');
     senderName.className = 'message-sender-name';
-    senderName.textContent = messageObj.sender === 'user'
-        ? (userProfile.name || '我')
-        : (contactData?.name || '联系人');
+    senderName.textContent = messageObj.sender === 'user' ? (userProfile.name || '我') : (contactData?.name || '联系人');
 
     const bubble = document.createElement('div');
     bubble.className = 'chat-bubble';
@@ -1389,28 +1430,17 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
     const renderMatch = text.match(/<render>([\s\S]*?)<\/render>/);
 
     if (renderMatch && renderMatch[1]) {
-        // --- A. 处理 <render> 标签 (iframe) ---
         bubble.classList.add('render-bubble');
         const iframe = document.createElement('iframe');
         iframe.className = 'render-iframe';
         iframe.sandbox = 'allow-scripts allow-forms allow-pointer-lock allow-popups allow-same-origin allow-top-navigation-by-user-activation';
-
-        const renderContent = renderMatch[1];
-        const secureSrcDoc = `
-            <!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <style>body{margin:0;padding:10px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;box-sizing:border-box;}*{box-sizing:border-box;}</style>
-            </head><body>${renderContent}</body></html>`;
+        const secureSrcDoc = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>body{margin:0;padding:10px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;box-sizing:border-box;}*{box-sizing:border-box;}</style></head><body>${renderMatch[1]}</body></html>`;
         iframe.srcdoc = secureSrcDoc;
-
         bubble.appendChild(iframe);
-
-        // ⭐ 核心修复：添加一个事件捕获全覆盖层（透明不可见），确保所有事件都先经过这个层
         const eventCaptureLayer = document.createElement('div');
-        eventCaptureLayer.className = 'iframe-event-capture-layer'; // 新的类名
+        eventCaptureLayer.className = 'iframe-event-capture-layer';
         bubble.appendChild(eventCaptureLayer);
-
     } else if (messageObj.imageUrl) {
-        // --- B. 处理图片消息 ---
         bubble.classList.add('image-only');
         const img = document.createElement('img');
         img.src = messageObj.imageUrl;
@@ -1418,21 +1448,17 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
         img.style.maxWidth = '150px';
         img.style.borderRadius = '10px';
         bubble.appendChild(img);
-
     } else {
-        // --- C. 处理普通文本和引用消息 ---
         let contentHTML = '';
         if (messageObj.quote && messageObj.quote.senderName) {
             let quotedText = (messageObj.quote.text || '').substring(0, 50);
-            if ((messageObj.quote.text || '').length > 50) quotedText += '...';
-
-            contentHTML += `
-                <div class="quoted-message-wrapper">
-                    <strong class="quoted-sender">${escapeHTML(messageObj.quote.senderName)}</strong>
-                    <span class="quoted-text">${escapeHTML(quotedText)}</span>
-                </div>`;
+            if (messageObj.quote.text && messageObj.quote.text.includes('<img')) {
+                quotedText = '[图片]';
+            } else if ((messageObj.quote.text || '').length > 50) {
+                quotedText += '...';
+            }
+            contentHTML += `<div class="quoted-message-wrapper"><strong class="quoted-sender">${escapeHTML(messageObj.quote.senderName)}</strong><span class="quoted-text">${escapeHTML(quotedText)}</span></div>`;
         }
-
         const formattedText = formatMessageText(text);
         if (formattedText) {
             contentHTML += `<div class="main-message-text">${formattedText}</div>`;
@@ -1440,46 +1466,155 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
         bubble.innerHTML = contentHTML;
     }
 
-    // 组装消息内容
     messageContent.appendChild(senderName);
     messageContent.appendChild(bubble);
 
-    // 🔥🔥🔥 核心修复：确保无论sent还是received，都正确添加头像和内容 🔥🔥🔥
-    // ✅ 统一使用：先头像，后内容（通过CSS的flex属性和order控制最终布局）
+    // 🔥 统一将头像和内容按顺序添加，交由 CSS 控制最终布局
+    messageRow.appendChild(avatarEl);
+    messageRow.appendChild(messageContent);
 
-    messageRow.appendChild(avatarEl);      // 1. 先添加头像
-    messageRow.appendChild(messageContent); // 2. 再添加内容
-
-    // 绑定事件
     bindMessageEvents(bubble, contactId, messageIndex, isSweetheartChatActive);
 
     setTimeout(() => {
         const codeBlockWrappers = messageRow.querySelectorAll('.code-block-wrapper');
         codeBlockWrappers.forEach(wrapper => {
-            const preElement = wrapper.querySelector('pre code'); // 获取实际的代码内容
             const copyButton = wrapper.querySelector('.copy-code-btn');
-            if (preElement && copyButton) {
-                copyButton.onclick = async () => {
-                    const codeContent = preElement.textContent || preElement.innerText;
-                    try {
-                        await navigator.clipboard.writeText(codeContent);
-                        copyButton.classList.add('copied');
-                        copyButton.querySelector('span').textContent = '已复制';
-                        setTimeout(() => {
-                            copyButton.classList.remove('copied');
-                            copyButton.querySelector('span').textContent = '复制';
-                        }, 2000);
-                    } catch (err) {
-                        console.error('复制失败:', err);
-                        alert('复制失败，请手动复制');
-                    }
-                };
+            if (copyButton) {
+                copyButton.onclick = () => copyCodeToClipboard(copyButton);
             }
         });
-    }, 0); // 使用 setTimeout 让事件绑定在 DOM 更新后执行
+    }, 0);
 
     return messageRow;
+}
 
+
+/* script.js (在全局作用域的任何地方添加) */
+
+// 创建一个DOMParser实例，以避免重复创建
+const messageParser = new DOMParser();
+
+
+/* script.js (接着上次的功能，完整重写 playTtsMessage 函数) */
+
+let currentPlayingMessageIdentifier = null; // 全局记录当前播放的消息唯一标识，如 "contactId_messageIndex"
+
+// 将 hex 编码的字符串转换为 Uint8Array
+function hexToUint8Array(hexString) {
+    const bytes = new Uint8Array(hexString.length / 2);
+    for (let i = 0; i < hexString.length; i += 2) {
+        bytes[i / 2] = parseInt(hexString.substring(i, i + 2), 16);
+    }
+    return bytes;
+}
+
+// 【最终健壮版】播放 TTS 消息，已优化全局音频控制
+// 新版本：不再需要 button 参数，使用全局提示框
+async function playTtsMessage(sender, contactId, messageIndex, isSweetheart = false) {
+    // 如果当前有音频正在播放，则先停止它
+    if (currentAudio) {
+        currentAudio.pause();
+    }
+
+    const voiceConfig = globalConfig.minimaxVoice;
+    if (!voiceConfig.apiUrl || !voiceConfig.apiKey || !voiceConfig.groupId || !voiceConfig.ttsModel) {
+        showErrorModal('语音配置不完整', '请在“设置 > 语音设置”中完整配置 Minimax TTS。');
+        return;
+    }
+
+    // 根据 isSweetheart 标志选择正确的聊天记录
+    const historyKey = isSweetheart ? 'phoneSweetheartChatHistory' : 'phoneChatHistory';
+    const chatHistory = JSON.parse(localStorage.getItem(historyKey) || '{}');
+    const message = chatHistory[contactId]?.[messageIndex];
+
+    if (!message || typeof message.text !== 'string' || !message.text.trim() || message.text.includes('<img') || message.text.includes('<render>')) {
+        showErrorModal('无法朗读', '此消息不是纯文本或内容为空。');
+        return;
+    }
+
+    let voiceId = '';
+    if (sender === 'user') {
+        voiceId = userProfile.userVoiceId || 'male-qn-qingse';
+    } else {
+        const contactList = isSweetheart ? sweetheartContactsData : contactsData;
+        const targetContact = contactList.find(c => c.id === contactId);
+        voiceId = targetContact?.voiceId || 'female-qn-yuxin';
+    }
+
+    // 使用一个div来解析HTML并提取纯文本
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = message.text;
+    const messageText = tempDiv.textContent || tempDiv.innerText;
+
+    // 显示加载提示
+    showSuccessModal('朗读中...', '正在为您合成语音，请稍候...', 99999); // 使用一个很长的时间，稍后手动关闭
+
+    try {
+        const response = await fetch(`${voiceConfig.apiUrl}?GroupId=${voiceConfig.groupId}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${voiceConfig.apiKey}`},
+            body: JSON.stringify({
+                model: voiceConfig.ttsModel, text: messageText, stream: false, output_format: 'hex',
+                voice_setting: {voice_id: voiceId, speed: 1, vol: 1, pitch: 0}
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`API请求失败: ${response.status}`);
+        }
+        const data = await response.json();
+        if (data.base_resp.status_code !== 0 || !data.data?.audio) {
+            throw new Error(`语音合成失败: ${data.base_resp?.status_msg || '未知错误'}`);
+        }
+
+        const audioBytes = hexToUint8Array(data.data.audio);
+
+
+        // --- 从这里继续 ---
+        const audioBlob = new Blob([audioBytes], {type: 'audio/mpeg'});
+        const audioObjectUrl = URL.createObjectURL(audioBlob);
+        const audio = new Audio(audioObjectUrl);
+        currentAudio = audio; // 存储为全局变量，方便控制
+
+        // 定义一个函数，用于关闭加载提示框
+        const hideLoadingModal = () => {
+            const modal = document.getElementById('successModal');
+            if (modal && modal.classList.contains('show')) {
+                modal.classList.remove('show');
+                setTimeout(() => modal.style.display = 'none', 300);
+            }
+        };
+
+        // 播放结束或暂停时
+        const onAudioEnd = () => {
+            hideLoadingModal();
+            URL.revokeObjectURL(audioObjectUrl); // 释放内存
+            if (currentAudio === audio) {
+                currentAudio = null;
+            }
+        };
+
+        audio.onplay = () => {
+            // 开始播放时，可以先关闭加载提示
+            hideLoadingModal();
+        };
+
+        audio.onended = onAudioEnd;
+        audio.onpause = onAudioEnd; // 暂停也算结束，清理资源
+        audio.onerror = () => {
+            showErrorModal('播放失败', '音频文件损坏或无法播放。');
+            onAudioEnd();
+        };
+
+        audio.play();
+
+    } catch (error) {
+        console.error('朗读失败:', error);
+        showErrorModal('朗读失败', error.message);
+        // 确保出错时也关闭加载提示
+        const modal = document.getElementById('successModal');
+        if (modal) modal.classList.remove('show');
+    }
 }
 
 
@@ -2095,6 +2230,7 @@ let sweetheartContactsData = [
         avatar: '💖',
         personality: '温柔体贴',
         relationship: '最好的朋友',
+        voiceId: 'female-qn-yuxin', // 添加 voiceId 默认值
         boundWorldbooks: []
     }
 ];
@@ -2998,6 +3134,15 @@ function createSettingsPageHTML() {
                     </div>
                     <div class="settings-arrow">›</div>
                 </div>
+                <!-- 2. 语音设置 -->
+                <div class="settings-item" onclick="openVoiceSettingsPage()">
+                    <div class="settings-icon icon-voice"></div> <!-- 新增：图标类 -->
+                    <div class="settings-info">
+                        <div class="settings-label">语音设置</div>
+                        <div class="settings-desc">配置语音合成（TTS）功能</div>
+                    </div>
+                    <div class="settings-arrow">›</div>
+                </div>
                 <!-- 2. 数据库设置 -->
                 <div class="settings-item" onclick="openConfig('database')">
                     <div class="settings-icon icon-database"></div>
@@ -3223,6 +3368,32 @@ function closeSettings() {
         console.log("设置页面DOM已从内存中移除。");
     }, 350); // 350ms 对应 CSS 中的 0.35s
 }
+
+/* script.js (在 openSettings() 函数附近的空白处添加) */
+
+function openVoiceSettingsPage() {
+    // 确保先关闭其他可能打开的页面
+    document.querySelectorAll('.config-page.show').forEach(page => {
+        if (page.id !== 'voiceSettingsPage') page.classList.remove('show');
+    });
+
+    const voiceSettingsPage = document.getElementById('voiceSettingsPage');
+    voiceSettingsPage.style.zIndex = '1010'; // 确保层级够高
+    voiceSettingsPage.classList.add('show');
+
+    // 填充已保存的配置
+    document.getElementById('minimaxApiUrl').value = globalConfig.minimaxVoice.apiUrl;
+    document.getElementById('minimaxApiKey').value = globalConfig.minimaxVoice.apiKey;
+    document.getElementById('minimaxGroupId').value = globalConfig.minimaxVoice.groupId;
+
+    // 渲染模型列表
+    renderMinimaxTtsModels(globalConfig.minimaxVoice.availableModels, globalConfig.minimaxVoice.ttsModel);
+}
+
+function closeVoiceSettingsPage() {
+    document.getElementById('voiceSettingsPage').classList.remove('show');
+}
+
 
 function openApiConfig() {
     // 确保先关闭其他可能打开的页面
@@ -3466,6 +3637,90 @@ function saveConfig(type) {
 
     setTimeout(() => closeConfig(type), 2000);
 }
+
+/* script.js (在 openConfig() 函数附近添加) */
+
+// 渲染 Minimax TTS 模型列表
+function renderMinimaxTtsModels(models, selectedModelId) {
+    const modelSelect = document.getElementById('minimaxTtsModel');
+    if (!modelSelect) return;
+
+    modelSelect.innerHTML = ''; // 清空现有选项
+
+    if (models && models.length > 0) {
+        models.forEach(model => {
+            const option = document.createElement('option');
+            option.value = model;
+            option.textContent = model;
+            if (model === selectedModelId) {
+                option.selected = true;
+            }
+            modelSelect.appendChild(option);
+        });
+    } else {
+        const defaultOption = document.createElement('option');
+        defaultOption.value = '';
+        defaultOption.textContent = '未找到模型';
+        modelSelect.appendChild(defaultOption);
+    }
+}
+
+
+// 拉取 Minimax TTS 模型列表
+async function fetchMinimaxTtsModels() {
+    const apiUrl = document.getElementById('minimaxApiUrl').value.trim();
+    const apiKey = document.getElementById('minimaxApiKey').value.trim();
+    const groupId = document.getElementById('minimaxGroupId').value.trim();
+
+    if (!apiUrl || !apiKey || !groupId) {
+        showMinimaxVoiceStatus('请填写API URL, API Key 和 Group ID', 'error');
+        return;
+    }
+
+    // Minimax TTS API 文档中没有直接提供拉取模型列表的接口
+    // 这里我们使用文档中列出的模型作为默认选项
+    const defaultMinimaxModels = [
+        "speech-2.6-hd", "speech-2.6-turbo",
+        "speech-02-hd", "speech-02-turbo",
+        "speech-01-hd", "speech-01-turbo"
+    ];
+
+    const commonMinimaxVoiceIds = [
+        "male-qn-qingse", // 男性语速适中
+        "female-qn-yuxin", // 女性语速适中
+        "male-qn-yulong",
+        "female-qn-tingting",
+        // ... (更多 Minimax 提供的 Voice ID)
+    ];
+
+    globalConfig.minimaxVoice.availableModels = defaultMinimaxModels;
+
+    showMinimaxVoiceStatus('已加载默认模型列表', 'success');
+}
+
+
+// 保存 Minimax 语音设置
+function saveMinimaxVoiceSettings() {
+    globalConfig.minimaxVoice.apiUrl = document.getElementById('minimaxApiUrl').value.trim();
+    globalConfig.minimaxVoice.apiKey = document.getElementById('minimaxApiKey').value.trim();
+    globalConfig.minimaxVoice.groupId = document.getElementById('minimaxGroupId').value.trim();
+    globalConfig.minimaxVoice.ttsModel = document.getElementById('minimaxTtsModel').value;
+
+    saveGlobalConfig(); // 保存到 localStorage
+
+    showMinimaxVoiceStatus('语音配置已保存', 'success');
+    showSuccessModal('保存成功', 'Minimax 语音配置已更新。');
+}
+
+// 显示 Minimax 语音设置状态
+function showMinimaxVoiceStatus(message, type) {
+    const status = document.getElementById('minimaxVoiceStatus');
+    if (status) { // 确保元素存在
+        status.textContent = message;
+        status.style.color = type === 'error' ? '#dc3545' : '#28a745';
+    }
+}
+
 
 function openBeautify() {
     // 关闭其他页面
@@ -5384,6 +5639,16 @@ async function getAiReply() {
             const newIndex = saveMessage(contactId, messageObj);
             const messageRow = _createMessageDOM(contactId, messageObj, newIndex);
             messagesEl.appendChild(messageRow);
+            // ***** 在这里添加 TTS 播放按钮 *****
+            const ttsButtonHtml = `
+                <div class="message-actions">
+                    <button class="play-tts-btn" onclick="playTtsMessage(this, '${messageObj.sender}', '${contactId}', ${newIndex})">
+                        <svg viewBox="0 0 24 24"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>
+                    </button>
+                </div>
+            `;
+            messageRow.querySelector('.message-content').insertAdjacentHTML('beforeend', ttsButtonHtml);
+            // *********************************************************************************
             messagesEl.scrollTop = messagesEl.scrollHeight; // 每次都滚动到底部
             // 增加一个自然的延迟
             await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 400));
@@ -5435,6 +5700,7 @@ function editCurrentContact() {
     // 填充联系人信息
     document.getElementById('char-name').value = currentChatContact.name;
     document.getElementById('char-persona').value = currentChatContact.status;
+    document.getElementById('char-voice-id').value = currentChatContact.voiceId || ''; // <<< 新增：填充 Voice ID
     const contactAvatar = currentChatContact.avatar;
     const isContactUrl = contactAvatar && (contactAvatar.startsWith('http') || contactAvatar.startsWith('data:'));
     document.getElementById('avatar-preview').src = isContactUrl ? contactAvatar : 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
@@ -5482,6 +5748,7 @@ function editCurrentSweetheartContact() {
     document.getElementById('sweetheart-catchphrase').value = contact.catchphrase || '';
     document.getElementById('sweetheart-history').value = contact.history || '';
     document.getElementById('sweetheart-relationship').value = contact.relationship || '';
+    document.getElementById('sweetheart-voice-id').value = contact.voiceId || ''; // <<< 新增：填充 Voice ID
 
     const avatarPreview = document.getElementById('sweetheart-avatar-preview');
     const isUrl = contact.avatar && (contact.avatar.startsWith('http') || contact.avatar.startsWith('data:'));
@@ -5673,6 +5940,7 @@ function saveGlobalConfig() {
         const configToSave = {
             apiConfigs: globalConfig.apiConfigs,
             activeApiConfig: globalConfig.activeApiConfig,
+            minimaxVoice: globalConfig.minimaxVoice, // <<< 新增：保存 Minimax 语音设置
         };
         localStorage.setItem('phoneGlobalConfig', JSON.stringify(configToSave));
     } catch (e) {
@@ -5685,8 +5953,15 @@ function loadGlobalConfig() {
         const savedConfig = localStorage.getItem('phoneGlobalConfig');
         if (savedConfig) {
             const parsedConfig = JSON.parse(savedConfig);
-            Object.assign(globalConfig, parsedConfig);
-            console.log('成功从 localStorage 加载API配置。');
+            // 仅合并顶层属性，避免深层对象被完全覆盖
+            Object.assign(globalConfig.apiConfigs, parsedConfig.apiConfigs);
+            globalConfig.activeApiConfig = parsedConfig.activeApiConfig;
+            // <<< 新增：加载 Minimax 语音设置
+            if (parsedConfig.minimaxVoice) {
+                Object.assign(globalConfig.minimaxVoice, parsedConfig.minimaxVoice);
+            }
+            // >>> 结束新增
+            console.log('成功从 localStorage 加载API和语音配置。');
         }
     } catch (e) {
         console.error('从 localStorage 加载API配置失败:', e);
@@ -7939,7 +8214,7 @@ async function getSweetheartAiReply() {
             }
             // 然后添加AI的消息
             if (msg.type === 'location') {
-                 // 将 location 消息作为 system 角色发送给AI，因为它描述的是场景而非对话
+                // 将 location 消息作为 system 角色发送给AI，因为它描述的是场景而非对话
                 messages.push({
                     role: 'system',
                     content: `[场景变化] 你们来到了【${msg.locationName}】。描述：${msg.locationDesc}`
@@ -7951,8 +8226,18 @@ async function getSweetheartAiReply() {
                 });
             } else if (msg.text) {
                 // 移除 <render> 标签的内容，AI不需要看到这个，否则会误以为是普通文本
-                messages.push({role: 'assistant', content: String(msg.text).replace(/<render>[\s\S]*?<\/render>/g, '')});
+                messages.push({
+                    role: 'assistant',
+                    content: String(msg.text).replace(/<render>[\s\S]*?<\/render>/g, '')
+                });
             }
+        }
+        // 在这里，确保 msg.text 是纯文本，移除HTML标签
+        let cleanText = msg.text || '';
+        if (cleanText.includes('<') && cleanText.includes('>')) {
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = cleanText;
+            cleanText = tempDiv.textContent || tempDiv.innerText;
         }
     }
     // 循环结束后，冲刷最后剩余的用户文本
@@ -8049,7 +8334,7 @@ async function getSweetheartAiReply() {
                 // 处理捕获到的特殊标签
                 const fullTag = match[1]; // 整个标签字符串，如 /voice/{...}/
                 const tagType = match[2]; // 'red-packet' 或 'voice'
-                 const jsonStringWithEscapes = match[3]; // 捕获到的 JSON 字符串，包含转义引号
+                const jsonStringWithEscapes = match[3]; // 捕获到的 JSON 字符串，包含转义引号
 
                 try {
                     // 替换转义的引号，以便 JSON.parse 能够处理
@@ -8127,7 +8412,6 @@ async function getSweetheartAiReply() {
     // chatInput.disabled = false; // 重新启用输入框
     chatInput.focus(); // 聚焦输入框
 }
-
 
 
 /**
@@ -11387,6 +11671,7 @@ function openLibraryCharacterModal(contactData, sourceType) {
     document.getElementById('library-catchphrase').value = contactData.catchphrase || '';
     document.getElementById('library-history').value = contactData.history || '';
     document.getElementById('library-relationship').value = contactData.relationship || '';
+    document.getElementById('library-voice-id').value = contactData.voiceId || ''; // <<< 新增：填充 Voice ID
 
     // 渲染世界书列表
     renderLibraryWorldbooksList(contactData.boundWorldbooks || []);
@@ -11513,6 +11798,7 @@ function saveLibraryCharacter() {
     const catchphrase = document.getElementById('library-catchphrase').value.trim();
     const history = document.getElementById('library-history').value.trim();
     const relationship = document.getElementById('library-relationship').value.trim();
+    const voiceId = document.getElementById('library-voice-id').value.trim(); // <<< 新增：获取 Voice ID
 
     // 获取绑定的世界书
     const boundWorldbooks = [];
@@ -11537,6 +11823,7 @@ function saveLibraryCharacter() {
         catchphrase,
         history,
         relationship,
+        voiceId, // <<< 新增：保存 Voice ID
         boundWorldbooks,
         boundMasks
     };
@@ -14115,6 +14402,8 @@ function initializeApp() {
     loadDockedIcons();
     loadMasksData();
     updateChatModeButton();
+    // 在应用程序初始化时，确保渲染 Minimax TTS 模型列表
+    renderMinimaxTtsModels(globalConfig.minimaxVoice.availableModels, globalConfig.minimaxVoice.ttsModel);
     setupSummarizeButton();
     setupTestButton();
     updateTestButtonState(); // 初始化测试按钮状态
@@ -14217,6 +14506,17 @@ function initializeApp() {
                 case 'quoteMessageBtn':
                     quoteMessage(contactId, messageIndex);
                     break;
+                // ✅ 新增这个 case
+                case 'readAloudNormalBtn':
+                    // 调用修改后的函数，传入必要参数
+                    playTtsMessage(
+                        chatHistory[contactId][messageIndex].sender,
+                        contactId,
+                        messageIndex,
+                        false // isSweetheart = false
+                    );
+                    hideMessageActionSheet(); // 朗读后隐藏菜单
+                    break;
                 case 'multiSelectNormalBtn': // ✅ 新增
                     enterNormalMultiSelectMode();
                     break;
@@ -14254,6 +14554,17 @@ function initializeApp() {
                     break;
                 case 'sweetheartQuoteMessageBtn':
                     quoteSweetheartMessage(contactId, messageIndex);
+                    break;
+                // ✅ 新增这个 case
+                case 'readAloudSweetheartBtn':
+                    // 调用修改后的函数，同样传入参数
+                    playTtsMessage(
+                        JSON.parse(localStorage.getItem('phoneSweetheartChatHistory') || '{}')[contactId][messageIndex].sender,
+                        contactId,
+                        messageIndex,
+                        true // isSweetheart = true
+                    );
+                    hideSweetheartMessageActionSheet(); // 朗读后隐藏菜单
                     break;
                 case 'multiSelectSweetheartBtn': // ✅ 新增
                     enterSweetheartMultiSelectMode();

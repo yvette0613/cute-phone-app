@@ -232,7 +232,7 @@ body {
 .message-row {
     display: flex;
     max-width: 100%;
-    gap: 12px;
+    /*gap: 12px;*/
     margin: 8px 0;
     align-items: flex-start;
 }
@@ -1187,6 +1187,35 @@ body.fullscreen-enabled {
 .form-group:last-of-type {
     border-bottom-left-radius: 12px;
     border-bottom-right-radius: 12px;
+}
+
+.voice-setting-section,
+.sweetheart-field .voice-setting-input,
+.library-section .voice-setting-input { /* 为统一角色卡和密友卡片增加样式 */
+    margin-top: 10px;
+}
+.voice-setting-label,
+.sweetheart-label .label-text { /* 标签样式复用现有 */
+    font-size: 14px;
+    font-weight: 600;
+    color: #333; /* 可以根据主题调整 */
+    margin-bottom: 8px;
+}
+.voice-setting-input,
+.sweetheart-input,
+.library-input { /* 输入框样式复用现有 */
+    width: 100%;
+    padding: 10px 12px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 14px;
+    transition: border-color 0.2s;
+}
+.voice-setting-input:focus,
+.sweetheart-input:focus,
+.library-input:focus {
+    outline: none;
+    border-color: #a8c9f5;
 }
 
 .form-label {
@@ -4225,29 +4254,29 @@ body.code-scrolling-enabled .code-block-wrapper {
     /* 这里很重要：设置position: relative; 使得三角形可以相对定位到这个区域，并且允许文字内容正常显示 */
 }
 
-/* 显示/隐藏转写文字的箭头 */
-.disclosure-arrow {
-    position: absolute;
-    bottom: 50px; /* 定位在 voice-transcription 底部，稍微突出 */
-    left: 35px; /* 从最左边开始 */
-    font-size: 12px;
-    color: rgba(255, 255, 255, 0.9); /* 指针颜色稍微亮一些 */
-    transform: translateX(-50%) rotate(180deg); /* 旋转180度，让三角形的尖朝上，并调整中心点 */
-    z-index: 10; /* 确保在所有内容之上 */
-    pointer-events: none; /* 确保它不阻挡点击事件 */
-    /* *** 关键改变：使用 transition 来控制移动 *** */
-    transition: transform 0s linear; /* 默认0s，JS会动态设置时长 */
-    /* animation-fill-mode: forwards; /* 这个就不需要了，因为是 transition */
-    /* animation-play-state: paused; */ /* 这个也不需要了 */
-}
+/*!* 显示/隐藏转写文字的箭头 *!*/
+/*.disclosure-arrow {*/
+/*    position: absolute;*/
+/*    bottom: 50px; !* 定位在 voice-transcription 底部，稍微突出 *!*/
+/*    left: 35px; !* 从最左边开始 *!*/
+/*    font-size: 12px;*/
+/*    color: rgba(255, 255, 255, 0.9); !* 指针颜色稍微亮一些 *!*/
+/*    transform: translateX(-50%) rotate(180deg); !* 旋转180度，让三角形的尖朝上，并调整中心点 *!*/
+/*    z-index: 10; !* 确保在所有内容之上 *!*/
+/*    pointer-events: none; !* 确保它不阻挡点击事件 *!*/
+/*    !* *** 关键改变：使用 transition 来控制移动 *** *!*/
+/*    transition: transform 0s linear; !* 默认0s，JS会动态设置时长 *!*/
+/*    !* animation-fill-mode: forwards; !* 这个就不需要了，因为是 transition *!*/
+/*    !* animation-play-state: paused; *! !* 这个也不需要了 *!*/
+/*}*/
 
-/* 当语音播放时，启动动画 */
-.voice-message-bubble.is-playing .disclosure-arrow {
-    animation-name: disclosureArrowSlide; /* 应用滑动的动画 */
-    animation-play-state: running; /* 动画运行 */
-    animation-timing-function: linear; /* 匀速播放 */
-    /* animation-duration 将通过 JavaScript 动态设置 */
-}
+/*!* 当语音播放时，启动动画 *!*/
+/*.voice-message-bubble.is-playing .disclosure-arrow {*/
+/*    animation-name: disclosureArrowSlide; !* 应用滑动的动画 *!*/
+/*    animation-play-state: running; !* 动画运行 *!*/
+/*    animation-timing-function: linear; !* 匀速播放 *!*/
+/*    !* animation-duration 将通过 JavaScript 动态设置 *!*/
+/*}*/
 
 /* AI 接收到的语音条样式 */
 .message-row.received .voice-message-bubble {
@@ -4261,9 +4290,9 @@ body.code-scrolling-enabled .code-block-wrapper {
     border-top-color: rgba(0, 0, 0, 0.2);
     color: #333;
 }
-.message-row.received .disclosure-arrow {
-    color: rgba(0, 0, 0, 0.8);
-}
+/*.message-row.received .disclosure-arrow {*/
+/*    color: rgba(0, 0, 0, 0.8);*/
+/*}*/
 
 
 /* 用户发送的语音条样式 */
@@ -4278,9 +4307,9 @@ body.code-scrolling-enabled .code-block-wrapper {
     border-top-color: rgba(255, 255, 255, 0.4);
     color: white;
 }
-.message-row.sent .disclosure-arrow {
-    color: rgba(255, 255, 255, 0.6);
-}
+/*.message-row.sent .disclosure-arrow {*/
+/*    color: rgba(255, 255, 255, 0.6);*/
+/*}*/
 
 .voice-message-bubble:active {
     filter: brightness(0.9);
@@ -4288,11 +4317,176 @@ body.code-scrolling-enabled .code-block-wrapper {
 
 
 
-/* 可以添加一个当语音消息在播放时停止动画的样式，如果需要的话 */
-.voice-message-bubble.playing .disclosure-arrow {
-    animation-play-state: paused; /* 播放时暂停动画，只在打开隐藏内容时才动 */
+/*!* 可以添加一个当语音消息在播放时停止动画的样式，如果需要的话 *!*/
+/*.voice-message-bubble.playing .disclosure-arrow {*/
+/*    animation-play-state: paused; !* 播放时暂停动画，只在打开隐藏内容时才动 *!*/
+/*}*/
+
+/* 聊天消息中的 TTS 播放按钮 */
+.message-actions {
+    display: flex;
+    align-items: center;
+    margin-left: 8px;
+    margin-right: 8px;
+    position: relative;
+    z-index: 10;
+}
+/* 4. 调整 TTS 按钮的背景和图标颜色，确保与气泡风格一致 */
+.play-tts-btn {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    /* 默认透明或略带背景，视乎其所属消息的气泡颜色 */
+    /* background: rgba(0, 0, 0, 0.1); */ /* 移除通用背景，让下面的覆盖 */
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+.play-tts-btn:hover {
+    background: rgba(0, 0, 0, 0.2);
+}
+.play-tts-btn svg {
+    width: 18px;
+    height: 18px;
+    /*fill: white; !* 默认白色图标 *!*/
 }
 
+/* AI 消息 (received) 的 TTS 按钮样式 */
+.message-row.received .play-tts-btn {
+    background: rgba(0, 0, 0, 0.05); /* 接收方气泡的浅色背景 */
+}
+
+.message-row.received .play-tts-btn:hover {
+    background: rgba(0, 0, 0, 0.1);
+}
+
+.message-row.received .play-tts-btn svg {
+    fill: #555; /* 接收方气泡的图标颜色 */
+}
+/* 我的消息的气泡图标颜色 */
+.message-row.sent .play-tts-btn {
+    background: rgba(255, 255, 255, 0.15); /* 发送方气泡的背景 */
+}
+
+.message-row.sent .play-tts-btn:hover {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.message-row.sent .play-tts-btn svg {
+    fill: white; /* 发送方气泡的图标颜色 */
+}
+/* 播放状态动画 */
+.play-tts-btn.playing svg path {
+    d: path('M6 19h4V5H6v14zm8-14v14h4V5h-4z'); /* 动画到暂停图标 */
+}
+/* 圆形进度条 */
+.play-tts-btn .circle-progress {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    transform: rotate(-90deg); /* 从顶部开始 */
+}
+.play-tts-btn .circle-progress circle {
+    stroke-linecap: round;
+    transition: stroke-dashoffset 0.1s linear;
+}
+
+/* 将 TTS 按钮集成到消息流中 */
+.message-row {
+    flex-wrap: nowrap; /* 防止TTS按钮换行 */
+}
+/* AI消息的TTS按钮需要在气泡左侧 */
+.message-row.received .message-content + .message-actions {
+    margin-left: 0;
+    margin-right: -8px; /* 微调间距 */
+    color: #555;
+    order: 3; /* 将播放按钮排在内容的后面 */
+}
+/* 我的消息的TTS按钮需要在气泡右侧 */
+.message-row.sent .message-content + .message-actions {
+    margin-left: -8px; /* 微调间距 */
+    margin-right: 0;
+    color: white;
+    order: -1; /* 将播放按钮排在内容的左边，因为flex-direction:row-reverse在发送消息时 */
+}
+/* 针对密友聊天，调整TTS按钮的颜色 */
+.sweetheart-chat-page .message-row.received .play-tts-btn {
+    background: rgba(161, 136, 127, 0.1);
+}
+
+.sweetheart-chat-page .message-row.received .play-tts-btn:hover {
+    background: rgba(161, 136, 127, 0.2);
+}
+
+.sweetheart-chat-page .message-row.received .play-tts-btn svg {
+    fill: #8D6E63;
+}
+.sweetheart-chat-page .message-row.sent .play-tts-btn {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.sweetheart-chat-page .message-row.sent .play-tts-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.sweetheart-chat-page .message-row.sent .play-tts-btn svg {
+    fill: white;
+}
+
+/* 加载状态的旋转动画 */
+@keyframes tts-spinner-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+.play-tts-btn .spinner {
+    animation: tts-spinner-spin 1s linear infinite;
+}
+.play-tts-btn .spinner .path {
+    stroke: currentColor;
+    stroke-linecap: round;
+    animation: dash 1.5s ease-in-out infinite;
+}
+@keyframes dash {
+    0% {
+        stroke-dasharray: 1, 150;
+        stroke-dashoffset: 0;
+    }
+    50% {
+        stroke-dasharray: 90, 150;
+        stroke-dashoffset: -35;
+    }
+    100% {
+        stroke-dasharray: 90, 150;
+        stroke-dashoffset: -124;
+    }
+}
+
+.message-row.received .message-actions {
+    order: 3; /* TTS 按钮在第三个（最右） */
+    margin-left: 8px; /* TTS 按钮与内容之间间距 */
+}
+/* 3. 发送消息（自己）：TTS 按钮在左，头像在右，内容居中 */
+.message-row.sent {
+    flex-direction: row-reverse; /* 保持 Dom 顺序：TTS按钮-头像-内容，但视觉上从右往左排 */
+    justify-content: flex-end; /* 整体右对齐 */
+}
+/* 调整发送消息的顺序和间距 */
+.message-row.sent .message-chat-avatar {
+    order: 1; /* 头像在第一个（最右） */
+    margin-left: 8px; /* 头像与内容之间间距 */
+}
+.message-row.sent .message-content {
+    order: 2; /* 内容在第二个 */
+}
+.message-row.sent .message-actions {
+    order: 3; /* TTS 按钮在第三个（最左） */
+    margin-right: 8px; /* TTS 按钮与内容之间间距 */
+}
 
 /* ========== 世界选择页面样式 ========== */
 .world-select-page {
@@ -8523,6 +8717,11 @@ body.code-scrolling-enabled .code-block-wrapper {
     background-image: url('https://chatbotcos.weixin.qq.com/chatbot/30-openaiassets_68f3834db21084aab1644317b57b1737_469401762089707973.png');
 }
 
+/* style.css (在 settings-icon 定义下) */
+.icon-voice {
+    background-image: url('https://yanfa-upload.oss-cn-zhangjiakou.aliyuncs.com/images/20251112/1762885109_wqbs_tpzb.png'); /* 替换为你的语音图标 */
+}
+
 .icon-database {
     background-image: url('https://s3plus.meituan.net/opapisdk/op_ticket_1_5677168484_1762885229487_qdqqd_1tiq2h.png');
 }
@@ -10023,8 +10222,18 @@ body.code-scrolling-enabled .code-block-wrapper {
     order: 1;
 }
 
+/* 调整接收消息的顺序和间距 */
+.message-row.received .message-chat-avatar {
+    order: 1; /* 头像在第一个 */
+    margin-right: 8px; /* 头像与内容之间间距 */
+}
+
 .sweetheart-chat-page.show-avatars .message-row.received .message-content {
     order: 2;
+}
+
+.message-row.received .message-content {
+    order: 2; /* 内容在第二个 */
 }
 
 /* 11. 消息内容容器的样式 */
@@ -10077,3 +10286,126 @@ body.code-scrolling-enabled .code-block-wrapper {
     max-width: 280px;
     min-width: 200px;
 }
+
+/*
+====================================
+ 语音条进度动画 - 【最终版】
+====================================
+*/
+
+/*!* 1. 关键帧动画：定义箭头从左到右的滑动行为 *!*/
+/*@keyframes disclosureArrowSlide {*/
+/*  from {*/
+/*    !* 动画开始时，箭头在最左边 (稍微向右偏移一点点，视觉效果更好) *!*/
+/*    left: 2%;*/
+/*  }*/
+/*  to {*/
+/*    !* 动画结束时，箭头在最右边 (同样留一点边距) *!*/
+/*    left: 98%;*/
+/*  }*/
+/*}*/
+
+/* 2. 让 voice-bar 成为箭头定位的参考父元素 */
+.voice-bar {
+    position: relative; /* 核心：让箭头可以相对它定位 */
+    overflow: hidden;   /* 确保箭头不会超出轨道 */
+}
+
+/*!* 3. 重新定义 disclosure-arrow 的样式，让它成为一个进度点 *!*/
+/*.voice-message-bubble .disclosure-arrow {*/
+/*    position: absolute; !* 绝对定位，脱离文档流 *!*/
+/*    top: 50%;           !* 垂直居中 *!*/
+/*    left: 2%;           !* 初始位置在最左边 *!*/
+/*    width: 10px;        !* 指示点的大小 *!*/
+/*    height: 10px;*/
+/*    background-color: white; !* 默认颜色 *!*/
+/*    border-radius: 50%;*/
+/*    transform: translate(-50%, -50%); !* 精确居中 *!*/
+/*    z-index: 10;*/
+/*    pointer-events: none;*/
+/*    box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);*/
+/*    !* 关键：默认不播放动画 *!*/
+/*    animation: none;*/
+/*}*/
+
+/*!* AI接收到的消息，箭头颜色更深 *!*/
+/*.message-row.received .disclosure-arrow {*/
+/*    background-color: #555;*/
+/*}*/
+
+/*!* 在密友聊天中，我方发送的消息，箭头使用主题粉色 *!*/
+/*.sweetheart-chat-page .message-row.sent .disclosure-arrow {*/
+/*    background-color: #FFFAFA;*/
+/*}*/
+/*!* 在密友聊天中，对方发送的消息，箭头使用主题棕色 *!*/
+/*.sweetheart-chat-page .message-row.received .disclosure-arrow {*/
+/*    background-color: #8D6E63;*/
+/*}*/
+
+
+/*!* 4. 当语音条处于播放状态时，应用动画 *!*/
+/*.voice-message-bubble.is-playing .disclosure-arrow {*/
+/*    !* JS会动态设置 animation-duration *!*/
+/*    animation-name: disclosureArrowSlide;*/
+/*    animation-play-state: running;*/
+/*    animation-timing-function: linear; !* 必须是线性，保证匀速 *!*/
+/*    animation-fill-mode: forwards; !* 动画结束后停在最后一帧 *!*/
+/*}*/
+
+/* 同时，让进度条填充也动起来 */
+.voice-progress-fill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 0%; /* 初始宽度为0 */
+    background: rgba(0,0,0,0.1);
+    border-radius: 5px;
+    transition: width 0.1s linear; /* 平滑过渡 */
+    z-index: 1; /* 确保在箭头下方 */
+}
+
+.voice-message-bubble.is-playing .voice-progress-fill {
+  /* JS会直接更新宽度，不需要CSS动画 */
+}
+
+/* AI接收到的消息，进度条填充颜色 */
+.message-row.received .voice-progress-fill {
+    background: rgba(0,0,0,0.2);
+}
+
+/* 我方发送的消息，进度条填充颜色 */
+.message-row.sent .voice-progress-fill {
+    background: rgba(255,255,255,0.2);
+}
+
+/* 密友聊天主题色 */
+.sweetheart-chat-page .message-row.sent .voice-progress-fill {
+    background: rgba(255,255,255,0.3);
+}
+.sweetheart-chat-page .message-row.received .voice-progress-fill {
+   background: rgba(141, 110, 99, 0.2);
+}
+
+/* 播放/加载中图标的样式 */
+.voice-play-icon.loading .spinner {
+    width: 20px;
+    height: 20px;
+    animation: tts-spinner-spin 1s linear infinite;
+}
+.voice-play-icon.loading .spinner .path {
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-width: 5;
+    fill: none;
+    animation: dash 1.5s ease-in-out infinite;
+}
+@keyframes tts-spinner-spin {
+    100% { transform: rotate(360deg); }
+}
+@keyframes dash {
+  0% { stroke-dasharray: 1, 150; stroke-dashoffset: 0; }
+  50% { stroke-dasharray: 90, 150; stroke-dashoffset: -35; }
+  100% { stroke-dasharray: 90, 150; stroke-dashoffset: -124; }
+}
+
