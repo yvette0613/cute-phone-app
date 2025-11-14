@@ -1275,9 +1275,12 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
         }
 
         // 【全新点击事件处理器】
-        playIcon.addEventListener('click', async (e) => {
-            e.stopPropagation(); // 阻止事件冒泡，只处理播放按钮的点击
-
+        const triggerPlay = async (e) => {
+            // 阻止事件冒泡和默认行为的传播，防止被父级长按事件捕获
+            e.stopPropagation();
+            if (e.cancelable) {
+                e.preventDefault();
+            }
             const voiceConfig = globalConfig.minimaxVoice;
             if (!voiceConfig.apiUrl || !voiceConfig.apiKey || !voiceConfig.groupId || !voiceConfig.ttsModel) {
                 showErrorModal('语音配置不完整', '请在“设置 > 语音设置”中完整配置 Minimax TTS。');
@@ -1388,7 +1391,37 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
                 playIcon.classList.remove('loading');
                 playIcon.innerHTML = `<svg viewBox="0 0 24 24"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>`;
             }
-        });
+        };
+
+        // --- 【新增或修改】事件监听器部分 ---
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let isMovingDuringTouch = false;
+        // 触摸开始（Mobile）
+        playIcon.addEventListener('touchstart', (e) => {
+            // 记录触摸起始位置，用于判断是否是滑动
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+            isMovingDuringTouch = false;
+        }, {passive: true}); // passive: true 提高滚动性能，不阻止默认行为
+        // 触摸移动（Mobile）
+        playIcon.addEventListener('touchmove', (e) => {
+            const currentX = e.touches[0].clientX;
+            const currentY = e.touches[0].clientY;
+            // 如果移动距离超过一个阈值，则认为是滑动
+            if (Math.abs(currentX - touchStartX) > 10 || Math.abs(currentY - touchStartY) > 10) {
+                isMovingDuringTouch = true;
+            }
+        }, {passive: true});
+        // 触摸结束（Mobile）
+        playIcon.addEventListener('touchend', (e) => {
+            e.stopPropagation(); // 阻止事件冒泡到父元素的长按检测
+            if (!isMovingDuringTouch) { // 如果不是滑动，就触发播放
+                triggerPlay(e);
+            }
+        }, {passive: false}); // passive: false 允许阻止默认行为（例如，如果点击后需要阻止元素的其他默认行为）
+        // 鼠标点击（Desktop）
+        playIcon.addEventListener('click', triggerPlay);
 
         // 点击气泡本身，切换转写文字的显示/隐藏（此功能保留）
         voiceBubble.addEventListener('click', (e) => {
