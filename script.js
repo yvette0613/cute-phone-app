@@ -1140,7 +1140,7 @@ function escapeHTML(str) {
 let messageLongPressTimer = null; // 用于检测长按的计时器
 
 /**
- * [终极修正版] 创建消息的DOM元素
+ * [最终健壮版] 创建消息的DOM元素
  * - 核心：重构了 type: 'voice' 消息的逻辑，使其能调用TTS API播放真实音频并同步进度条。
  * - 修复了旧模拟动画的逻辑，直接与真实Audio对象事件绑定。
  * - 统一了全局音频播放控制，防止音频重叠。
@@ -1237,11 +1237,13 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
         const transcriptionText = escapeHTML(messageObj.content.text || '...');
         const duration = messageObj.content.duration || '0';
 
+        // 重新构建播放图标和转写文字的HTML结构。
+        // playIcon 现在是 voiceBubble 的直接子元素，但事件绑定直接在它身上。
         voiceBubble.innerHTML = `
             <div class="voice-main-content">
-                <div class="voice-play-icon">
+                <button class="voice-play-icon">
                     <svg viewBox="0 0 24 24"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>
-                </div>
+                </button>
                 <div class="voice-bar">
                     <div class="voice-progress-fill"></div>
                 </div>
@@ -1255,10 +1257,26 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
 
         const playIcon = voiceBubble.querySelector('.voice-play-icon');
         const progressBar = voiceBubble.querySelector('.voice-progress-fill');
+        const playIconSvg = playIcon.querySelector('svg'); // 获取 SVG 元素
+        // === 新增代码：根据发送者设置播放图标的颜色 ===
+        if (playIconSvg) { // 确保 SVG 元素存在
+            if (messageObj.sender === 'user') {
+                // 用户发送的语音条，在蓝色/粉色气泡中，图标应为白色
+                playIconSvg.style.fill = 'white';
+            } else {
+                // 对方接收的语音条，在浅色气泡中，图标应为深色（例如黑色或主题色）
+                // 普通聊天：深色
+                playIconSvg.style.fill = '#333';
+                // 密友聊天：如果 active，则使用密友主题色或相应颜色
+                if (isSweetheartChatActive) {
+                    playIconSvg.style.fill = '#8D6E63'; // 密友接收气泡的深色
+                }
+            }
+        }
 
         // 【全新点击事件处理器】
         playIcon.addEventListener('click', async (e) => {
-            e.stopPropagation();
+            e.stopPropagation(); // 阻止事件冒泡，只处理播放按钮的点击
 
             const voiceConfig = globalConfig.minimaxVoice;
             if (!voiceConfig.apiUrl || !voiceConfig.apiKey || !voiceConfig.groupId || !voiceConfig.ttsModel) {
@@ -1374,7 +1392,9 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
 
         // 点击气泡本身，切换转写文字的显示/隐藏（此功能保留）
         voiceBubble.addEventListener('click', (e) => {
-            if (e.target.closest('.voice-play-icon')) return; // 如果点的是播放按钮，则不触发
+            // 如果点击的是播放按钮区域，则不触发转写显示隐藏
+            if (e.target.closest('.voice-play-icon')) return;
+
             const transcriptionEl = voiceBubble.querySelector('.voice-transcription');
             if (transcriptionEl) {
                 transcriptionEl.style.display = transcriptionEl.style.display === 'none' ? 'block' : 'none';
@@ -1388,6 +1408,7 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
         }
         messageRow.appendChild(messageContent); // 修正：确保内容总是附加
 
+        // 这里的 bindMessageEvents 仍然需要，因为它处理的是长按菜单
         bindMessageEvents(voiceBubble, contactId, messageIndex, isSweetheartChatActive);
         return messageRow;
     }
@@ -3369,24 +3390,22 @@ function closeSettings() {
     }, 350); // 350ms 对应 CSS 中的 0.35s
 }
 
-/* script.js (在 openSettings() 函数附近的空白处添加) */
-
 function openVoiceSettingsPage() {
     // 确保先关闭其他可能打开的页面
     document.querySelectorAll('.config-page.show').forEach(page => {
         if (page.id !== 'voiceSettingsPage') page.classList.remove('show');
     });
-
     const voiceSettingsPage = document.getElementById('voiceSettingsPage');
     voiceSettingsPage.style.zIndex = '1010'; // 确保层级够高
     voiceSettingsPage.classList.add('show');
-
     // 填充已保存的配置
     document.getElementById('minimaxApiUrl').value = globalConfig.minimaxVoice.apiUrl;
     document.getElementById('minimaxApiKey').value = globalConfig.minimaxVoice.apiKey;
     document.getElementById('minimaxGroupId').value = globalConfig.minimaxVoice.groupId;
-
-    // 渲染模型列表
+    // // ⚠️ 原始这里只调用了 render，没有调用 fetch 导致模型列表为空
+    // // 修正：在打开页面时就尝试拉取并渲染模型列表
+    fetchMinimaxTtsModels(); // <--- 新增这行代码！
+    // 渲染模型列表（确保即使 fetch 失败或返回空，也至少渲染默认选项）
     renderMinimaxTtsModels(globalConfig.minimaxVoice.availableModels, globalConfig.minimaxVoice.ttsModel);
 }
 
@@ -3638,15 +3657,11 @@ function saveConfig(type) {
     setTimeout(() => closeConfig(type), 2000);
 }
 
-/* script.js (在 openConfig() 函数附近添加) */
-
 // 渲染 Minimax TTS 模型列表
 function renderMinimaxTtsModels(models, selectedModelId) {
     const modelSelect = document.getElementById('minimaxTtsModel');
     if (!modelSelect) return;
-
     modelSelect.innerHTML = ''; // 清空现有选项
-
     if (models && models.length > 0) {
         models.forEach(model => {
             const option = document.createElement('option');
@@ -3660,7 +3675,7 @@ function renderMinimaxTtsModels(models, selectedModelId) {
     } else {
         const defaultOption = document.createElement('option');
         defaultOption.value = '';
-        defaultOption.textContent = '未找到模型';
+        defaultOption.textContent = '未找到模型'; // 或者 "请先拉取模型列表"
         modelSelect.appendChild(defaultOption);
     }
 }
@@ -3671,33 +3686,37 @@ async function fetchMinimaxTtsModels() {
     const apiUrl = document.getElementById('minimaxApiUrl').value.trim();
     const apiKey = document.getElementById('minimaxApiKey').value.trim();
     const groupId = document.getElementById('minimaxGroupId').value.trim();
-
     if (!apiUrl || !apiKey || !groupId) {
         showMinimaxVoiceStatus('请填写API URL, API Key 和 Group ID', 'error');
+        // 如果没有API信息，我们就不去尝试拉取，直接显示默认模型或者空
+        globalConfig.minimaxVoice.availableModels = [];
+        renderMinimaxTtsModels(globalConfig.minimaxVoice.availableModels, globalConfig.minimaxVoice.ttsModel);
         return;
     }
-
-    // Minimax TTS API 文档中没有直接提供拉取模型列表的接口
-    // 这里我们使用文档中列出的模型作为默认选项
-    const defaultMinimaxModels = [
-        "speech-2.6-hd", "speech-2.6-turbo",
-        "speech-02-hd", "speech-02-turbo",
-        "speech-01-hd", "speech-01-turbo"
-    ];
-
-    const commonMinimaxVoiceIds = [
-        "male-qn-qingse", // 男性语速适中
-        "female-qn-yuxin", // 女性语速适中
-        "male-qn-yulong",
-        "female-qn-tingting",
-        // ... (更多 Minimax 提供的 Voice ID)
-    ];
-
-    globalConfig.minimaxVoice.availableModels = defaultMinimaxModels;
-
-    showMinimaxVoiceStatus('已加载默认模型列表', 'success');
+    showMinimaxVoiceStatus('正在拉取模型...', ''); // 显示正在拉取的状态
+    document.getElementById('minimaxTtsModel').disabled = true; // 禁用选择框
+    try {
+        // Minimax TTS API 文档中没有直接提供拉取模型列表的接口
+        // 这里我们使用文档中列出的模型作为默认选项
+        const defaultMinimaxModels = [
+            "speech-2.6-hd", "speech-2.6-turbo",
+            "speech-02-hd", "speech-02-turbo",
+            "speech-01-hd", "speech-01-turbo"
+        ];
+        // 真实场景下，如果Minimax提供了 /models 或类似接口，会在这里调用
+        // 假设这里我们需要等待一个模拟的API调用
+        // await new Promise(resolve => setTimeout(resolve, 1000)); // 模拟网络延迟
+        globalConfig.minimaxVoice.availableModels = defaultMinimaxModels;
+        // 拉取模型成功后，立即渲染模型列表
+        renderMinimaxTtsModels(globalConfig.minimaxVoice.availableModels, globalConfig.minimaxVoice.ttsModel);
+        showMinimaxVoiceStatus('已加载默认模型列表', 'success');
+    } catch (error) {
+        console.error('拉取 Minimax TTS 模型失败:', error);
+        showMinimaxVoiceStatus(`拉取失败: ${error.message}。`, 'error');
+    } finally {
+        document.getElementById('minimaxTtsModel').disabled = false; // 重新启用选择框
+    }
 }
-
 
 // 保存 Minimax 语音设置
 function saveMinimaxVoiceSettings() {

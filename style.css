@@ -4141,19 +4141,31 @@ body.code-scrolling-enabled .code-block-wrapper {
 
 /* 播放图标 */
 .voice-play-icon {
-    width: 28px; /* 稍微大一点 */
+    width: 28px;
     height: 28px;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    transition: transform 0.2s; /* 播放/暂停图标切换动画 */
+    cursor: pointer; /* 保持指针样式 */
+    /* === 新增/修改的样式 === */
+    border: none; /* 移除边框 */
+    background: transparent; /* 背景透明 */
+    outline: none; /* 移除聚焦时的轮廓 */
+    padding: 0; /* 移除内边距 */
+    transition: transform 0.2s; /* 动画效果：点击时会稍微缩小 */
 }
 
 .voice-play-icon svg {
     width: 20px; /* 稍微大一点 */
     height: 20px;
-    transition: transform 0.2s; /* 播放/暂停图标本身的动画 */
+    /* fill 颜色将由 JS 动态设置或根据父元素继承 */
+    transition: transform 0.2s ease-in-out, fill 0.2s ease-in-out; /* 让图标本身的动画更平滑 */
+}
+
+/* 点击时的缩放效果 */
+.voice-play-icon:active {
+    transform: scale(0.9);
 }
 
 /* 播放状态的图标动画 */
