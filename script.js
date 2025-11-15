@@ -1435,25 +1435,37 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
             if (e.cancelable) {
                 e.preventDefault();
             }
-            e.stopPropagation();
+            e.stopPropagation(); // 重要:阻止事件冒泡
             if (!isMovingDuringTouch) {
                 triggerPlay(e);
             }
         }, {passive: false});
 
-        playIcon.addEventListener('click', triggerPlay);
+        playIcon.addEventListener('click', (e) => {
+            e.stopPropagation(); // 重要:阻止事件冒泡
+            triggerPlay(e);
+        });
 
-        // --- 语音气泡主体的点击事件，用于展开/收起转写文字 ---
+        // 2. 在气泡上绑定点击事件来切换文字显示
         voiceBubble.addEventListener('click', (e) => {
+            // 如果点击的是播放按钮,不处理
             if (e.target.closest('.voice-play-icon')) {
                 return;
             }
+
+            // 切换转写文字的显示/隐藏
             const transcriptionEl = voiceBubble.querySelector('.voice-transcription');
             if (transcriptionEl) {
-                transcriptionEl.style.display = transcriptionEl.style.display === 'none' ? 'block' : 'none';
+                const isHidden = transcriptionEl.style.display === 'none';
+                transcriptionEl.style.display = isHidden ? 'block' : 'none';
+
+                // 切换箭头方向
+                const arrow = transcriptionEl.querySelector('.disclosure-arrow');
+                if (arrow) {
+                    arrow.textContent = isHidden ? '▼' : '▲';
+                }
             }
         });
-
         messageContent.appendChild(senderName);
         messageContent.appendChild(voiceBubble);
 
@@ -1571,7 +1583,6 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
     }, 0);
     return messageRow;
 }
-
 
 
 /* script.js (在全局作用域的任何地方添加) */
@@ -1766,7 +1777,7 @@ function bindMessageEvents(element, contactId, messageIndex, isSweetheart) {
 
         // 如果是iframe的事件层，不处理长按菜单
         if (e.target.classList.contains('iframe-event-capture-layer')) {
-           return;
+            return;
         }
 
         // 如果是语音消息的播放按钮，不处理长按菜单（语音播放按钮有自己的长按处理）
@@ -1864,8 +1875,6 @@ function bindMessageEvents(element, contactId, messageIndex, isSweetheart) {
     element.addEventListener('contextmenu', handleContextMenu, {capture: true});
     // ==================== 绑定事件 END ====================
 }
-
-
 
 
 /**
