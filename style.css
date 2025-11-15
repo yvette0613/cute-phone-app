@@ -4125,8 +4125,8 @@ body.code-scrolling-enabled .code-block-wrapper {
     transition: background-color 0.2s ease-in-out;
     display: flex;
     flex-direction: column;
-    overflow: hidden; /* 确保进度条不会溢出气泡圆角 */
-    position: relative; /* 为进度条的绝对定位提供参考 */
+    overflow: hidden !important; /* 确保进度条不会溢出气泡圆角 */
+    position: relative !important; /* 为进度条的绝对定位提供参考 */
     z-index: 1;
     -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1); /* 添加点击反馈 */
     touch-action: manipulation; /* 优化触摸响应 */
@@ -4136,7 +4136,7 @@ body.code-scrolling-enabled .code-block-wrapper {
 .voice-main-content {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     position: relative; /* 确保voice-bar的定位正常 */
     z-index: 1; /* 确保内容在进度条之上 */
     height: 28px; /* 确保有足够高度，防止被遮挡 */
@@ -4150,16 +4150,18 @@ body.code-scrolling-enabled .code-block-wrapper {
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    cursor: pointer; /* 保持指针样式 */
+    cursor: pointer !important; /* 保持指针样式 */
     /* === 新增/修改的样式 === */
     border: none; /* 移除边框 */
     background: transparent; /* 背景透明 */
     outline: none; /* 移除聚焦时的轮廓 */
     padding: 0; /* 移除内边距 */
     transition: transform 0.2s; /* 动画效果：点击时会稍微缩小 */
-    position: relative;
-    z-index: 2;
+    position: relative !important;
+    z-index: 20 !important;
     pointer-events: auto;
+    touch-action: manipulation !important;
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1) !important;
 }
 
 .voice-play-icon svg {
@@ -4167,6 +4169,11 @@ body.code-scrolling-enabled .code-block-wrapper {
     height: 20px;
     /* fill 颜色将由 JS 动态设置或根据父元素继承 */
     transition: transform 0.2s ease-in-out, fill 0.2s ease-in-out; /* 让图标本身的动画更平滑 */
+}
+
+/* 播放按钮悬停效果 */
+.voice-play-icon:hover {
+    opacity: 0.8;
 }
 
 /* 点击时的缩放效果 */
@@ -4194,6 +4201,9 @@ body.code-scrolling-enabled .code-block-wrapper {
     background: transparent;
     box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
     z-index: 1; /* 确保在disclosure-arrow下方 */
+    cursor: pointer !important;
+    padding: 5px 0; /* 增加点击区域 */
+    margin: -5px 0; /* 补偿padding */
 }
 
 .voice-bar::before { /* 静态波形图的背景 (未播放部分) */
@@ -4205,6 +4215,10 @@ body.code-scrolling-enabled .code-block-wrapper {
     background-size: contain;
     background-repeat: repeat-x;
     opacity: 0.5; /* 静态波形图淡一点 */
+}
+
+.voice-bar:hover {
+    opacity: 0.8;
 }
 
 /* 接收消息的静态波形图颜色 */
@@ -4224,6 +4238,14 @@ body.code-scrolling-enabled .code-block-wrapper {
     flex-shrink: 0;
     position: relative;
     z-index: 1; /* 确保内容在进度条之上 */
+    cursor: pointer !important;
+    padding: 5px;
+    margin: -5px;
+    user-select: none;
+}
+
+.voice-duration:hover {
+    opacity: 0.7;
 }
 
 /* 密友聊天主题下的语音条样式 */
@@ -4272,6 +4294,12 @@ body.code-scrolling-enabled .code-block-wrapper {
     z-index: 0;
     pointer-events: none; /* 文字区域不接收点击事件 */
     /* 这里很重要：设置position: relative; 使得三角形可以相对定位到这个区域，并且允许文字内容正常显示 */
+    cursor: pointer !important;
+    user-select: text; /* 允许选择文字 */
+}
+
+.voice-transcription:hover {
+    background-color: rgba(0, 0, 0, 0.05);
 }
 
 .voice-transcription .voice-text {
@@ -10420,4 +10448,19 @@ body.code-scrolling-enabled .code-block-wrapper {
 
 .message-content > * {
     pointer-events: auto;
+}
+
+/* 移除可能的遮挡 */
+.voice-message-bubble::before,
+.voice-message-bubble::after {
+    pointer-events: none !important;
+}
+
+/* 确保加载动画不会遮挡 */
+.voice-play-icon.loading {
+    pointer-events: none;
+}
+
+.voice-play-icon:not(.loading) {
+    pointer-events: auto !important;
 }
