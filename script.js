@@ -1442,28 +1442,29 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
         }, {passive: false});
 
         playIcon.addEventListener('click', (e) => {
-            e.stopPropagation(); // 重要:阻止事件冒泡
+            // e.stopPropagation(); // 重要:阻止事件冒泡
             triggerPlay(e);
         });
 
-        // 2. 在气泡上绑定点击事件来切换文字显示
+        // --- 🎯 核心修改：优化的语音气泡点击事件 ---
         voiceBubble.addEventListener('click', (e) => {
-            // 如果点击的是播放按钮,不处理
+            // 只排除播放按钮本身和它的子元素
             if (e.target.closest('.voice-play-icon')) {
-                return;
+                return; // 如果点击的是播放按钮，不处理文字显示
             }
 
-            // 切换转写文字的显示/隐藏
+            // 否则，切换转写文字的显示状态
             const transcriptionEl = voiceBubble.querySelector('.voice-transcription');
             if (transcriptionEl) {
-                const isHidden = transcriptionEl.style.display === 'none';
-                transcriptionEl.style.display = isHidden ? 'block' : 'none';
+                const isCurrentlyHidden = transcriptionEl.style.display === 'none' || !transcriptionEl.style.display;
+                transcriptionEl.style.display = isCurrentlyHidden ? 'block' : 'none';
 
-                // 切换箭头方向
-                const arrow = transcriptionEl.querySelector('.disclosure-arrow');
-                if (arrow) {
-                    arrow.textContent = isHidden ? '▼' : '▲';
-                }
+                // 🎨 添加轻微的视觉反馈
+                voiceBubble.style.transition = 'transform 0.1s ease';
+                voiceBubble.style.transform = 'scale(0.98)';
+                setTimeout(() => {
+                    voiceBubble.style.transform = 'scale(1)';
+                }, 100);
             }
         });
         messageContent.appendChild(senderName);
