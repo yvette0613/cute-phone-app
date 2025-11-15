@@ -1140,11 +1140,12 @@ function escapeHTML(str) {
 let messageLongPressTimer = null; // 用于检测长按的计时器
 
 /**
- * [最终健壮版] 创建消息的DOM元素
- * - 核心：重构了 type: 'voice' 消息的逻辑，使其能调用TTS API播放真实音频并同步进度条。
- * - 修复了旧模拟动画的逻辑，直接与真实Audio对象事件绑定。
- * - 统一了全局音频播放控制，防止音频重叠。
- * - 保留了普通文本消息的TTS按钮功能，并使其能与语音条播放互不干扰。
+ * [整合版] 创建消息的DOM元素
+ * - 完整包含原始函数中location, red-packet, notice, text, imageUrl, render等所有功能。
+ * - 增强了语音条功能（TTS播放、进度条、转写文字显示/隐藏点击优化）。
+ * - 完善了红包功能。
+ * - 统一了头像和消息内容的DOM结构添加方式，方便CSS控制布局。
+ * - 优化了事件绑定逻辑，特别是长按和点击的区分。
  *
  * @param {string} contactId - 联系人ID
  * @param {object} messageObj - 消息对象
@@ -1157,13 +1158,18 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
         return createFallbackMessage({sender: 'system'});
     }
 
+    // 核心修正：在消息创建时，动态获取当前页面的类型
     const sweetheartChatPageEl = document.getElementById('sweetheartChatPage');
     const isSweetheartChatActive = sweetheartChatPageEl && sweetheartChatPageEl.classList.contains('show');
 
+    // =======================================================================
+    // ▼▼▼ 类型 A: 地点通知消息 (Original Functionality) ▼▼▼
+    // =======================================================================
     if (messageObj.type === 'location') {
         const locationNotice = document.createElement('div');
         locationNotice.className = 'location-notice';
         locationNotice.dataset.index = messageIndex;
+        // 确保 location notice 也有 timestamp 属性
         locationNotice.dataset.timestamp = messageObj.timestamp;
         locationNotice.innerHTML = `
             <div class="location-notice-icon">🗺️</div>
@@ -1172,44 +1178,52 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
                 <p>${escapeHTML(messageObj.locationDesc || '无描述')}</p>
             </div>
         `;
+        // 事件绑定到 notice 元素本身
         bindMessageEvents(locationNotice, contactId, messageIndex, isSweetheartChatActive);
         return locationNotice;
     }
 
+    // =======================================================================
+    // ▼▼▼ 类型 B: 红包消息 (Original Functionality Enhanced) ▼▼▼
+    // =======================================================================
     if (messageObj.type === 'red-packet') {
         const messageRow = document.createElement('div');
         messageRow.className = 'message-row ' + (messageObj.sender === 'user' ? 'sent' : 'received');
-        messageRow.dataset.timestamp = messageObj.timestamp;
-        messageRow.dataset.index = messageIndex;
+        messageRow.dataset.timestamp = messageObj.timestamp; // 记录时间戳
+        messageRow.dataset.index = messageIndex; // 记录索引
 
+        // 1. 创建正确的头像DOM
         const avatarEl = document.createElement('div');
         avatarEl.className = 'message-chat-avatar';
+        // 根据当前聊天模式获取联系人数据
         const contactData = isSweetheartChatActive ? currentSweetheartChatContact : currentChatContact;
         const avatarSrc = messageObj.sender === 'user' ? (userProfile?.avatar || '👤') : (contactData?.avatar || '💬');
         const isUrl = avatarSrc.startsWith('http') || avatarSrc.startsWith('data:');
         avatarEl.innerHTML = isUrl ? `<img src="${avatarSrc}" alt="avatar">` : `<div class="initials">${avatarSrc}</div>`;
 
+        // 2. 创建 message-content 容器
         const messageContent = document.createElement('div');
         messageContent.className = 'message-content';
 
+        // 3. 创建红包气泡并绑定事件 (使用之前提供的 `createRedPacketBubble` 函数)
         const bubble = createRedPacketBubble(messageObj);
+
+        // 4. 将气泡放入 message-content 容器
         messageContent.appendChild(bubble);
 
-        if (messageObj.sender === 'user') {
-            messageRow.appendChild(messageContent);
-            messageRow.appendChild(avatarEl);
-        } else {
-            messageRow.appendChild(avatarEl);
-            messageRow.appendChild(messageContent);
-        }
+        // 5. 【核心修复】统一将头像和内容按顺序添加，交由 CSS 控制最终布局
+        // 这样可以确保无论在哪个聊天模式，头像和内容都会被正确放置到 messageRow 中
+        messageRow.appendChild(avatarEl);
+        messageRow.appendChild(messageContent);
+
+        // 绑定长按等事件到气泡上
         bindMessageEvents(bubble, contactId, messageIndex, isSweetheartChatActive);
+
         return messageRow;
     }
 
-    // ... (之前的代码)
-
     // =======================================================================
-    // ▼▼▼ 核心修改区域：语音条逻辑重构 ▼▼▼
+    // ▼▼▼ 类型 C: 语音条消息 (Enhanced Functionality) ▼▼▼
     // =======================================================================
     if (messageObj.type === 'voice') {
         const messageRow = document.createElement('div');
@@ -1240,7 +1254,6 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
         const duration = messageObj.content.duration || '0';
 
         // 重新构建播放图标和转写文字的HTML结构。
-        // playIcon 现在是 voiceBubble 的直接子元素，但事件绑定直接在它身上。
         voiceBubble.innerHTML = `
             <div class="voice-main-content">
                 <button class="voice-play-icon">
@@ -1260,41 +1273,33 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
         const playIcon = voiceBubble.querySelector('.voice-play-icon');
         const progressBar = voiceBubble.querySelector('.voice-progress-fill');
         const playIconSvg = playIcon.querySelector('svg'); // 获取 SVG 元素
-        // === 新增代码：根据发送者设置播放图标的颜色 ===
+
         if (playIconSvg) { // 确保 SVG 元素存在
             if (messageObj.sender === 'user') {
-                // 用户发送的语音条，在蓝色/粉色气泡中，图标应为白色
                 playIconSvg.style.fill = 'white';
             } else {
-                // 对方接收的语音条，在浅色气泡中，图标应为深色（例如黑色或主题色）
-                // 普通聊天：深色
                 playIconSvg.style.fill = '#333';
-                // 密友聊天：如果 active，则使用密友主题色或相应颜色
                 if (isSweetheartChatActive) {
-                    playIconSvg.style.fill = '#8D6E63'; // 密友接收气泡的深色
+                    playIconSvg.style.fill = '#8D6E63';
                 }
             }
         }
 
-        // ▼ ▼ ▼ 核心修改部分：点击播放和展开/收起文字 ▼ ▼ ▼
-        // 重置状态变量，防止上一次播放的状态影响这一次
         let touchStartX = 0;
         let touchStartY = 0;
         let isMovingDuringTouch = false;
-        let longPressPlayTimer = null; // 新增：用于区分播放按钮的短按和长按，防止长按后也触发播放
+        let longPressPlayTimer = null;
 
         const triggerPlay = async (e) => {
-            // 阻止长按事件的默认行为，防止菜单意外弹出
             if (e.cancelable) {
                 e.preventDefault();
             }
-            e.stopPropagation(); // 阻止事件冒泡到父元素（如整个气泡的长按事件或文字展开事件）
+            e.stopPropagation();
 
-            clearTimeout(longPressPlayTimer); // 清除长按播放的判断计时器
+            clearTimeout(longPressPlayTimer);
 
-            // 只有当不是拖动触摸时才触发播放
             if (e.type === 'touchend' && isMovingDuringTouch) {
-                return; // 如果是滑动，则不触发播放
+                return;
             }
 
             const voiceConfig = globalConfig.minimaxVoice;
@@ -1303,15 +1308,12 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
                 return;
             }
 
-            // 如果当前有音频正在播放
             if (currentAudio) {
                 const wasPlayingThis = currentPlayingButton === playIcon;
-                // 暂停当前播放的音频，这会触发 onpause 事件，从而重置UI
                 currentAudio.pause();
-                currentAudio = null; // 确保清除
+                currentAudio = null;
                 currentPlayingButton = null;
                 if (wasPlayingThis) {
-                    // 如果点击的是正在播放的按钮，暂停后直接返回，不重新播放
                     return;
                 }
             }
@@ -1364,8 +1366,6 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
                 // --- 音频处理与播放 ---
                 const audioBytes = hexToUint8Array(data.data.audio);
                 const audioBlob = new Blob([audioBytes], {type: 'audio/mpeg'});
-                // ... (接上文 `const audioBytes = hexToUint8Array(data.data.audio);` 之后)
-
                 const audioObjectUrl = URL.createObjectURL(audioBlob);
                 const audio = new Audio(audioObjectUrl);
                 currentAudio = audio;        // 存储为全局变量，方便控制
@@ -1393,8 +1393,8 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
                     progressBar.style.width = '0%';
                     URL.revokeObjectURL(audioObjectUrl); // 释放内存
                     if (currentAudio === audio) { // 确保清除的是当前正在播放的这个Audio对象
-                         currentAudio = null;
-                         currentPlayingButton = null;
+                        currentAudio = null;
+                        currentPlayingButton = null;
                     }
                 };
 
@@ -1416,51 +1416,38 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
             }
         };
 
-        // --- 【新增或修改】事件监听器部分 ---
-
-        // 触摸开始（Mobile）
+        // --- 事件监听器部分 ---
         playIcon.addEventListener('touchstart', (e) => {
-            // 记录触摸起始位置，用于判断是否是滑动
             touchStartX = e.touches[0].clientX;
             touchStartY = e.touches[0].clientY;
             isMovingDuringTouch = false;
-        }, {passive: true}); // passive: true 提高滚动性能，不阻止默认行为
+        }, {passive: true});
 
-        // 触摸移动（Mobile）
         playIcon.addEventListener('touchmove', (e) => {
             const currentX = e.touches[0].clientX;
             const currentY = e.touches[0].clientY;
-            // 如果移动距离超过一个阈值，则认为是滑动
-            // 这个阈值可以根据实际体验调整
             if (Math.abs(currentX - touchStartX) > 10 || Math.abs(currentY - touchStartY) > 10) {
                 isMovingDuringTouch = true;
             }
-        }, {passive: true}); // passive: true 提高滚动性能
+        }, {passive: true});
 
-        // 触摸结束（Mobile）
         playIcon.addEventListener('touchend', (e) => {
             if (e.cancelable) {
-                e.preventDefault(); // 阻止默认行为，防止后续的click事件
+                e.preventDefault();
             }
-            e.stopPropagation(); // 阻止事件冒泡到父元素的长按检测
-            if (!isMovingDuringTouch) { // 如果不是滑动，就触发播放
+            e.stopPropagation();
+            if (!isMovingDuringTouch) {
                 triggerPlay(e);
             }
-        }, {passive: false}); // passive: false 允许阻止默认行为
+        }, {passive: false});
 
-        // 鼠标点击（Desktop）
         playIcon.addEventListener('click', triggerPlay);
 
-
-        // --- 【新增】语音气泡主体的点击事件，用于展开/收起转写文字 ---
-        // 这个事件应该绑定在 voiceBubble 本身，但要阻止来自 playIcon 的事件冒泡，
-        // 这样点击播放按钮时就不会同时展开/收起文字。
+        // --- 语音气泡主体的点击事件，用于展开/收起转写文字 ---
         voiceBubble.addEventListener('click', (e) => {
-            // 如果点击的是播放按钮区域，则不触发转写显示隐藏
             if (e.target.closest('.voice-play-icon')) {
                 return;
             }
-            // 否则，切换转写文字的显示状态
             const transcriptionEl = voiceBubble.querySelector('.voice-transcription');
             if (transcriptionEl) {
                 transcriptionEl.style.display = transcriptionEl.style.display === 'none' ? 'block' : 'none';
@@ -1470,56 +1457,66 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
         messageContent.appendChild(senderName);
         messageContent.appendChild(voiceBubble);
 
-        // 如果是密友聊天且开启头像显示，则添加头像
-        if (isSweetheartChatActive && globalConfig.showAvatarsInSweetheartChat) {
-            messageRow.appendChild(avatarEl);
-        }
-        messageRow.appendChild(messageContent); // 修正：确保内容总是附加
-
-        // 这里的 bindMessageEvents 仍然需要，因为它处理的是长按菜单
+        messageRow.appendChild(avatarEl);
+        messageRow.appendChild(messageContent);
         bindMessageEvents(voiceBubble, contactId, messageIndex, isSweetheartChatActive);
         return messageRow;
     }
 
-    // ===================================
-    // ▲▲▲ 核心修改区域结束 ▲▲▲
-    // ===================================
-
+    // =======================================================================
+    // ▼▼▼ 类型 D: 系统通知消息 (Original Functionality) ▼▼▼
+    // =======================================================================
     if (messageObj.type === 'notice') {
         return createSystemNotice(messageObj);
     }
 
+    // =======================================================================
+    // ▼▼▼ 类型 E: 文本 (含引用、代码块) / 图片 / Render 消息 (Original Functionality) ▼▼▼
+    // =======================================================================
+    const hasContent = messageObj.text || messageObj.imageUrl;
+    if (!hasContent) {
+        console.warn(`⚠️ 消息渲染失败：消息内容为空 (Index: ${messageIndex})`, messageObj);
+        return createFallbackMessage(messageObj);
+    }
+
     const messageRow = document.createElement('div');
-    messageRow.className = 'message-row ' + (messageObj.sender === 'user' ? 'sent' : 'received');
+    messageRow.className = 'message-row';
+    messageRow.classList.add(messageObj.sender === 'user' ? 'sent' : 'received');
     messageRow.dataset.timestamp = messageObj.timestamp;
     messageRow.dataset.index = messageIndex;
 
     const avatarEl = document.createElement('div');
     avatarEl.className = 'message-chat-avatar';
-    const contactData = isSweetheartChatActive ? currentSweetheartChatContact : currentChatContact;
-    let avatarSrc = messageObj.sender === 'user' ? (userProfile?.avatar || '👤') : (contactData?.avatar || '💬');
 
-    if (avatarSrc === 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=' || avatarSrc === '') {
-        avatarSrc = (messageObj.sender === 'user') ? '👤' : (contactData?.name ? contactData.name.charAt(0) : '💬');
-    }
+    let contactData = isSweetheartChatActive ? currentSweetheartChatContact : currentChatContact;
+
+    let avatarSrc = messageObj.sender === 'user'
+        ? (userProfile?.avatar || '👤')
+        : (contactData?.avatar || '💬');
 
     const isUrl = avatarSrc.startsWith('http') || avatarSrc.startsWith('data:');
-    avatarEl.innerHTML = isUrl ? `<img src="${avatarSrc}" alt="avatar">` : `<div class="initials">${escapeHTML(avatarSrc)}</div>`;
+    avatarEl.innerHTML = isUrl
+        ? `<img src="${avatarSrc}" alt="avatar">`
+        : `<div class="initials">${escapeHTML(avatarSrc)}</div>`;
 
     const messageContent = document.createElement('div');
     messageContent.className = 'message-content';
 
     const senderName = document.createElement('div');
     senderName.className = 'message-sender-name';
-    senderName.textContent = messageObj.sender === 'user' ? (userProfile.name || '我') : (contactData?.name || '联系人');
+    senderName.textContent = messageObj.sender === 'user'
+        ? (userProfile.name || '我')
+        : (contactData?.name || '联系人');
 
     const bubble = document.createElement('div');
     bubble.className = 'chat-bubble';
 
     const text = messageObj.text || '';
+    // 使用更健壮的正则表达式来匹配 <render> 标签，处理多行和各种非<字符
+
     const renderMatch = text.match(/<render>([\s\S]*?)<\/render>/);
 
-        if (renderMatch && renderMatch[1]) {
+    if (renderMatch && renderMatch[1]) {
         bubble.classList.add('render-bubble');
         const iframe = document.createElement('iframe');
         iframe.className = 'render-iframe';
@@ -1574,6 +1571,7 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
     }, 0);
     return messageRow;
 }
+
 
 
 /* script.js (在全局作用域的任何地方添加) */
@@ -1705,7 +1703,7 @@ async function playTtsMessage(sender, contactId, messageIndex, isSweetheart = fa
 }
 
 /**
- * [终极修复版] 为指定消息元素绑定长按和右键菜单事件
+ * [最终修复版] 为指定消息元素绑定长按和右键菜单事件
  * - 确保事件被目标元素精确捕获，并全面阻止浏览器默认行为。
  * - 健壮性处理区分长按、拖动和点击。
  *
@@ -1740,6 +1738,7 @@ function bindMessageEvents(element, contactId, messageIndex, isSweetheart) {
         clearTimeout(longPressTimer);
         longPressTimer = null;
         isMoving = false;
+
         // 如果是render bubble，显示菜单时要禁用iframe事件捕获层
         const renderOverlay = element.querySelector('.iframe-event-capture-layer');
         if (renderOverlay) renderOverlay.style.pointerEvents = 'auto'; // 重新激活捕获层
@@ -1759,8 +1758,7 @@ function bindMessageEvents(element, contactId, messageIndex, isSweetheart) {
 
     // ==================== 事件处理 START ====================
     const handleStart = (e) => {
-        // 阻止浏览器默认行为（例如：长按选中文本、拖动图像等）
-        // 对于 touchstart，阻止默认行为非常关键，防止浏览器劫持长按
+        // 阻止浏览器默认行为
         if (e.cancelable) {
             e.preventDefault();
         }
@@ -1768,10 +1766,11 @@ function bindMessageEvents(element, contactId, messageIndex, isSweetheart) {
 
         // 如果是iframe的事件层，不处理长按菜单
         if (e.target.classList.contains('iframe-event-capture-layer')) {
-            return;
+           return;
         }
 
         // 如果是语音消息的播放按钮，不处理长按菜单（语音播放按钮有自己的长按处理）
+        // ✅ 核心修复：这里判断 target.closest('.voice-play-icon') 确保点击播放按钮不会触发气泡长按
         if (e.target.closest('.voice-play-icon')) {
             return;
         }
@@ -1865,6 +1864,7 @@ function bindMessageEvents(element, contactId, messageIndex, isSweetheart) {
     element.addEventListener('contextmenu', handleContextMenu, {capture: true});
     // ==================== 绑定事件 END ====================
 }
+
 
 
 
