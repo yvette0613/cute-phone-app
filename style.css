@@ -4127,6 +4127,9 @@ body.code-scrolling-enabled .code-block-wrapper {
     flex-direction: column;
     overflow: hidden; /* 确保进度条不会溢出气泡圆角 */
     position: relative; /* 为进度条的绝对定位提供参考 */
+    z-index: 1;
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1); /* 添加点击反馈 */
+    touch-action: manipulation; /* 优化触摸响应 */
 }
 
 /* 语音消息主体内容（播放图标、波形、时长） */
@@ -4154,6 +4157,9 @@ body.code-scrolling-enabled .code-block-wrapper {
     outline: none; /* 移除聚焦时的轮廓 */
     padding: 0; /* 移除内边距 */
     transition: transform 0.2s; /* 动画效果：点击时会稍微缩小 */
+    position: relative;
+    z-index: 2;
+    pointer-events: auto;
 }
 
 .voice-play-icon svg {
@@ -4263,32 +4269,14 @@ body.code-scrolling-enabled .code-block-wrapper {
     font-size: 13px;
     line-height: 1.5;
     position: relative;
+    z-index: 0;
+    pointer-events: none; /* 文字区域不接收点击事件 */
     /* 这里很重要：设置position: relative; 使得三角形可以相对定位到这个区域，并且允许文字内容正常显示 */
 }
 
-/*!* 显示/隐藏转写文字的箭头 *!*/
-/*.disclosure-arrow {*/
-/*    position: absolute;*/
-/*    bottom: 50px; !* 定位在 voice-transcription 底部，稍微突出 *!*/
-/*    left: 35px; !* 从最左边开始 *!*/
-/*    font-size: 12px;*/
-/*    color: rgba(255, 255, 255, 0.9); !* 指针颜色稍微亮一些 *!*/
-/*    transform: translateX(-50%) rotate(180deg); !* 旋转180度，让三角形的尖朝上，并调整中心点 *!*/
-/*    z-index: 10; !* 确保在所有内容之上 *!*/
-/*    pointer-events: none; !* 确保它不阻挡点击事件 *!*/
-/*    !* *** 关键改变：使用 transition 来控制移动 *** *!*/
-/*    transition: transform 0s linear; !* 默认0s，JS会动态设置时长 *!*/
-/*    !* animation-fill-mode: forwards; !* 这个就不需要了，因为是 transition *!*/
-/*    !* animation-play-state: paused; *! !* 这个也不需要了 *!*/
-/*}*/
-
-/*!* 当语音播放时，启动动画 *!*/
-/*.voice-message-bubble.is-playing .disclosure-arrow {*/
-/*    animation-name: disclosureArrowSlide; !* 应用滑动的动画 *!*/
-/*    animation-play-state: running; !* 动画运行 *!*/
-/*    animation-timing-function: linear; !* 匀速播放 *!*/
-/*    !* animation-duration 将通过 JavaScript 动态设置 *!*/
-/*}*/
+.voice-transcription .voice-text {
+    pointer-events: auto; /* 但文字本身可以被选中 */
+}
 
 /* AI 接收到的语音条样式 */
 .message-row.received .voice-message-bubble {
@@ -4302,10 +4290,6 @@ body.code-scrolling-enabled .code-block-wrapper {
     border-top-color: rgba(0, 0, 0, 0.2);
     color: #333;
 }
-/*.message-row.received .disclosure-arrow {*/
-/*    color: rgba(0, 0, 0, 0.8);*/
-/*}*/
-
 
 /* 用户发送的语音条样式 */
 .message-row.sent .voice-message-bubble {
@@ -10421,3 +10405,19 @@ body.code-scrolling-enabled .code-block-wrapper {
   100% { stroke-dasharray: 90, 150; stroke-dashoffset: -124; }
 }
 
+/* 移除可能的遮挡层 */
+.message-row::before,
+.message-row::after,
+.chat-bubble::before,
+.chat-bubble::after {
+    pointer-events: none !important;
+}
+
+/* 确保消息容器不会干扰 */
+.message-content {
+    pointer-events: none;
+}
+
+.message-content > * {
+    pointer-events: auto;
+}
