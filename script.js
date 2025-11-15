@@ -1223,8 +1223,8 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
     }
 
     // =======================================================================
-    // ▼▼▼ 类型 C: 语音条消息 (Enhanced Functionality) ▼▼▼
-    // =======================================================================
+// ▼▼▼ 类型 C: 语音条消息 - 完全重写版 ▼▼▼
+// =======================================================================
     if (messageObj.type === 'voice') {
         const messageRow = document.createElement('div');
         messageRow.className = 'message-row ' + (messageObj.sender === 'user' ? 'sent' : 'received');
@@ -1253,28 +1253,51 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
         const transcriptionText = escapeHTML(messageObj.content.text || '...');
         const duration = messageObj.content.duration || '0';
 
-        // 重新构建播放图标和转写文字的HTML结构。
         voiceBubble.innerHTML = `
-            <div class="voice-main-content">
-                <button class="voice-play-icon">
-                    <svg viewBox="0 0 24 24"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>
-                </button>
-                <div class="voice-bar">
-                    <div class="voice-progress-fill"></div>
-                </div>
-                <div class="voice-duration">${duration}"</div>
+        <div class="voice-main-content">
+            <button class="voice-play-icon" type="button">
+                <svg viewBox="0 0 24 24"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>
+            </button>
+            <div class="voice-bar">
+                <div class="voice-progress-fill"></div>
             </div>
-            <div class="voice-transcription" style="display: none;">
-                <span class="disclosure-arrow">▲</span>
-                <div class="voice-text">${transcriptionText}</div>
-            </div>
-        `;
+            <div class="voice-duration">${duration}"</div>
+        </div>
+        <div class="voice-transcription" style="display: none;">
+            <span class="disclosure-arrow">▲</span>
+            <div class="voice-text">${transcriptionText}</div>
+        </div>
+    `;
 
         const playIcon = voiceBubble.querySelector('.voice-play-icon');
         const progressBar = voiceBubble.querySelector('.voice-progress-fill');
-        const playIconSvg = playIcon.querySelector('svg'); // 获取 SVG 元素
+        const transcriptionEl = voiceBubble.querySelector('.voice-transcription');
 
-        if (playIconSvg) { // 确保 SVG 元素存在
+        // 🎯 核心修改：为语音条添加一个透明的点击层
+        const clickLayer = document.createElement('div');
+        clickLayer.className = 'voice-click-layer';
+        clickLayer.style.cssText = `
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 10;
+        background: transparent;
+        cursor: pointer;
+    `;
+
+        // 将点击层插入到语音条中
+        voiceBubble.style.position = 'relative';
+        voiceBubble.appendChild(clickLayer);
+
+        // 调整播放按钮的 z-index，使其高于点击层
+        playIcon.style.position = 'relative';
+        playIcon.style.zIndex = '11';
+
+        // 设置图标颜色
+        const playIconSvg = playIcon.querySelector('svg');
+        if (playIconSvg) {
             if (messageObj.sender === 'user') {
                 playIconSvg.style.fill = 'white';
             } else {
@@ -1285,26 +1308,21 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
             }
         }
 
-        let touchStartX = 0;
-        let touchStartY = 0;
-        let isMovingDuringTouch = false;
-        let longPressPlayTimer = null;
+        // ============ 播放按钮的事件处理 ============
+        let isPlayButtonClicked = false;
 
         const triggerPlay = async (e) => {
-            if (e.cancelable) {
-                e.preventDefault();
-            }
+            e.preventDefault();
             e.stopPropagation();
 
-            clearTimeout(longPressPlayTimer);
-
-            if (e.type === 'touchend' && isMovingDuringTouch) {
-                return;
-            }
+            isPlayButtonClicked = true;
+            setTimeout(() => {
+                isPlayButtonClicked = false;
+            }, 100);
 
             const voiceConfig = globalConfig.minimaxVoice;
             if (!voiceConfig.apiUrl || !voiceConfig.apiKey || !voiceConfig.groupId || !voiceConfig.ttsModel) {
-                showErrorModal('语音配置不完整', '请在“设置 > 语音设置”中完整配置 Minimax TTS。');
+                showErrorModal('语音配置不完整', '请在"设置 > 语音设置"中完整配置 Minimax TTS。');
                 return;
             }
 
@@ -1334,13 +1352,11 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
                 voiceId = contact?.voiceId || 'female-qn-yuxin';
             }
 
-            // --- UI: 设置为加载状态 ---
             playIcon.disabled = true;
             playIcon.classList.add('loading');
             playIcon.innerHTML = `<svg class="spinner" viewBox="0 0 50 50"><circle class="path" cx="25" cy="25" r="20" fill="none" stroke-width="5"></circle></svg>`;
 
             try {
-                // --- API 调用 ---
                 const response = await fetch(`${voiceConfig.apiUrl}?GroupId=${voiceConfig.groupId}`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${voiceConfig.apiKey}`},
@@ -1363,15 +1379,13 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
                     throw new Error(`语音合成失败: ${data.base_resp?.status_msg || '未知错误'}`);
                 }
 
-                // --- 音频处理与播放 ---
                 const audioBytes = hexToUint8Array(data.data.audio);
                 const audioBlob = new Blob([audioBytes], {type: 'audio/mpeg'});
                 const audioObjectUrl = URL.createObjectURL(audioBlob);
                 const audio = new Audio(audioObjectUrl);
-                currentAudio = audio;        // 存储为全局变量，方便控制
-                currentPlayingButton = playIcon; // 记录当前正在播放的按钮
+                currentAudio = audio;
+                currentPlayingButton = playIcon;
 
-                // 【核心】将UI更新与真实音频事件绑定
                 audio.onplay = () => {
                     playIcon.disabled = false;
                     playIcon.classList.remove('loading');
@@ -1391,8 +1405,8 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
                     playIcon.innerHTML = `<svg viewBox="0 0 24 24"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>`;
                     voiceBubble.classList.remove('is-playing');
                     progressBar.style.width = '0%';
-                    URL.revokeObjectURL(audioObjectUrl); // 释放内存
-                    if (currentAudio === audio) { // 确保清除的是当前正在播放的这个Audio对象
+                    URL.revokeObjectURL(audioObjectUrl);
+                    if (currentAudio === audio) {
                         currentAudio = null;
                         currentPlayingButton = null;
                     }
@@ -1416,63 +1430,92 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
             }
         };
 
-        // --- 事件监听器部分 ---
-        playIcon.addEventListener('touchstart', (e) => {
-            touchStartX = e.touches[0].clientX;
-            touchStartY = e.touches[0].clientY;
-            isMovingDuringTouch = false;
-        }, {passive: true});
+        // 只为播放按钮绑定点击事件
+        playIcon.addEventListener('click', triggerPlay);
 
-        playIcon.addEventListener('touchmove', (e) => {
-            const currentX = e.touches[0].clientX;
-            const currentY = e.touches[0].clientY;
-            if (Math.abs(currentX - touchStartX) > 10 || Math.abs(currentY - touchStartY) > 10) {
-                isMovingDuringTouch = true;
-            }
-        }, {passive: true});
+        // ============ 点击层的事件处理（显示/隐藏文字）============
+        let touchStartTime = 0;
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let longPressTimer = null;
 
-        playIcon.addEventListener('touchend', (e) => {
-            if (e.cancelable) {
-                e.preventDefault();
-            }
-            e.stopPropagation(); // 重要:阻止事件冒泡
-            if (!isMovingDuringTouch) {
-                triggerPlay(e);
-            }
-        }, {passive: false});
-
-        playIcon.addEventListener('click', (e) => {
-            // e.stopPropagation(); // 重要:阻止事件冒泡
-            triggerPlay(e);
-        });
-
-        // --- 🎯 核心修改：优化的语音气泡点击事件 ---
-        voiceBubble.addEventListener('click', (e) => {
-            // 只排除播放按钮本身和它的子元素
-            if (e.target.closest('.voice-play-icon')) {
-                return; // 如果点击的是播放按钮，不处理文字显示
-            }
-
-            // 否则，切换转写文字的显示状态
-            const transcriptionEl = voiceBubble.querySelector('.voice-transcription');
+        const toggleTranscription = () => {
             if (transcriptionEl) {
-                const isCurrentlyHidden = transcriptionEl.style.display === 'none' || !transcriptionEl.style.display;
-                transcriptionEl.style.display = isCurrentlyHidden ? 'block' : 'none';
+                const isHidden = transcriptionEl.style.display === 'none' || !transcriptionEl.style.display;
+                transcriptionEl.style.display = isHidden ? 'block' : 'none';
 
-                // 🎨 添加轻微的视觉反馈
+                // 添加视觉反馈
                 voiceBubble.style.transition = 'transform 0.1s ease';
-                voiceBubble.style.transform = 'scale(0.98)';
+                voiceBubble.style.transform = 'scale(0.96)';
                 setTimeout(() => {
                     voiceBubble.style.transform = 'scale(1)';
                 }, 100);
             }
+        };
+
+        // 处理点击层的触摸开始
+        clickLayer.addEventListener('touchstart', (e) => {
+            touchStartTime = Date.now();
+            touchStartX = e.touches[0].clientX;
+
+            touchStartY = e.touches[0].clientY;
+
+            // 启动长按检测（500ms后触发长按菜单）
+            longPressTimer = setTimeout(() => {
+                // 长按逻辑（如果需要的话）
+                console.log('长按语音条');
+                // 可以在这里添加长按菜单逻辑
+            }, 500);
+        }, {passive: true});
+
+        // 处理点击层的触摸移动
+        clickLayer.addEventListener('touchmove', (e) => {
+            const currentX = e.touches[0].clientX;
+            const currentY = e.touches[0].clientY;
+
+            // 如果移动超过10像素，取消长按检测
+            if (Math.abs(currentX - touchStartX) > 10 || Math.abs(currentY - touchStartY) > 10) {
+                clearTimeout(longPressTimer);
+            }
+        }, {passive: true});
+
+        // 处理点击层的触摸结束
+        clickLayer.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            clearTimeout(longPressTimer);
+
+            const touchDuration = Date.now() - touchStartTime;
+            const currentX = e.changedTouches[0].clientX;
+            const currentY = e.changedTouches[0].clientY;
+            const moveDistance = Math.sqrt(Math.pow(currentX - touchStartX, 2) + Math.pow(currentY - touchStartY, 2));
+
+            // 如果是快速点击（小于200ms）且移动距离小于10像素，则切换文字显示
+            if (touchDuration < 200 && moveDistance < 10 && !isPlayButtonClicked) {
+                toggleTranscription();
+            }
+        }, {passive: false});
+
+        // 处理点击层的鼠标点击（PC端）
+        clickLayer.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            if (!isPlayButtonClicked) {
+                toggleTranscription();
+            }
         });
+
         messageContent.appendChild(senderName);
         messageContent.appendChild(voiceBubble);
 
         messageRow.appendChild(avatarEl);
         messageRow.appendChild(messageContent);
-        bindMessageEvents(voiceBubble, contactId, messageIndex, isSweetheartChatActive);
+
+        // 🔴 不再调用 bindMessageEvents，避免事件冲突
+        // bindMessageEvents(voiceBubble, contactId, messageIndex, isSweetheartChatActive);
+
         return messageRow;
     }
 
