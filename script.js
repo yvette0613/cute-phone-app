@@ -4646,16 +4646,16 @@ function createElement(app, grid) {
 
 
 function addDragListeners(el, clickable) {
-    // === [修改开始] ===
-    // 移除所有拖拽相关的逻辑，只保留点击事件
-    // const longPressDelay = el.classList.contains('cat-widget') ? 500 : 350; // 不再需要这个长按延迟
+    // 桌面图标不再可拖拽，只需响应点击事件。
+    // 这里的逻辑只处理纯粹的点击，不涉及长按和拖拽。
 
-    // 直接绑定点击事件，不进行拖拽判断
     el.addEventListener('click', (e) => {
         // 阻止事件冒泡，防止点击事件被页面的其他部分捕获
         e.stopPropagation();
 
-        // 【新增】判断点击的是否为文件夹
+        // 桌面已固定，不再有拖拽动作，所以不需要判断 hasDragged 或 timeSinceLastDrag
+
+        // 1. 判断点击的是否为文件夹
         if (el.classList.contains('folder')) {
             const pageKey = el.parentElement.id === 'grid1' ? 'page1' : 'page2';
             const appId = el.dataset.id;
@@ -4664,36 +4664,28 @@ function addDragListeners(el, clickable) {
                 openFolder(folderData);
             }
         }
-        // 【修改】将原来的if改为else if，处理可点击的应用
+        // 2. 如果是可点击的应用图标 (例如设置、世界书)
         else if (clickable) {
+            // 根据 data-id 执行不同的操作
             if (el.dataset.id === 'settings') {
-                openSettings();
+                openSettings(); // 打开设置
             } else if (el.dataset.id === 'worldbook') {
-                openWorldbook();
+                openWorldbook(); // 打开世界书
             }
             // Add other specific clickable app actions here if any
         }
+        // 对于小猫组件或其他非文件夹、非可点击的图标，可以保持无响应，或者添加默认行为
     });
 
-    // 同时，我们需要确保长按不会激活编辑模式
-    // 禁用长按计时器和拖拽状态的起始逻辑
-    el.addEventListener('mousedown', (e) => {
-        e.preventDefault(); // 阻止默认的拖拽行为
-    });
-    el.addEventListener('touchstart', (e) => {
-        e.preventDefault(); // 阻止默认的拖拽行为
-    }, {passive: false});
+    // 移除所有拖拽相关的事件监听器和逻辑
+    // 确保不再有 e.preventDefault() 阻止 click 事件
+    // 因为图标是固定的，不再是可拖拽的，所以不需要处理 mousedown/touchstart/mousemove/touchmove
 
-    // 如果还有其他地方需要阻止默认的拖拽行为，可以在这里添加
-
-    // 禁用拖拽结束时的清理工作，因为拖拽功能已经移除了
-    // document.removeEventListener('touchmove', handleMove);
-    // document.removeEventListener('mousemove', handleMove);
-    // document.removeEventListener('touchend', (e) => handleEnd(e));
-    // document.removeEventListener('mouseup', (e) => handleEnd(e));
-
-    // === [修改结束] ===
+    // 为了防止浏览器默认的图片拖拽行为（如果图标是图片），
+    // 可以在 CSS 中设置 user-drag: none; 或者在 JavaScript 中稍微处理一下
+    // 但对于纯粹的点击，无需在此使用 preventDefault()
 }
+
 
 function isOccupied(pageKey, targetRow, targetCol, draggedId) {
     const apps = state.appLayouts[pageKey];
