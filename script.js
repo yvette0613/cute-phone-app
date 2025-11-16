@@ -5052,6 +5052,8 @@ function swipeEndHandler(e) {
     }, 0);
 
     state.isSwipingPage = false;
+    document.body.classList.remove('is-swiping');
+
 }
 
 // script.js
@@ -5078,6 +5080,8 @@ function swipeStartHandler(e) {
     const touch = getTouch(e);
     state.swipeStart = {x: touch.clientX, time: Date.now()};
     state.isSwipingPage = true;
+    document.body.classList.add('is-swiping');
+
     state.initialTransform = -(state.currentPage - 1) * 50;
 
     pagesWrapper.classList.add('no-transition');
@@ -5117,10 +5121,10 @@ function swipeMoveHandler(e) {
 // updateSwipeTransform 函数保持不变
 function updateSwipeTransform() {
     if (!state.swipeMoveScheduled) {
-        return;
+        return; // 如果没有排期的更新，直接返回
     }
     pagesWrapper.style.transform = `translateX(${state.lastSwipeTranslateX}%)`;
-    state.swipeMoveScheduled = false;
+    state.swipeMoveScheduled = false; // 重置标志，等待下一个更新
 }
 
 // ============ 结束：粘贴代码 ============

@@ -9490,7 +9490,8 @@ body.code-scrolling-enabled .code-block-wrapper {
     font-weight: 600;
 }
 
-/* 在 style.css 中添加 */
+/* style.css */
+
 /* 当滑动时，暂时禁用高消耗的 backdrop-filter */
 .body.is-swiping .dock,
 .body.is-swiping .folder-overlay {
@@ -9498,6 +9499,7 @@ body.code-scrolling-enabled .code-block-wrapper {
     -webkit-backdrop-filter: none;
     background: rgba(255, 255, 255, 0.8); /* 提供一个降级背景 */
 }
+
 
 #widgetManager .settings-content {
     overflow-y: auto !important;
