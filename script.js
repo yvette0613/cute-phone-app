@@ -4646,70 +4646,53 @@ function createElement(app, grid) {
 
 
 function addDragListeners(el, clickable) {
-    let lastDragEndTime = 0;
-    // ✅ 新增：如果是小猫组件，增加长按时间，防止误触
-    const longPressDelay = el.classList.contains('cat-widget') ? 500 : 350;
-    const startInteraction = (e) => {
-        if (state.isSwipingPage) return;
+    // === [修改开始] ===
+    // 移除所有拖拽相关的逻辑，只保留点击事件
+    // const longPressDelay = el.classList.contains('cat-widget') ? 500 : 350; // 不再需要这个长按延迟
 
-        state.hasDragged = false;
-        const touch = getTouch(e);
-        state.dragStart = {x: touch.clientX, y: touch.clientY};
-
-        state.longPressTimer = setTimeout(() => {
-            state.draggedElement = el;
-            state.isEditMode = true;
-            state.isDragging = true;
-            el.classList.add('dragging');
-            document.body.style.cursor = 'grabbing';
-            showEditHint(true);
-            showDeleteButtons(true);
-        }, longPressDelay); // ✅ 使用动态延迟时间
-    };
-
-    const endInteraction = () => {
-        clearTimeout(state.longPressTimer);
-        if (state.hasDragged) {
-            lastDragEndTime = Date.now();
-        }
-    };
-
-    el.addEventListener('mousedown', (e) => {
-        e.preventDefault();
-        startInteraction(e);
-    });
-    el.addEventListener('touchstart', startInteraction, {passive: true});
-
-    el.addEventListener('mouseup', endInteraction);
-    el.addEventListener('mouseleave', endInteraction);
-    el.addEventListener('touchend', endInteraction);
-
-    // ▼▼▼▼▼ 从这里开始修改 ▼▼▼▼▼
+    // 直接绑定点击事件，不进行拖拽判断
     el.addEventListener('click', (e) => {
-        const timeSinceLastDrag = Date.now() - lastDragEndTime;
-        if (!state.hasDragged && !state.isEditMode && timeSinceLastDrag > 300) {
-            e.stopPropagation();
+        // 阻止事件冒泡，防止点击事件被页面的其他部分捕获
+        e.stopPropagation();
 
-            // 【新增】判断点击的是否为文件夹
-            if (el.classList.contains('folder')) {
-                const pageKey = el.parentElement.id === 'grid1' ? 'page1' : 'page2';
-                const appId = el.dataset.id;
-                const folderData = state.appLayouts[pageKey].find(app => app.id === appId);
-                if (folderData) {
-                    openFolder(folderData);
-                }
-            }
-            // 【修改】将原来的if改为else if
-            else if (clickable) {
-                if (el.dataset.id === 'settings') {
-                    openSettings();
-                } else if (el.dataset.id === 'worldbook') {
-                    openWorldbook();
-                }
+        // 【新增】判断点击的是否为文件夹
+        if (el.classList.contains('folder')) {
+            const pageKey = el.parentElement.id === 'grid1' ? 'page1' : 'page2';
+            const appId = el.dataset.id;
+            const folderData = state.appLayouts[pageKey].find(app => app.id === appId);
+            if (folderData) {
+                openFolder(folderData);
             }
         }
+        // 【修改】将原来的if改为else if，处理可点击的应用
+        else if (clickable) {
+            if (el.dataset.id === 'settings') {
+                openSettings();
+            } else if (el.dataset.id === 'worldbook') {
+                openWorldbook();
+            }
+            // Add other specific clickable app actions here if any
+        }
     });
-    // ▲▲▲▲▲ 修改到这里结束 ▲▲▲▲▲
+
+    // 同时，我们需要确保长按不会激活编辑模式
+    // 禁用长按计时器和拖拽状态的起始逻辑
+    el.addEventListener('mousedown', (e) => {
+        e.preventDefault(); // 阻止默认的拖拽行为
+    });
+    el.addEventListener('touchstart', (e) => {
+        e.preventDefault(); // 阻止默认的拖拽行为
+    }, {passive: false});
+
+    // 如果还有其他地方需要阻止默认的拖拽行为，可以在这里添加
+
+    // 禁用拖拽结束时的清理工作，因为拖拽功能已经移除了
+    // document.removeEventListener('touchmove', handleMove);
+    // document.removeEventListener('mousemove', handleMove);
+    // document.removeEventListener('touchend', (e) => handleEnd(e));
+    // document.removeEventListener('mouseup', (e) => handleEnd(e));
+
+    // === [修改结束] ===
 }
 
 function isOccupied(pageKey, targetRow, targetCol, draggedId) {
