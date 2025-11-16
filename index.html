@@ -2,7 +2,21 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<!-- 🍎 iOS PWA 核心标签：启用WebApp模式，隐藏Safari浏览器UI -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <!-- 🍎 设置 iOS 状态栏样式（时间、电量等）。可选值：default, black, black-translucent -->
+    <!-- 推荐使用 black-translucent，它会使顶部状态栏背景半透明，文字白色，更融入应用 -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <!-- 🍎 PWA 在桌面图标下方显示的应用程序名称 -->
+    <meta name="apple-mobile-web-app-title" content="Yetta以她小手机">
+<!-- 🍎 PWA 的 Web Manifest 文件引用 -->
+    <!-- 请确保 manifest.json 文件的路径正确 -->
+    <link rel="manifest" href="./manifest.json">
+    <!-- 🍎 PWA 在 iOS 设备主屏幕上使用的图标 -->
+    <!-- 建议提供至少 180x180 像素的图标。请替换为你的图标实际路径 -->
+    <link rel="apple-touch-icon" href="./icons/icon1.png">
+
     <title>Yetta以她小手机</title>
     <!-- 1. 引入外部的CSS样式文件 -->
     <link rel="stylesheet" href="style.css">
