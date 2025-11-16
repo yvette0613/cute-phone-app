@@ -742,8 +742,72 @@ const globalConfig = {
     customIcons: {},
     savedWidgets: [],
     dockIcons: ['https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760103483956_qdqqd_ufc76a.png', 'https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760095214931_qdqqd_cud7dm.png', 'https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760094934930_qdqqd_5lvg07.png', 'https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760103414729_qdqqd_t8eu22.png'],
-    showAvatarsInSweetheartChat: false
+    showAvatarsInSweetheartChat: false,
+    sweetheartReplyMode: 'multi', // 默认设为多信息模式
 };
+
+
+function setupSweetheartReplyModeSelector() {
+    const selector = document.getElementById('sweetheartReplyModeSelector');
+    if (selector) {
+        selector.addEventListener('click', (event) => {
+            const target = event.target.closest('.segmented-option');
+            if (target) {
+                const newMode = target.dataset.mode;
+                globalConfig.sweetheartReplyMode = newMode;
+                localStorage.setItem('sweetheartReplyMode', newMode); // 持久化
+                updateSweetheartReplyModeUI(newMode);
+                showSuccessModal('设置成功', `已切换到${newMode === 'single' ? '单信息' : '多信息'}模式`, 1500);
+                // 在这里可能需要调用一个函数来根据模式更新按钮的显示状态
+                updateSweetheartChatInputAreaButtons();
+            }
+        });
+    }
+}
+
+// script.js (添加到你的辅助函数区域，例如 closeSweetheartChat() 之后，或在任何合适的位置)
+
+/**
+ * 更新密友聊天回复模式分段选择器的UI显示
+ * @param {string} mode - 当前的回复模式 ('single' 或 'multi')
+ */
+function updateSweetheartReplyModeUI(mode) {
+    const selector = document.getElementById('sweetheartReplyModeSelector');
+    if (selector) {
+        selector.querySelectorAll('.segmented-option').forEach(option => {
+            option.classList.toggle('active', option.dataset.mode === mode);
+        });
+    }
+}
+
+
+function updateSweetheartChatInputAreaButtons() {
+    const chatInputArea = document.querySelector('.sweetheart-chat-input-area');
+    const sendMsgBtn = document.getElementById('sweetheartSendMsgBtn');
+    const getReplyBtn = document.getElementById('sweetheartGetReplyBtn');
+
+    if (!chatInputArea || !sendMsgBtn || !getReplyBtn) return;
+
+    if (globalConfig.sweetheartReplyMode === 'single') {
+        // 单信息模式：隐藏回复按钮，发送按钮可见
+        getReplyBtn.style.display = 'none';
+        sendMsgBtn.style.display = 'flex'; // 确保发送按钮可见，但它的点击行为待会修改
+    } else {
+        // 多信息模式：回复按钮可见，发送按钮可见
+        getReplyBtn.style.display = 'flex'; // 确保回复按钮可见
+        sendMsgBtn.style.display = 'flex'; // 发送按钮也可见
+    }
+    // 确保发送按钮和回复按钮的初始显示状态取决于输入框是否有文本，覆盖上面的规则
+    // 只有当输入框文本为空时，回复按钮才显示，如果非空，发送按钮显示
+    if (document.getElementById('sweetheartChatInput').value.trim().length > 0) {
+        chatInputArea.classList.add('has-text'); // 显示发送按钮
+    } else {
+        chatInputArea.classList.remove('has-text'); // 显示回复按钮
+    }
+}
+
+// 调用：在 initializeApp() 和 `openSweetheartChat()` 的末尾调用 ``
+
 
 // ========== 密友聊天头像显示控制 - 完整版 ==========
 
@@ -1222,7 +1286,7 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
         return messageRow;
     }
 
-      // =======================================================================
+    // =======================================================================
 // ▼▼▼ 类型 C: 语音条消息 - 最终修复版 ▼▼▼
 // =======================================================================
     if (messageObj.type === 'voice') {
@@ -7307,6 +7371,7 @@ let currentSweetheartQuoteData = null;
 function openSweetheartChat(contact) {
     hideMessageActionSheet(); // 隐藏普通聊天菜单
     hideSweetheartMessageActionSheet(); // 隐藏密友聊天菜单
+
     if (!contact) return;
     currentSweetheartChatContact = contact;
 
@@ -7353,6 +7418,7 @@ function openSweetheartChat(contact) {
         // 滚动到底部
         setTimeout(() => {
             messagesEl.scrollTop = messagesEl.scrollHeight;
+            updateSweetheartChatInputAreaButtons();
         }, 50);
 
         // 初始化函数
@@ -7572,7 +7638,7 @@ function selectExistingContactForSweetheart() {
 /**
  * 发送密友消息
  */
-function addSweetheartMessageToList() {
+async function addSweetheartMessageToList() {
     const inputEl = document.getElementById('sweetheartChatInput');
     const messagesEl = document.getElementById('sweetheartChatMessages');
     const messageText = inputEl.value.trim();
@@ -7597,8 +7663,14 @@ function addSweetheartMessageToList() {
     cancelSweetheartQuote();
 
     renderSweetheartList();
+
     messagesEl.scrollTop = messagesEl.scrollHeight;
     inputEl.focus();
+    if (globalConfig.sweetheartReplyMode === 'single') {
+        console.log('单信息模式：已发送用户消息，自动触发AI回复...');
+        await getSweetheartAiReply(); // 等待AI回复完成
+        // 注意：因为 getSweetheartAiReply() 会禁用按钮，所以它完成后会再次启用
+    }
 }
 
 /**
@@ -9023,6 +9095,7 @@ function setupSweetheartChatInput() {
         } else {
             chatInputArea.classList.remove('has-text');
         }
+        updateSweetheartChatInputAreaButtons(); // 调用更新按钮状态
     });
 
     freshChatInput.addEventListener('keypress', function (e) {
@@ -14503,6 +14576,8 @@ function initializeApp() {
     updateTestButtonState(); // 初始化测试按钮状态
     loadSweetheartAvatarSetting();
     initAvatarToggle();
+    setupSweetheartReplyModeSelector();
+
 
     // ▼▼▼ 新增：密友聊天显示头像功能初始化 ▼▼▼
     const showAvatarsToggle = document.getElementById('showAvatarsToggle');
@@ -14681,6 +14756,16 @@ function initializeApp() {
     }
 
     setTimeout(loadCatWidgetData, 500); // 延迟加载，确保DOM已渲染
+
+    const savedSweetheartReplyMode = localStorage.getItem('sweetheartReplyMode');
+    if (savedSweetheartReplyMode) {
+        globalConfig.sweetheartReplyMode = savedSweetheartReplyMode;
+    }
+    console.log(`✅ 已加载密友聊天回复模式: ${globalConfig.sweetheartReplyMode}`);
+    // ===== 初始化密友聊天回复模式选择器并应用UI =====
+    setupSweetheartReplyModeSelector(); // 设置监听器在页面加载时
+    updateSweetheartReplyModeUI(globalConfig.sweetheartReplyMode); // 应用UI的初始状态
+
     // ✅ 新增：初始化密友聊天输入框
     setupSweetheartChatInput();
 
@@ -14789,7 +14874,7 @@ function initializeApp() {
             reader.readAsDataURL(file);
         }
     });
-
+    updateSweetheartChatInputAreaButtons();
 
     console.log('%c🎉 应用初始化完成！', 'color: #667eea; font-size: 16px; font-weight: bold;');
     // 新增：加载小猫组件数据

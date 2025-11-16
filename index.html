@@ -2,15 +2,16 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<!-- 🍎 iOS PWA 核心标签：启用WebApp模式，隐藏Safari浏览器UI -->
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <!-- 🍎 iOS PWA 核心标签：启用WebApp模式，隐藏Safari浏览器UI -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <!-- 🍎 设置 iOS 状态栏样式（时间、电量等）。可选值：default, black, black-translucent -->
     <!-- 推荐使用 black-translucent，它会使顶部状态栏背景半透明，文字白色，更融入应用 -->
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <!-- 🍎 PWA 在桌面图标下方显示的应用程序名称 -->
     <meta name="apple-mobile-web-app-title" content="Yetta以她小手机">
-<!-- 🍎 PWA 的 Web Manifest 文件引用 -->
+    <!-- 🍎 PWA 的 Web Manifest 文件引用 -->
     <!-- 请确保 manifest.json 文件的路径正确 -->
     <link rel="manifest" href="./manifest.json">
     <!-- 🍎 PWA 在 iOS 设备主屏幕上使用的图标 -->
@@ -1456,6 +1457,23 @@
                     <div class="settings-title">密友聊天设置</div>
                 </div>
                 <div class="settings-content">
+                    <!-- 新增：单信息/多信息模式选择 -->
+                    <div class="settings-section">
+                        <div class="section-title">回复模式</div>
+                        <div class="settings-item">
+                            <div class="settings-info">
+                                <div class="settings-label">回复模式</div>
+                                <div class="settings-desc">选择一条消息自动回复，或手动触发更多回复</div>
+                            </div>
+                            <div class="settings-action">
+                                <div class="segmented-control" id="sweetheartReplyModeSelector">
+                                    <div class="segmented-option" data-mode="single">单信息</div>
+                                    <div class="segmented-option" data-mode="multi">多信息</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="settings-section">
                         <div class="section-title">当前对话</div>
                         <div class="settings-item" onclick="clearCurrentSweetheartChatHistory()">
