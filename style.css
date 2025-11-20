@@ -4344,69 +4344,6 @@ body.code-scrolling-enabled .code-block-wrapper {
 }
 
 
-
-/*!* 可以添加一个当语音消息在播放时停止动画的样式，如果需要的话 *!*/
-/*.voice-message-bubble.playing .disclosure-arrow {*/
-/*    animation-play-state: paused; !* 播放时暂停动画，只在打开隐藏内容时才动 *!*/
-/*}*/
-
-/* 聊天消息中的 TTS 播放按钮 */
-.message-actions {
-    display: flex;
-    align-items: center;
-    margin-left: 8px;
-    margin-right: 8px;
-    position: relative;
-    z-index: 10;
-}
-/* 4. 调整 TTS 按钮的背景和图标颜色，确保与气泡风格一致 */
-.play-tts-btn {
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    /* 默认透明或略带背景，视乎其所属消息的气泡颜色 */
-    /* background: rgba(0, 0, 0, 0.1); */ /* 移除通用背景，让下面的覆盖 */
-    border: none;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s ease;
-    flex-shrink: 0;
-}
-.play-tts-btn:hover {
-    background: rgba(0, 0, 0, 0.2);
-}
-.play-tts-btn svg {
-    width: 18px;
-    height: 18px;
-    /*fill: white; !* 默认白色图标 *!*/
-}
-
-/* AI 消息 (received) 的 TTS 按钮样式 */
-.message-row.received .play-tts-btn {
-    background: rgba(0, 0, 0, 0.05); /* 接收方气泡的浅色背景 */
-}
-
-.message-row.received .play-tts-btn:hover {
-    background: rgba(0, 0, 0, 0.1);
-}
-
-.message-row.received .play-tts-btn svg {
-    fill: #555; /* 接收方气泡的图标颜色 */
-}
-/* 我的消息的气泡图标颜色 */
-.message-row.sent .play-tts-btn {
-    background: rgba(255, 255, 255, 0.15); /* 发送方气泡的背景 */
-}
-
-.message-row.sent .play-tts-btn:hover {
-    background: rgba(255, 255, 255, 0.25);
-}
-
-.message-row.sent .play-tts-btn svg {
-    fill: white; /* 发送方气泡的图标颜色 */
-}
 /* 播放状态动画 */
 .play-tts-btn.playing svg path {
     d: path('M6 19h4V5H6v14zm8-14v14h4V5h-4z'); /* 动画到暂停图标 */
