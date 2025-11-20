@@ -1369,6 +1369,58 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
     const sweetheartChatPageEl = document.getElementById('sweetheartChatPage');
     const isSweetheartChatActive = sweetheartChatPageEl && sweetheartChatPageEl.classList.contains('show');
 
+    // 在 _createMessageDOM 函数内部的最开头插入：
+
+    // =======================================================================
+    // ▼▼▼ 新增类型：文件上传消息渲染 ▼▼▼
+    // =======================================================================
+    if (messageObj.type === 'file') {
+        const messageRow = document.createElement('div');
+        // 同样区分是谁发的
+        const senderClass = messageObj.sender === 'user' ? 'sent' : 'received';
+        messageRow.className = `message-row ${senderClass}`;
+        messageRow.dataset.timestamp = messageObj.timestamp;
+        messageRow.dataset.index = messageIndex;
+
+        // 1. 这里的头像逻辑直接复用现有的即可，或者简化如下：
+        const avatarEl = document.createElement('div');
+        avatarEl.className = 'message-chat-avatar';
+        // 根据当前聊天模式判断用谁的头像
+        const isSweetheart = document.getElementById('sweetheartChatPage').classList.contains('show');
+        const contactData = isSweetheart ? currentSweetheartChatContact : currentChatContact;
+        // 如果是用户发的，用我的头像；如果是对面发的，用联系人头像
+        const avatarSrc = messageObj.sender === 'user' ? (userProfile.avatar || '👤') : (contactData.avatar || '💬');
+        const isUrl = avatarSrc && (avatarSrc.startsWith('http') || avatarSrc.startsWith('data:'));
+        avatarEl.innerHTML = isUrl ? `<img src="${avatarSrc}">` : `<div class="initials">${avatarSrc}</div>`;
+
+        // 2. 创建内容容器
+        const messageContent = document.createElement('div');
+        messageContent.className = 'message-content';
+
+        // 3. 创建气泡
+        const bubble = document.createElement('div');
+        bubble.className = 'chat-bubble';
+        // 给一个蓝色的文件图标样式
+        bubble.innerHTML = `
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-size:24px;">📄</span>
+                <div>
+                    <div style="font-weight:bold; font-size:14px;">${escapeHTML(messageObj.content.name)}</div>
+                    <div style="font-size:11px; opacity:0.8;">已上传，等待发送...</div>
+                </div>
+            </div>`;
+
+        messageContent.appendChild(bubble);
+        messageRow.appendChild(avatarEl);
+        messageRow.appendChild(messageContent);
+
+        // 绑定长按事件（保持原有逻辑）
+        bindMessageEvents(bubble, contactId, messageIndex, isSweetheart);
+
+        return messageRow; // 直接返回，不再往下执行
+    }
+    // ▲▲▲ 插入结束 ▲▲▲
+
     // =======================================================================
     // ▼▼▼ 类型 A: 地点通知消息 (Original Functionality) ▼▼▼
     // =======================================================================
@@ -5810,32 +5862,26 @@ ${formattedDialog}
  * 普通聊天 - 获取AI回复（完整版）
  */
 async function getAiReply() {
+    // 1. 基础检查
     if (globalConfig.activeApiConfig === null || !globalConfig.apiConfigs[globalConfig.activeApiConfig]) {
-        showErrorModal('配置错误', '请先在“设置 > API设置”中配置并激活一个API！', 3000);
-        return; // 终止函数执行
+        showErrorModal('配置错误', '请先在设置中配置API！');
+        return;
     }
     if (!currentChatContact) return;
 
     const contactId = currentChatContact.id;
-    const chatHistory = JSON.parse(localStorage.getItem('phoneChatHistory') || '{}')[contactId] || [];
-
     const chatInput = document.getElementById('chatInput');
     const getReplyBtn = document.getElementById('getReplyBtn');
     const messagesEl = document.getElementById('chatMessages');
 
-    if (!chatInput || !getReplyBtn || !messagesEl) return;
-
-    getReplyBtn.disabled = true;
-    // chatInput.disabled = true;
+    getReplyBtn.disabled = true; // 点击后禁用按钮，防止重复点击
+    // 2. 读取历史记录
+    const chatHistory = JSON.parse(localStorage.getItem('phoneChatHistory') || '{}')[contactId] || [];
 
     // === 构建发送给AI的消息数组 ===
     const messages = [];
+    messages.push({role: "system", content: AI_REALCHAT_SYSTEM_PROMPT});
 
-    // ✅ 1. 系统提示词（使用全局常量）
-    messages.push({
-        role: "system",
-        content: AI_REALCHAT_SYSTEM_PROMPT
-    });
 
     // 2. 世界书上下文
     const worldbookContext = gatherWorldbookContext();
@@ -5898,33 +5944,27 @@ async function getAiReply() {
         });
     }
 
-    // 3. [核心改造] 智能处理聊天历史，识别图片
+    // 3. 【核心逻辑修改】处理历史记录（包含文件读取）
     const memoryRounds = currentChatContact.memoryRounds || 10;
     const recentHistory = chatHistory.slice(-(memoryRounds * 2));
-    // 我们需要使用普通的 for 循环或 for...of 循环，以便使用 await
+    // ★★★ 必须使用 for...of 循环来支持 await ★★★
     for (const msg of recentHistory) {
         const role = msg.sender === 'user' ? 'user' : 'assistant';
-
-        // === 情况 A: 文件消息 (新增) ===
+        // === 情况 A: 文件消息 (去数据库读内容) ===
         if (msg.type === 'file' && msg.content && msg.content.fileId) {
-            // 1. 从 IndexedDB 获取文本内容
-            const fileContent = await ImageDB.getText(msg.content.fileId);
-
-            if (fileContent) {
-                // 2. 将文件内容包装成明确的 Prompt
-                const filePrompt = `
-[用户上传了一个文件]
-文件名: ${msg.content.name}
-文件内容开始:
-"""
-${fileContent}
-"""
-文件内容结束。
-`;
-                messages.push({role: role, content: filePrompt});
-            } else {
-                messages.push({role: role, content: `[系统提示: 文件 ${msg.content.name} 内容已过期或丢失]`});
-            }
+           try {
+                // 从 IndexedDB 异步获取文本内容
+                const fileContent = await ImageDB.getText(msg.content.fileId);
+                if (fileContent) {
+                    // 把文件内容包装成一段提示词发给AI
+                    const filePrompt = `[用户上传文件: ${msg.content.name}]\n内容如下:\n"""\n${fileContent}\n"""\n(请根据文件内容回答)`;
+                    messages.push({ role: role, content: filePrompt });
+                } else {
+                    messages.push({ role: role, content: `[系统提示: 文件 ${msg.content.name} 内容已过期或丢失]` });
+                }
+           } catch (err) {
+               console.error("读取文件内容出错", err);
+           }
         }
         // === 情况 B: 图片消息 (保持不变) ===
         else {
@@ -5960,32 +6000,28 @@ ${fileContent}
         chatInput.disabled = false;
         return;
     }
-    // 5. 显示"思考中"气泡并调用API (这部分逻辑不变)
-    console.log('📋 [带图识别] - 发送给AI的消息结构：', messages);
-    const thinkingBubble = _createMessageDOM(contactId, {sender: 'contact', text: '...'}, -1);
+    // 5. 调用API
+    // 添加一个"思考中"气泡
+    const thinkingBubble = _createMessageDOM(contactId, { sender: 'contact', text: '...' }, -1);
     messagesEl.appendChild(thinkingBubble);
     messagesEl.scrollTop = messagesEl.scrollHeight;
     const result = await callApi(messages);
-    thinkingBubble.remove();
-    // 6. 处理和显示AI回复
+    thinkingBubble.remove(); // 移除思考中
+    // 6. 处理结果
     if (!result.success) {
-        showErrorModal('API 响应错误', result.message);
+        showErrorModal('请求失败', result.message);
     } else {
-        // ✅ [功能已恢复] 分段显示AI回复
+        // 分段显示回复
         const segments = result.message.split('---').filter(s => s.trim());
-        // 如果AI没有使用分割符，则将整个回复作为一个气泡
-        if (segments.length === 0) {
-            segments.push(result.message || '...');
-        }
-        // 遍历每个片段，依次显示为独立的气泡
+        if (segments.length === 0) segments.push(result.message);
+
         for (const segmentText of segments) {
-            const messageObj = {sender: 'contact', text: segmentText.trim()};
+            const messageObj = { sender: 'contact', text: segmentText.trim() };
             const newIndex = saveMessage(contactId, messageObj);
-            const messageRow = _createMessageDOM(contactId, messageObj, newIndex);
-            messagesEl.appendChild(messageRow);
-            messagesEl.scrollTop = messagesEl.scrollHeight; // 每次都滚动到底部
-            // 增加一个自然的延迟
-            await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 400));
+            const row = _createMessageDOM(contactId, messageObj, newIndex);
+            messagesEl.appendChild(row);
+            await new Promise(r => setTimeout(r, 400)); // 停顿一下
+            messagesEl.scrollTop = messagesEl.scrollHeight;
         }
     }
     // 7. 清理和收尾工作 (这部分不变)
@@ -6583,10 +6619,7 @@ function setupAttachmentMenu() {
     });
 
 
-    // 6. 文件上传并获取AI分析的逻辑 (这部分功能保持不变)
-    // ... 在 setupAttachmentMenu 函数内部 ...
-
-    // 6. 文件选择监听 (完全修正版：只上屏，不调用API)
+    // 6. 文件选择监听 (只保存上屏，不分析)
     fileInput.addEventListener('change', async (event) => {
         const file = event.target.files[0];
         if (!file || !currentChatContact) return;
@@ -6599,7 +6632,7 @@ function setupAttachmentMenu() {
         }
 
         try {
-            // A. 读取文件内容
+            // A. 读取文件内容文本
             const textContent = await new Promise((resolve, reject) => {
                 const reader = new FileReader();
                 reader.onload = (e) => resolve(e.target.result);
@@ -6610,39 +6643,38 @@ function setupAttachmentMenu() {
             // B. 将内容存入 IndexedDB，获取 ID
             const fileId = await ImageDB.saveText(textContent);
 
-            // C. 构造消息对象 (只存 ID 和元数据，不存大段内容)
+            // C. 构造消息对象 (关键：type='file')
             const fileMessage = {
                 sender: 'user',
                 type: 'file',
                 content: {
                     name: file.name,
                     size: file.size,
-                    fileId: fileId // 关键：保存 ID 引用
+                    fileId: fileId // 保存引用ID
                 },
                 timestamp: Date.now()
             };
 
-            // D. 保存并渲染消息到界面
+            // D. 保存并渲染到界面上
             const messagesEl = document.getElementById('chatMessages');
             const newIndex = saveMessage(currentChatContact.id, fileMessage);
             const messageRow = _createMessageDOM(currentChatContact.id, fileMessage, newIndex);
             messagesEl.appendChild(messageRow);
 
-            // 滚动到底部
             messagesEl.scrollTop = messagesEl.scrollHeight;
             renderContacts(contactsData);
 
-            // E. 重点：这里不需要 simulateSendingMessage，也不需要 callApi
-            // 此时 has-text 类应该被移除，露出“接收”按钮（如果输入框空的话）
+            // E. 【关键修改】这里什么都不做！不调用 callApi，不模拟发送。
+            // 确保输入框没有 has-text 类，这样显示的就是“接收(信封按钮)”
             document.querySelector('.chat-input-area').classList.remove('has-text');
 
-            console.log(`文件 ${file.name} 已暂存，ID: ${fileId}`);
+            console.log(`普通文件 ${file.name} 已暂存，等待点击接收按钮`);
 
         } catch (error) {
             console.error("文件读取失败", error);
             alert("文件读取失败，请重试");
         } finally {
-            event.target.value = ''; // 清空选择，允许重复上传
+            event.target.value = '';
         }
     });
 
@@ -6662,49 +6694,113 @@ function setupAttachmentMenu() {
  * [最终修复版] 初始化密友聊天附件菜单
  * - 使用 cloneNode 技巧移除旧的事件监听器，修复重复绑定问题。
  */
+// script.js - 找到 setupSweetheartAttachmentMenu 函数，完整替换为：
+
 function setupSweetheartAttachmentMenu() {
     const attachmentBtn = document.getElementById('sweetheartShowAttachmentMenuBtn');
     const attachmentMenu = document.getElementById('sweetheartAttachmentMenu');
     const fileInput = document.getElementById('sweetheartFileInput');
     const imageInput = document.getElementById('sweetheartImageInput');
-
     const redPacketBtn = document.getElementById('sweetheartSendRedPacketBtn');
 
-    if (!attachmentBtn || !attachmentMenu) {
-        console.error('❌ 密友附件菜单元素未找到');
-        return;
-    }
+    if (!attachmentBtn || !attachmentMenu) return;
 
-    // ▼▼▼ 核心修复：克隆“+”按钮以移除所有旧的 click 事件 ▼▼▼
+    // 1. 克隆按钮以清除旧事件 (防止重复绑定)
     const freshAttachmentBtn = attachmentBtn.cloneNode(true);
     attachmentBtn.parentNode.replaceChild(freshAttachmentBtn, attachmentBtn);
-    // ▲▲▲ 修复结束 ▲▲▲
 
-    // 现在，我们在“干净”的新按钮上绑定唯一的 click 事件
     freshAttachmentBtn.addEventListener('click', function (e) {
         e.stopPropagation();
         attachmentMenu.classList.toggle('show');
     });
 
-    // --- 其他部分的逻辑保持不变 ---
-
+    // 点击外部关闭菜单
     document.addEventListener('click', function (e) {
         if (!attachmentMenu.contains(e.target) && !freshAttachmentBtn.contains(e.target)) {
             attachmentMenu.classList.remove('show');
         }
     });
 
+    // 2. 文件上传按钮点击 - 触发 input
     const uploadFileBtn = document.getElementById('sweetheartUploadFileBtn');
     if (uploadFileBtn && fileInput) {
-        uploadFileBtn.addEventListener('click', function () {
+        // 克隆以清除旧事件
+        const freshUploadFileBtn = uploadFileBtn.cloneNode(true);
+        uploadFileBtn.parentNode.replaceChild(freshUploadFileBtn, uploadFileBtn);
+
+        freshUploadFileBtn.addEventListener('click', function () {
             fileInput.click();
             attachmentMenu.classList.remove('show');
         });
+
+        // ▼▼▼ 【核心修改】文件选择监听 (只保存，不发请求) ▼▼▼
+        const freshFileInput = fileInput.cloneNode(true);
+        fileInput.parentNode.replaceChild(freshFileInput, fileInput);
+
+        freshFileInput.addEventListener('change', async (event) => {
+            const file = event.target.files[0];
+            if (!file || !currentSweetheartChatContact) return;
+
+            if (file.size > 2 * 1024 * 1024) {
+                alert("文件过大，请上传 2MB 以内的文本文件");
+                event.target.value = '';
+                return;
+            }
+
+            try {
+                // A. 读取文件内容
+                const textContent = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => resolve(e.target.result);
+                    reader.onerror = (e) => reject(e);
+                    reader.readAsText(file);
+                });
+
+                // B. 存入数据库，拿到ID
+                const fileId = await ImageDB.saveText(textContent);
+
+                // C. 构造文件消息对象 (type: 'file')
+                const fileMessage = {
+                    sender: 'user',
+                    type: 'file',
+                    content: {
+                        name: file.name,
+                        size: file.size,
+                        fileId: fileId // 关键引用
+                    },
+                    timestamp: Date.now()
+                };
+
+                // D. 保存并渲染 (只显示在界面)
+                const contactId = currentSweetheartChatContact.id;
+                // 注意：这里用的是 saveSweetheartMessage
+                const newIndex = saveSweetheartMessage(contactId, fileMessage);
+
+                const messagesEl = document.getElementById('sweetheartChatMessages');
+                // 注意：这里 _createMessageDOM 会用到我们在第一步增加的渲染逻辑
+                const messageRow = _createMessageDOM(contactId, fileMessage, newIndex);
+                messagesEl.appendChild(messageRow);
+
+                messagesEl.scrollTop = messagesEl.scrollHeight;
+                renderSweetheartList();
+
+                // E. 移除 has-text 类，确保显示的是"接收(信封)"按钮
+                document.querySelector('.sweetheart-chat-input-area').classList.remove('has-text');
+
+                console.log(`密友文件 ${file.name} 已暂存，等待点击接收按钮`);
+
+            } catch (error) {
+                console.error("密友文件读取失败", error);
+                alert("文件读取失败，请重试");
+            } finally {
+                event.target.value = ''; // 清空
+            }
+        });
     }
 
+    // 3. 图片上传逻辑 (保持不变)
     const uploadImageBtn = document.getElementById('sweetheartUploadImageBtn');
     if (uploadImageBtn && imageInput) {
-        // 为图片上传按钮也进行克隆清理，确保万无一失
         const freshUploadImageBtn = uploadImageBtn.cloneNode(true);
         uploadImageBtn.parentNode.replaceChild(freshUploadImageBtn, uploadImageBtn);
 
@@ -6713,69 +6809,58 @@ function setupSweetheartAttachmentMenu() {
             attachmentMenu.classList.remove('show');
         });
 
-        // 图片上传处理逻辑保持不变
-        // 在 setupSweetheartAttachmentMenu 函数内部...
+        const freshImageInput = imageInput.cloneNode(true);
+        imageInput.parentNode.replaceChild(freshImageInput, imageInput);
 
-        imageInput.addEventListener('change', async function (e) {
+        freshImageInput.addEventListener('change', async function (e) {
             const file = e.target.files[0];
             if (file && currentSweetheartChatContact) {
                 try {
-                    // 1. 存入数据库，获取ID
+                    // 图片直接发
                     const imageId = await ImageDB.save(file);
-
-                    // 2. 构造带有特殊协议头的 URL (这次我们把 URL 放在 imageUrl 字段，适配你原有的密友逻辑)
-                    // 注意：密友聊天原来是用 imageUrl 字段的，我们保持不变，只是值变了
                     const dbUrl = `db-image://${imageId}`;
-
                     const messageObj = {
                         sender: 'user',
-                        imageUrl: dbUrl, // 存的是假地址
+                        imageUrl: dbUrl,
                         timestamp: Date.now()
                     };
-
                     const contactId = currentSweetheartChatContact.id;
-
-                    // 3. 保存到 LocalStorage (现在非常快且不占空间)
                     const newIndex = saveSweetheartMessage(contactId, messageObj);
-
-                    // 4. 渲染DOM
                     const messagesEl = document.getElementById('sweetheartChatMessages');
                     const messageRow = _createMessageDOM(contactId, messageObj, newIndex);
                     messagesEl.appendChild(messageRow);
 
-                    // 5. 立即加载真实图片
                     const img = messageRow.querySelector('img');
                     if (img) loadRealImage(img);
 
                     messagesEl.scrollTop = messagesEl.scrollHeight;
                     renderSweetheartList();
                 } catch (err) {
-                    console.error("密友图片发送失败", err);
-                    alert("图片保存出错");
+                    console.error("图片出错", err);
                 }
             }
             this.value = '';
         });
-
     }
 
+    // 4. 红包按钮 (保持不变)
     if (redPacketBtn) {
-        redPacketBtn.addEventListener('click', function () {
-            attachmentMenu.classList.remove('show'); // 先关掉附件菜单
-            openRedPacketModal(); // 再打开红包弹窗
+        const freshRedPacketBtn = redPacketBtn.cloneNode(true);
+        redPacketBtn.parentNode.replaceChild(freshRedPacketBtn, redPacketBtn);
+        freshRedPacketBtn.addEventListener('click', function () {
+            attachmentMenu.classList.remove('show');
+            openRedPacketModal();
         });
     }
-
-    console.log('✅ 密友附件菜单已初始化 (已清除旧事件)');
 }
 
 
-// ========== 结束：粘贴全新的JavaScript代码块 ==========
-
+// script.js - 找到 uploadFileAndGetAiResponse 函数，完整替换为：
 
 /**
- * 【修改版】本地读取文件内容，直接发送给AI进行分析
- * 不需要后端服务器，直接在浏览器完成读取
+ * [更新版] 文件预处理工具函数
+ * 作用：读取本地文件 -> 存入IndexedDB -> 返回文件信息
+ * 核心：不再直接调用 CallApi，而是等待用户手动点击接收按钮
  */
 function uploadFileAndGetAiResponse(file) {
     return new Promise((resolve, reject) => {
@@ -6791,35 +6876,24 @@ function uploadFileAndGetAiResponse(file) {
 
         // 3. 读取成功的回调
         reader.onload = async (e) => {
-            const content = e.target.result;
-
-            // 构造提示词，把文件内容塞给 AI
-            const prompt = `我上传了一个文件，文件名为 "${file.name}"。
-            
-以下是文件内容：
-"""
-${content}
-"""
-
-请帮我分析这个文件的内容，并总结它的要点。`;
-
-            // 调用现有的 callApi 函数发送给 AI
-            // 注意：我们需要构造一个临时的 messages 数组
-            const messages = [
-                {role: 'system', content: '你是一个文件分析助手。'}, // 临时系统设定
-                {role: 'user', content: prompt}
-            ];
-
             try {
-                // 调用 AI 接口
-                const result = await callApi(messages);
-                if (result.success) {
-                    resolve(result.message); // 返回 AI 的分析结果
-                } else {
-                    reject(new Error(result.message));
-                }
+                const content = e.target.result;
+
+                // 核心步骤：将文件内容存入 IndexedDB，获取唯一的 fileId
+                // 这样我们只需要在聊天记录里存一个短短的 ID
+                const fileId = await ImageDB.saveText(content);
+
+                // 返回处理好的数据结构，供后续渲染气泡使用
+                resolve({
+                    success: true,
+                    name: file.name,
+                    size: file.size,
+                    fileId: fileId, // 重点：返回这个ID
+                    preview: content.substring(0, 50) // 仅用于调试
+                });
+
             } catch (err) {
-                reject(err);
+                reject(new Error("文件存储失败: " + err.message));
             }
         };
 
@@ -6828,9 +6902,7 @@ ${content}
             reject(new Error("浏览器读取文件失败"));
         };
 
-        // 5. 开始读取 (作为文本读取)
-        // 注意：这只适用于 txt, md, json, js, html, 代码文件等文本格式
-        // 如果上传图片或 PDF，这里会读取成乱码，需要额外的库(如 pdf.js)处理
+        // 5. 开始作为文本读取
         reader.readAsText(file);
     });
 }
@@ -8584,72 +8656,94 @@ async function getSweetheartAiReply() {
 
     let userTextBuffer = []; // 用于收集和打包用户的文本消息
     // 遍历最近的消息，构建API请求
+    // ★★★ 必须使用 for...of 循环来支持 await 读取文件 ★★★
     for (const msg of recentMessages) {
-        if (msg.sender === 'user') {
-            // 当消息是用户发送时
-            if (msg.imageUrl && !msg.isProcessed) {
-                // 如果遇到未处理的图片，且缓冲区有文本，先发送文本
-                if (userTextBuffer.length > 0) {
-                    messages.push({role: 'user', content: userTextBuffer.join('\n')});
-                    userTextBuffer = []; // 清空缓冲区
-                }
-                // 然后发送图片
-                messages.push({
-                    role: 'user',
-                    content: [{type: 'image_url', image_url: {url: msg.imageUrl}}]
-                });
-                // 标记图片为“已处理”并立即保存
-                const msgIndex = contactSweetheartMessages.findIndex(m => m.timestamp === msg.timestamp);
-                if (msgIndex !== -1) {
-                    chatHistory[contactId][msgIndex].isProcessed = true;
-                }
-            } else if (msg.type === 'red-packet') {
-                userTextBuffer.push(`[用户发送了一个红包] 祝福语：${msg.content.greeting}，金额：${msg.content.amount}元`);
-            } else if (msg.text) {
-                userTextBuffer.push(String(msg.text)); // 将文本添加到缓冲区，强制转为字符串
-            }
-        } else { // AI 发送的消息
-            // 如果遇到AI回复，先冲刷用户文本缓冲区
+        const role = msg.sender === 'user' ? 'user' : 'assistant';
+        // === A. 处理文件消息 ===
+        if (msg.type === 'file' && msg.content && msg.content.fileId) {
+            // 先把之前的文本缓冲发出去
             if (userTextBuffer.length > 0) {
                 messages.push({role: 'user', content: userTextBuffer.join('\n')});
                 userTextBuffer = [];
             }
-            // 然后添加AI的消息
-            if (msg.type === 'location') {
-                // 将 location 消息作为 system 角色发送给AI，因为它描述的是场景而非对话
-                messages.push({
-                    role: 'system',
-                    content: `[场景变化] 你们来到了【${msg.locationName}】。描述：${msg.locationDesc}`
-                });
-            } else if (msg.type === 'red-packet') {
-                messages.push({
-                    role: 'assistant',
-                    content: `[我发送了一个红包] 祝福语：${msg.content.greeting}，金额：${msg.content.amount}元`
-                });
-            } else if (msg.text) {
-                // 移除 <render> 标签的内容，AI不需要看到这个，否则会误以为是普通文本
-                messages.push({
-                    role: 'assistant',
-                    content: String(msg.text).replace(/<render>[\s\S]*?<\/render>/g, '')
-                });
+
+            try {
+                // 异步读取内容
+                const fileContent = await ImageDB.getText(msg.content.fileId);
+                if (fileContent) {
+                    const filePrompt = `[用户上传文件: ${msg.content.name}]\n内容如下:\n"""\n${fileContent}\n"""\n(请根据文件内容进行互动)`;
+                    messages.push({ role: role, content: filePrompt });
+                } else {
+                    messages.push({ role: role, content: `[文件 ${msg.content.name} 内容已过期]` });
+                }
+            } catch (e) {
+                console.error('读取文件出错', e);
             }
         }
-        // 在这里，确保 msg.text 是纯文本，移除HTML标签
-        let cleanText = msg.text || '';
-        if (cleanText.includes('<') && cleanText.includes('>')) {
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = cleanText;
-            cleanText = tempDiv.textContent || tempDiv.innerText;
+        // === B. 处理红包消息 ===
+        else if (msg.type === 'red-packet') {
+            // 如果是普通文本，先存缓冲区
+            if (role === 'user') {
+                userTextBuffer.push(`[用户发送红包] 祝福语：${msg.content.greeting}，金额：${msg.content.amount}元`);
+            } else {
+                // 如果是AI发的，先清空用户缓冲，再推AI消息
+                if (userTextBuffer.length > 0) {
+                    messages.push({role: 'user', content: userTextBuffer.join('\n')});
+                    userTextBuffer = [];
+                }
+                messages.push({role: 'assistant', content: `[我发送红包] 祝福语：${msg.content.greeting}，金额：${msg.content.amount}元`});
+            }
+        }
+        // === C. 处理图片 ===
+        else if (msg.sender === 'user' && msg.imageUrl) {
+            // 处理未处理的图片（多模态）
+            if (!msg.isProcessed) {
+                if (userTextBuffer.length > 0) {
+                    messages.push({ role: "user", content: userTextBuffer.join('\n') });
+                    userTextBuffer = [];
+                }
+                messages.push({
+                    role: 'user',
+                    content: [{type: 'image_url', image_url: {url: msg.imageUrl}}]
+                });
+                // 更新已处理状态
+                msg.isProcessed = true;
+            }
+        }
+        // === D. 处理普通文本 / Location ===
+        else if (msg.text) {
+            let text = msg.text.replace(/<render>[\s\S]*?<\/render>/g, ''); // 去掉渲染代码
+
+            if (role === 'user') {
+                userTextBuffer.push(text);
+            } else {
+                // 遇到AI回复，先发用户缓冲
+                if (userTextBuffer.length > 0) {
+                    messages.push({role: 'user', content: userTextBuffer.join('\n')});
+                    userTextBuffer = [];
+                }
+                messages.push({role: 'assistant', content: text});
+            }
+        } else if (msg.type === 'location') {
+            // 地点提示作为 system 插入
+             if (userTextBuffer.length > 0) {
+                messages.push({role: 'user', content: userTextBuffer.join('\n')});
+                userTextBuffer = [];
+            }
+            messages.push({
+                role: 'system',
+                content: `[场景变化] 你们来到了【${msg.locationName}】。描述：${msg.locationDesc}`
+            });
         }
     }
-    // 循环结束后，冲刷最后剩余的用户文本
+
+    // 循环结束，发剩余文本
     if (userTextBuffer.length > 0) {
         messages.push({role: 'user', content: userTextBuffer.join('\n')});
+        // 记得更新本地存储（因为修改了 isProcessed）
+        localStorage.setItem('phoneSweetheartChatHistory', JSON.stringify(chatHistory));
     }
-
-    // 保存对 isProcessed 标志的修改（如果有）
-    localStorage.setItem('phoneSweetheartChatHistory', JSON.stringify(chatHistory));
-
+    //
     // --- 步骤 3: 处理当前输入框的新消息 ---
     const currentUserInput = chatInput.value.trim();
     if (currentUserInput) {
@@ -8686,8 +8780,9 @@ async function getSweetheartAiReply() {
         showErrorModal('API 响应错误', result.message);
     } else {
         // 1. 使用我们新的、更强大的解析器
-        const {chatReplyText, statusData} = parseAiJsonResponse(result.message);
-
+        const {chatReplyText, statusData} = currentChatMode === 'offline'
+            ? parseOfflineResponse(result)
+            : parseAiJsonResponse(result.message);
         // 2. 如果成功解析出 status 数据，就立即更新UI并保存
         if (statusData) {
             updateStatusPopup(statusData);
@@ -9305,10 +9400,10 @@ function cancelSweetheartQuote() {
     previewEl.classList.remove('show');
 }
 
-
 /**
  * [最终修复版] 初始化密友聊天输入框
- * - 使用 cloneNode 技巧移除旧的事件监听器，防止堆叠。
+ * 作用：只负责处理文本框的回车发送。
+ * 注意：文件上传逻辑已移至 setupSweetheartAttachmentMenu 中统一处理，此处已移除以防止冲突。
  */
 function setupSweetheartChatInput() {
     const chatInput = document.getElementById('sweetheartChatInput');
@@ -9319,78 +9414,34 @@ function setupSweetheartChatInput() {
         return;
     }
 
-    // ▼▼▼ 核心修复：克隆节点以移除所有旧事件 ▼▼▼
+    // 1. 克隆节点以移除旧的所有事件监听器 (防止重复绑定)
     const freshChatInput = chatInput.cloneNode(true);
     chatInput.parentNode.replaceChild(freshChatInput, chatInput);
-    // ▲▲▲ 修复结束 ▲▲▲
 
-    // 现在，我们在“干净”的新输入框上绑定事件
-    // 在 setupAttachmentMenu 函数内部...
-
-    // 6. 文件上传逻辑 (保持这部分，或者确认它是这样的)
-    fileInput.addEventListener('change', async (event) => {
-        const file = event.target.files[0];
-        if (!file) return;
-
-        // 显示用户发送的消息
-        const userMessageText = `📎 上传文件: ${file.name}`;
-        simulateSendingMessage(userMessageText);
-
-        // 显示思考中气泡
-        const messagesEl = document.getElementById('chatMessages');
-        const thinkingBubble = _createMessageDOM(currentChatContact.id, {
-            sender: 'contact',
-            text: '正在读取并分析文件...'
-        }, -1);
-        messagesEl.appendChild(thinkingBubble);
-        messagesEl.scrollTop = messagesEl.scrollHeight;
-
-        try {
-            // 这里会调用我们上面改写过的“本地读取”函数
-            const aiResponse = await uploadFileAndGetAiResponse(file);
-
-            thinkingBubble.remove(); // 移除思考中
-
-            // 保存并在界面显示 AI 的回复
-            const newIndex = saveMessage(currentChatContact.id, {
-                sender: 'contact',
-                text: aiResponse
-            });
-            const messageRow = _createMessageDOM(currentChatContact.id, {
-                sender: 'contact',
-                text: aiResponse
-            }, newIndex);
-            messagesEl.appendChild(messageRow);
-
-        } catch (error) {
-            thinkingBubble.remove();
-            // 错误处理
-            const errorText = `💔 分析失败: ${error.message}`;
-            const newIndex = saveMessage(currentChatContact.id, {
-                sender: 'contact',
-                text: errorText
-            });
-            const messageRow = _createMessageDOM(currentChatContact.id, {
-                sender: 'contact',
-                text: errorText
-            }, newIndex);
-            messagesEl.appendChild(messageRow);
-        } finally {
-            messagesEl.scrollTop = messagesEl.scrollHeight;
-            event.target.value = ''; // 清空 input，允许重复上传同名文件
+    // 2. 绑定 "输入时显示发送按钮" 的逻辑
+    freshChatInput.addEventListener('input', function () {
+        if (this.value.trim().length > 0) {
+            chatInputArea.classList.add('has-text');
+        } else {
+            chatInputArea.classList.remove('has-text');
         }
     });
 
-
+    // 3. 绑定 "回车发送" 逻辑
     freshChatInput.addEventListener('keypress', function (e) {
         if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            addSweetheartMessageToList();
+            e.preventDefault(); // 阻止默认换行
+            addSweetheartMessageToList(); // 发送文本消息
         }
     });
 
-    console.log('✅ 密友聊天输入框已初始化 (已清除旧事件)');
+    // 4. 确保输入框可用
+    freshChatInput.disabled = false;
+    freshChatInput.removeAttribute('readonly');
+
+    console.log('✅ 密友文本输入框已初始化 (已移除旧的文件自动发送逻辑)');
 }
+
 
 
 // ========== 世界书功能 - 开始 ==========
