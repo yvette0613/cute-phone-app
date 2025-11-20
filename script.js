@@ -54,62 +54,65 @@ const ImageDB = {
         if (this.db) return;
         return new Promise((resolve, reject) => {
             const request = indexedDB.open(this.dbName, 1);
-
             request.onupgradeneeded = (e) => {
                 const db = e.target.result;
-                // 创建一个仓库，用图片ID作为主键
                 if (!db.objectStoreNames.contains(this.storeName)) {
                     db.createObjectStore(this.storeName, {keyPath: 'id'});
                 }
             };
-
             request.onsuccess = (e) => {
                 this.db = e.target.result;
-                console.log("💾 本地图片数据库已就绪");
                 resolve();
             };
-
-            request.onerror = (e) => {
-                console.error("数据库打开失败", e);
-                reject(e);
-            };
-        });
-    },
-
-    // 保存图片，返回唯一的 ID
-    async save(file) {
-        await this.init();
-        // 1. 先压缩图片
-        const compressedData = await compressImage(file);
-
-        // 2. 生成唯一ID
-        const id = 'img_' + Date.now() + Math.random().toString(36).substr(2, 6);
-
-        // 3. 存入数据库
-        return new Promise((resolve, reject) => {
-            const transaction = this.db.transaction([this.storeName], 'readwrite');
-            const store = transaction.objectStore(this.storeName);
-            const request = store.add({id: id, data: compressedData});
-
-            request.onsuccess = () => resolve(id); // 成功后只返回 ID
             request.onerror = (e) => reject(e);
         });
     },
 
-    // 根据 ID 取出图片数据
+    // 图片保存 (保持不变)
+    async save(file) {
+        await this.init();
+        const compressedData = await compressImage(file);
+        const id = 'img_' + Date.now() + Math.random().toString(36).substr(2, 6);
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction([this.storeName], 'readwrite');
+            const store = transaction.objectStore(this.storeName);
+            const request = store.add({id: id, data: compressedData});
+            request.onsuccess = () => resolve(id);
+            request.onerror = (e) => reject(e);
+        });
+    },
+
+    // 图片读取 (保持不变)
     async get(id) {
         await this.init();
         return new Promise((resolve) => {
             const transaction = this.db.transaction([this.storeName], 'readonly');
             const store = transaction.objectStore(this.storeName);
             const request = store.get(id);
-
-            request.onsuccess = () => {
-                // 如果找得到就返回数据，找不到返回 null
-                resolve(request.result ? request.result.data : null);
-            };
+            request.onsuccess = () => resolve(request.result ? request.result.data : null);
             request.onerror = () => resolve(null);
         });
+    },
+
+    // ▼▼▼ 新增：保存文本内容 ▼▼▼
+    async saveText(content) {
+        await this.init();
+        // 生成唯一的文本ID
+        const id = 'txt_' + Date.now() + Math.random().toString(36).substr(2, 6);
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction([this.storeName], 'readwrite');
+            const store = transaction.objectStore(this.storeName);
+            // 直接存储文本字符串，不压缩
+            const request = store.add({id: id, data: content});
+            request.onsuccess = () => resolve(id);
+            request.onerror = (e) => reject(e);
+        });
+    },
+
+    // ▼▼▼ 新增：读取文本内容 ▼▼▼
+    async getText(id) {
+        // 其实逻辑和 get 一样，但为了语义清晰单独列出
+        return this.get(id);
     }
 };
 
@@ -5898,31 +5901,50 @@ async function getAiReply() {
     // 3. [核心改造] 智能处理聊天历史，识别图片
     const memoryRounds = currentChatContact.memoryRounds || 10;
     const recentHistory = chatHistory.slice(-(memoryRounds * 2));
-    recentHistory.forEach(msg => {
+    // 我们需要使用普通的 for 循环或 for...of 循环，以便使用 await
+    for (const msg of recentHistory) {
         const role = msg.sender === 'user' ? 'user' : 'assistant';
-        const textContent = msg.text || '';
-        // 使用正则表达式查找消息中的 base64 图片
-        const imgMatch = textContent.match(/<img src="(data:image\/[^;]+;base64,[^"]+)"[^>]*>/);
-        if (imgMatch && role === 'user') { // 只处理用户发送的图片
-            const imageUrl = imgMatch[1]; // 提取 Base64 数据
-            // 移除 img 标签，获取周围的文字
-            const surroundingText = textContent.replace(/<img[^>]*>/, '').replace(/<br>/g, '\n').trim();
-            // 构建符合 Vision API 的多部分 content 数组
-            const contentArray = [];
-            if (surroundingText) {
-                contentArray.push({type: 'text', text: surroundingText});
-            }
-            contentArray.push({
-                type: 'image_url',
-                image_url: {url: imageUrl}
-            });
 
-            messages.push({role, content: contentArray});
-        } else {
-            // 如果没有图片，或者消息是AI发的，则作为纯文本处理
-            messages.push({role, content: textContent.replace(/<br>/g, '\n')});
+        // === 情况 A: 文件消息 (新增) ===
+        if (msg.type === 'file' && msg.content && msg.content.fileId) {
+            // 1. 从 IndexedDB 获取文本内容
+            const fileContent = await ImageDB.getText(msg.content.fileId);
+
+            if (fileContent) {
+                // 2. 将文件内容包装成明确的 Prompt
+                const filePrompt = `
+[用户上传了一个文件]
+文件名: ${msg.content.name}
+文件内容开始:
+"""
+${fileContent}
+"""
+文件内容结束。
+`;
+                messages.push({role: role, content: filePrompt});
+            } else {
+                messages.push({role: role, content: `[系统提示: 文件 ${msg.content.name} 内容已过期或丢失]`});
+            }
         }
-    });
+        // === 情况 B: 图片消息 (保持不变) ===
+        else {
+            const textContent = msg.text || '';
+            const imgMatch = textContent.match(/<img src="(data:image\/[^;]+;base64,[^"]+)"[^>]*>/);
+
+            if (imgMatch && role === 'user') {
+                const imageUrl = imgMatch[1];
+                const surroundingText = textContent.replace(/<img[^>]*>/, '').replace(/<br>/g, '\n').trim();
+                const contentArray = [];
+                if (surroundingText) contentArray.push({type: 'text', text: surroundingText});
+                contentArray.push({type: 'image_url', image_url: {url: imageUrl}});
+                messages.push({role, content: contentArray});
+            } else {
+                // === 情况 C: 普通文本 ===
+                // 移除可能的 HTML 标签保留纯文本，或者保留格式
+                messages.push({role, content: textContent.replace(/<br>/g, '\n')});
+            }
+        }
+    }
     // 4. 处理当前输入框中可能存在的新消息 (这部分逻辑不变)
     const userMessage = chatInput.value.trim();
     if (userMessage) {
@@ -6562,54 +6584,68 @@ function setupAttachmentMenu() {
 
 
     // 6. 文件上传并获取AI分析的逻辑 (这部分功能保持不变)
+    // ... 在 setupAttachmentMenu 函数内部 ...
+
+    // 6. 文件选择监听 (完全修正版：只上屏，不调用API)
     fileInput.addEventListener('change', async (event) => {
         const file = event.target.files[0];
-        if (!file) return;
+        if (!file || !currentChatContact) return;
 
-        // ... 您原有的文件上传并获取AI分析的逻辑代码 ...
-        // 这部分逻辑是正确的，无需修改。
-        const userMessageText = `📎 文件已发送: ${file.name}`;
-        simulateSendingMessage(userMessageText);
-
-        const messagesEl = document.getElementById('chatMessages');
-        const thinkingBubble = _createMessageDOM(currentChatContact.id, {
-            sender: 'contact',
-            text: '正在读取和分析文件...'
-        }, -1);
-        messagesEl.appendChild(thinkingBubble);
-        messagesEl.scrollTop = messagesEl.scrollHeight;
+        // 限制大小 2MB
+        if (file.size > 2 * 1024 * 1024) {
+            alert("文件过大，请上传 2MB 以内的文本文件");
+            event.target.value = '';
+            return;
+        }
 
         try {
-            const aiResponse = await uploadFileAndGetAiResponse(file);
-            thinkingBubble.remove();
-            const newIndex = saveMessage(currentChatContact.id, {
-                sender: 'contact',
-                text: aiResponse
+            // A. 读取文件内容
+            const textContent = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve(e.target.result);
+                reader.onerror = (e) => reject(e);
+                reader.readAsText(file);
             });
-            const messageRow = _createMessageDOM(currentChatContact.id, {
-                sender: 'contact',
-                text: aiResponse
-            }, newIndex);
+
+            // B. 将内容存入 IndexedDB，获取 ID
+            const fileId = await ImageDB.saveText(textContent);
+
+            // C. 构造消息对象 (只存 ID 和元数据，不存大段内容)
+            const fileMessage = {
+                sender: 'user',
+                type: 'file',
+                content: {
+                    name: file.name,
+                    size: file.size,
+                    fileId: fileId // 关键：保存 ID 引用
+                },
+                timestamp: Date.now()
+            };
+
+            // D. 保存并渲染消息到界面
+            const messagesEl = document.getElementById('chatMessages');
+            const newIndex = saveMessage(currentChatContact.id, fileMessage);
+            const messageRow = _createMessageDOM(currentChatContact.id, fileMessage, newIndex);
             messagesEl.appendChild(messageRow);
-        } catch (error) {
-            thinkingBubble.remove();
-            const errorText = `处理文件失败: ${error.message}`;
-            const newIndex = saveMessage(currentChatContact.id, {
-                sender: 'contact',
-                text: errorText
-            });
-            const messageRow = _createMessageDOM(currentChatContact.id, {
-                sender: 'contact',
-                text: errorText
-            }, newIndex);
-            messageRow.querySelector('.chat-bubble').style.backgroundColor = '#ffebee';
-            messageRow.querySelector('.chat-bubble').style.color = '#c62828';
-            messagesEl.appendChild(messageRow);
-        } finally {
+
+            // 滚动到底部
             messagesEl.scrollTop = messagesEl.scrollHeight;
-            event.target.value = '';
+            renderContacts(contactsData);
+
+            // E. 重点：这里不需要 simulateSendingMessage，也不需要 callApi
+            // 此时 has-text 类应该被移除，露出“接收”按钮（如果输入框空的话）
+            document.querySelector('.chat-input-area').classList.remove('has-text');
+
+            console.log(`文件 ${file.name} 已暂存，ID: ${fileId}`);
+
+        } catch (error) {
+            console.error("文件读取失败", error);
+            alert("文件读取失败，请重试");
+        } finally {
+            event.target.value = ''; // 清空选择，允许重复上传
         }
     });
+
 
     // 7. 点击页面其他任何地方，自动关闭附件菜单 (保持不变)
     document.addEventListener('click', () => {
@@ -13355,6 +13391,7 @@ async function summarizeKnowledge() {
 
     const contactId = currentChatContact.id;
     const memoryRounds = currentChatContact.memoryRounds || 10;
+
 
     // 获取聊天历史
     const chatHistory = JSON.parse(localStorage.getItem('phoneChatHistory') || '{}');
