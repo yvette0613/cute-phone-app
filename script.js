@@ -6738,51 +6738,66 @@ function setupSweetheartAttachmentMenu() {
 
 
 /**
- * 【核心函数】上传文件到后端并等待AI响应
- * @param {File} file 用户选择的文件对象
- * @returns {Promise<string>} AI的回复文本
+ * 【修改版】本地读取文件内容，直接发送给AI进行分析
+ * 不需要后端服务器，直接在浏览器完成读取
  */
-async function uploadFileAndGetAiResponse(file) {
-    // 假设你的 Supabase Edge Function 地址是这个
-    // 你需要先创建这个 Function，见第2步
-    const functionUrl = `${globalConfig.database.supabaseUrl}/functions/v1/analyze-file`;
-    const supabaseKey = globalConfig.database.supabaseKey;
+function uploadFileAndGetAiResponse(file) {
+    return new Promise((resolve, reject) => {
+        // 1. 限制文件大小 (例如最大 2MB)
+        const maxSize = 2 * 1024 * 1024;
+        if (file.size > maxSize) {
+            reject(new Error("文件过大，请上传 2MB 以内的文本文件"));
+            return;
+        }
 
-    if (!functionUrl || !supabaseKey) {
-        throw new Error("Supabase 配置不完整，请在设置中检查 URL 和 Key。");
-    }
+        // 2. 创建文件读取器
+        const reader = new FileReader();
 
-    // 使用 FormData 来包装文件，适合文件上传
-    const formData = new FormData();
-    formData.append('file', file);
+        // 3. 读取成功的回调
+        reader.onload = async (e) => {
+            const content = e.target.result;
 
-    // 获取当前聊天记录作为上下文
-    const chatHistory = JSON.parse(localStorage.getItem('phoneChatHistory') || '{}');
-    const historyMessages = chatHistory[currentChatContact.id] || [];
+            // 构造提示词，把文件内容塞给 AI
+            const prompt = `我上传了一个文件，文件名为 "${file.name}"。
+            
+以下是文件内容：
+"""
+${content}
+"""
 
-    // 将历史记录和角色设定一起发送给后端
-    formData.append('chatHistory', JSON.stringify(historyMessages));
-    formData.append('persona', currentChatContact.status || '你是一个乐于助人的AI助手');
+请帮我分析这个文件的内容，并总结它的要点。`;
 
-    const response = await fetch(functionUrl, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${supabaseKey}`
-            // 注意：当使用 FormData 时，浏览器会自动设置 Content-Type，不要手动设置
-        },
-        body: formData
+            // 调用现有的 callApi 函数发送给 AI
+            // 注意：我们需要构造一个临时的 messages 数组
+            const messages = [
+                {role: 'system', content: '你是一个文件分析助手。'}, // 临时系统设定
+                {role: 'user', content: prompt}
+            ];
+
+            try {
+                // 调用 AI 接口
+                const result = await callApi(messages);
+                if (result.success) {
+                    resolve(result.message); // 返回 AI 的分析结果
+                } else {
+                    reject(new Error(result.message));
+                }
+            } catch (err) {
+                reject(err);
+            }
+        };
+
+        // 4. 读取失败的回调
+        reader.onerror = () => {
+            reject(new Error("浏览器读取文件失败"));
+        };
+
+        // 5. 开始读取 (作为文本读取)
+        // 注意：这只适用于 txt, md, json, js, html, 代码文件等文本格式
+        // 如果上传图片或 PDF，这里会读取成乱码，需要额外的库(如 pdf.js)处理
+        reader.readAsText(file);
     });
-
-    if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || '服务器返回错误');
-    }
-
-    const result = await response.json();
-    return result.reply;
 }
-
-/* ========== 结束：替换代码 ========== */
 
 
 // 创建一个辅助函数来模拟发送消息，避免代码重复
@@ -9274,14 +9289,62 @@ function setupSweetheartChatInput() {
     // ▲▲▲ 修复结束 ▲▲▲
 
     // 现在，我们在“干净”的新输入框上绑定事件
-    freshChatInput.addEventListener('input', function () {
-        if (this.value.trim().length > 0) {
-            chatInputArea.classList.add('has-text');
-        } else {
-            chatInputArea.classList.remove('has-text');
+    // 在 setupAttachmentMenu 函数内部...
+
+    // 6. 文件上传逻辑 (保持这部分，或者确认它是这样的)
+    fileInput.addEventListener('change', async (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        // 显示用户发送的消息
+        const userMessageText = `📎 上传文件: ${file.name}`;
+        simulateSendingMessage(userMessageText);
+
+        // 显示思考中气泡
+        const messagesEl = document.getElementById('chatMessages');
+        const thinkingBubble = _createMessageDOM(currentChatContact.id, {
+            sender: 'contact',
+            text: '正在读取并分析文件...'
+        }, -1);
+        messagesEl.appendChild(thinkingBubble);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+
+        try {
+            // 这里会调用我们上面改写过的“本地读取”函数
+            const aiResponse = await uploadFileAndGetAiResponse(file);
+
+            thinkingBubble.remove(); // 移除思考中
+
+            // 保存并在界面显示 AI 的回复
+            const newIndex = saveMessage(currentChatContact.id, {
+                sender: 'contact',
+                text: aiResponse
+            });
+            const messageRow = _createMessageDOM(currentChatContact.id, {
+                sender: 'contact',
+                text: aiResponse
+            }, newIndex);
+            messagesEl.appendChild(messageRow);
+
+        } catch (error) {
+            thinkingBubble.remove();
+            // 错误处理
+            const errorText = `💔 分析失败: ${error.message}`;
+            const newIndex = saveMessage(currentChatContact.id, {
+                sender: 'contact',
+                text: errorText
+            });
+            const messageRow = _createMessageDOM(currentChatContact.id, {
+                sender: 'contact',
+                text: errorText
+            }, newIndex);
+            messagesEl.appendChild(messageRow);
+        } finally {
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+            event.target.value = ''; // 清空 input，允许重复上传同名文件
         }
-        updateSweetheartChatInputAreaButtons(); // 调用更新按钮状态
     });
+
 
     freshChatInput.addEventListener('keypress', function (e) {
         if (e.key === 'Enter' && !e.shiftKey) {
