@@ -5947,44 +5947,74 @@ async function getAiReply() {
     // 3. 【核心逻辑修改】处理历史记录（包含文件读取）
     const memoryRounds = currentChatContact.memoryRounds || 10;
     const recentHistory = chatHistory.slice(-(memoryRounds * 2));
+        // ---------------------------------------------------------------------
+    // [修改版] 普通聊天构建历史记录 (需替换的部分)
+    // ---------------------------------------------------------------------
+
     // ★★★ 必须使用 for...of 循环来支持 await ★★★
     for (const msg of recentHistory) {
         const role = msg.sender === 'user' ? 'user' : 'assistant';
-        // === 情况 A: 文件消息 (去数据库读内容) ===
+
+        // === 情况 A: 文件消息 ===
         if (msg.type === 'file' && msg.content && msg.content.fileId) {
            try {
-                // 从 IndexedDB 异步获取文本内容
                 const fileContent = await ImageDB.getText(msg.content.fileId);
                 if (fileContent) {
-                    // 把文件内容包装成一段提示词发给AI
                     const filePrompt = `[用户上传文件: ${msg.content.name}]\n内容如下:\n"""\n${fileContent}\n"""\n(请根据文件内容回答)`;
                     messages.push({ role: role, content: filePrompt });
                 } else {
                     messages.push({ role: role, content: `[系统提示: 文件 ${msg.content.name} 内容已过期或丢失]` });
                 }
-           } catch (err) {
-               console.error("读取文件内容出错", err);
-           }
+           } catch (err) { console.error("读取文件内容出错", err); }
         }
-        // === 情况 B: 图片消息 (保持不变) ===
+        // === 情况 B: 图片消息 (普通聊天通常把图片包在HTML里) ===
         else {
             const textContent = msg.text || '';
-            const imgMatch = textContent.match(/<img src="(data:image\/[^;]+;base64,[^"]+)"[^>]*>/);
+
+            // 1. 尝试匹配图片标签
+            // 正则解释：匹配 <img src="(任意内容)" ...>
+            const imgMatch = textContent.match(/<img src="([^"]+)"[^>]*>/);
 
             if (imgMatch && role === 'user') {
-                const imageUrl = imgMatch[1];
-                const surroundingText = textContent.replace(/<img[^>]*>/, '').replace(/<br>/g, '\n').trim();
-                const contentArray = [];
-                if (surroundingText) contentArray.push({type: 'text', text: surroundingText});
-                contentArray.push({type: 'image_url', image_url: {url: imageUrl}});
-                messages.push({role, content: contentArray});
+                let imageUrl = imgMatch[1]; // 获取 src 属性
+
+                // 2. 如果是数据库占位符，还原成 Base64
+                if (imageUrl.startsWith('db-image://')) {
+                    const imageId = imageUrl.split('db-image://')[1];
+                    try {
+                        const base64Entry = await ImageDB.get(imageId);
+                        if (base64Entry) {
+                            imageUrl = base64Entry;
+                        } else {
+                            imageUrl = null; // 图片丢失
+                        }
+                    } catch (e) {
+                        console.error("图取失败", e);
+                        imageUrl = null;
+                    }
+                }
+
+                const surroundingText = textContent
+                    .replace(/<img[^>]*>/, '') // 移除图片标签保留文字
+                    .replace(/<br>/g, '\n').trim();
+
+                if (imageUrl) {
+                    const contentArray = [];
+                    if (surroundingText) contentArray.push({type: 'text', text: surroundingText});
+                    contentArray.push({type: 'image_url', image_url: {url: imageUrl}});
+                    messages.push({role, content: contentArray});
+                } else {
+                    // 图片加载失败，只发文字
+                    messages.push({role, content: surroundingText || '[图片已失效]'});
+                }
             } else {
                 // === 情况 C: 普通文本 ===
-                // 移除可能的 HTML 标签保留纯文本，或者保留格式
                 messages.push({role, content: textContent.replace(/<br>/g, '\n')});
             }
         }
     }
+    // ---------------------------------------------------------------------
+
     // 4. 处理当前输入框中可能存在的新消息 (这部分逻辑不变)
     const userMessage = chatInput.value.trim();
     if (userMessage) {
@@ -8655,20 +8685,22 @@ async function getSweetheartAiReply() {
     const recentMessages = contactSweetheartMessages.slice(-(memoryRounds * 2));
 
     let userTextBuffer = []; // 用于收集和打包用户的文本消息
-    // 遍历最近的消息，构建API请求
-    // ★★★ 必须使用 for...of 循环来支持 await 读取文件 ★★★
+        // ---------------------------------------------------------------------
+    // [修改版] 遍历最近消息，构建API请求 (需替换的部分)
+    // ---------------------------------------------------------------------
+
+    // ★★★ 必须使用 for...of 循环来支持 await ★★★
     for (const msg of recentMessages) {
         const role = msg.sender === 'user' ? 'user' : 'assistant';
-        // === A. 处理文件消息 ===
+
+        // === A. 处理文件消息 (读取IndexedDB文本) ===
         if (msg.type === 'file' && msg.content && msg.content.fileId) {
             // 先把之前的文本缓冲发出去
             if (userTextBuffer.length > 0) {
                 messages.push({role: 'user', content: userTextBuffer.join('\n')});
                 userTextBuffer = [];
             }
-
             try {
-                // 异步读取内容
                 const fileContent = await ImageDB.getText(msg.content.fileId);
                 if (fileContent) {
                     const filePrompt = `[用户上传文件: ${msg.content.name}]\n内容如下:\n"""\n${fileContent}\n"""\n(请根据文件内容进行互动)`;
@@ -8676,17 +8708,13 @@ async function getSweetheartAiReply() {
                 } else {
                     messages.push({ role: role, content: `[文件 ${msg.content.name} 内容已过期]` });
                 }
-            } catch (e) {
-                console.error('读取文件出错', e);
-            }
+            } catch (e) { console.error('读取文件出错', e); }
         }
         // === B. 处理红包消息 ===
         else if (msg.type === 'red-packet') {
-            // 如果是普通文本，先存缓冲区
             if (role === 'user') {
                 userTextBuffer.push(`[用户发送红包] 祝福语：${msg.content.greeting}，金额：${msg.content.amount}元`);
             } else {
-                // 如果是AI发的，先清空用户缓冲，再推AI消息
                 if (userTextBuffer.length > 0) {
                     messages.push({role: 'user', content: userTextBuffer.join('\n')});
                     userTextBuffer = [];
@@ -8694,38 +8722,76 @@ async function getSweetheartAiReply() {
                 messages.push({role: 'assistant', content: `[我发送红包] 祝福语：${msg.content.greeting}，金额：${msg.content.amount}元`});
             }
         }
-        // === C. 处理图片 ===
+        // === C. 处理图片 (✅ 核心修复：支持 db-image 转换) ===
         else if (msg.sender === 'user' && msg.imageUrl) {
-            // 处理未处理的图片（多模态）
+            // 如果是未处理的图片（IsProcessed=false），或者你希望AI能看到最近几轮的图片
+            // 为了节省Tokens，通常我们只发一次。这里逻辑是：如果没处理过，就发送给AI看。
             if (!msg.isProcessed) {
                 if (userTextBuffer.length > 0) {
                     messages.push({ role: "user", content: userTextBuffer.join('\n') });
                     userTextBuffer = [];
                 }
-                messages.push({
-                    role: 'user',
-                    content: [{type: 'image_url', image_url: {url: msg.imageUrl}}]
-                });
-                // 更新已处理状态
-                msg.isProcessed = true;
+
+                // 1. 获取真实图片数据
+                let realBase64 = null;
+                if (msg.imageUrl.startsWith('db-image://')) {
+                    const imgId = msg.imageUrl.split('db-image://')[1];
+                    try {
+                        realBase64 = await ImageDB.get(imgId);
+                    } catch (e) { console.error('图读取失败', e); }
+                } else {
+                    // 兼容旧数据（直接存Base64的情况）
+                    realBase64 = msg.imageUrl;
+                }
+
+                // 2. 只有读到了图，才发给AI
+                if (realBase64) {
+                    messages.push({
+                        role: 'user',
+                        content: [
+                            { type: 'text', text: currentUserInput || '分析一下这张图片。' },
+                            { type: 'image_url', image_url: { url: realBase64 } }
+                        ]
+                    });
+                    // 标记为已处理，避免下次重复分析（更新本地存储）
+                    msg.isProcessed = true;
+
+                    // 注意：这一步会导致 saveSweetheartMessage 没被调用，因为我们直接改了对象引用
+                    // 在循环结束后，我们需要手动保存一下 array 更新状态
+                    const fullHistory = JSON.parse(localStorage.getItem('phoneSweetheartChatHistory') || '{}');
+                    if (fullHistory[contactId]) {
+                        // 找到对应消息更新
+                        const targetMsg = fullHistory[contactId].find(m => m.timestamp === msg.timestamp);
+                        if (targetMsg) targetMsg.isProcessed = true;
+                        localStorage.setItem('phoneSweetheartChatHistory', JSON.stringify(fullHistory));
+                    }
+                } else {
+                    // 图片丢失的情况
+                    messages.push({ role: 'user', content: '[图片数据丢失]' });
+                }
+            } else {
+                // 如果已经处理过（AI看过了），我们只在历史记录里留一个[图片]占位符，节省Token
+                // 或者如果可以承受，你可以选择每次都发图。目前策略是发文本占位。
+                userTextBuffer.push('[用户发送了一张图片]');
             }
         }
         // === D. 处理普通文本 / Location ===
         else if (msg.text) {
-            let text = msg.text.replace(/<render>[\s\S]*?<\/render>/g, ''); // 去掉渲染代码
+            let text = msg.text.replace(/<render>[\s\S]*?<\/render>/g, '');
+            // 过滤掉 HTML <img> 标签，防止把很长的 HTML 发给 AI
+            if (text.includes('<img')) text = '[图片]';
 
             if (role === 'user') {
                 userTextBuffer.push(text);
             } else {
-                // 遇到AI回复，先发用户缓冲
                 if (userTextBuffer.length > 0) {
                     messages.push({role: 'user', content: userTextBuffer.join('\n')});
                     userTextBuffer = [];
                 }
                 messages.push({role: 'assistant', content: text});
             }
-        } else if (msg.type === 'location') {
-            // 地点提示作为 system 插入
+        }
+        else if (msg.type === 'location') {
              if (userTextBuffer.length > 0) {
                 messages.push({role: 'user', content: userTextBuffer.join('\n')});
                 userTextBuffer = [];
@@ -8736,6 +8802,8 @@ async function getSweetheartAiReply() {
             });
         }
     }
+    // ---------------------------------------------------------------------
+
 
     // 循环结束，发剩余文本
     if (userTextBuffer.length > 0) {
