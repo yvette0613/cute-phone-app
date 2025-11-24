@@ -5955,6 +5955,22 @@ async function getAiReply() {
     for (const msg of recentHistory) {
         const role = msg.sender === 'user' ? 'user' : 'assistant';
 
+        // 🔥🔥🔥 新增：处理引用信息 🔥🔥🔥
+        let finalContentText = msg.text || '';
+
+        // 如果这条消息包含引用
+        if (msg.quote) {
+            let quotedContent = msg.quote.text;
+            // 如果引用的是图片，转换文字说明
+            if (quotedContent.includes('<img') || quotedContent.includes('db-image')) {
+                quotedContent = '[图片]';
+            }
+            // 将引用格式化并拼接到消息前面
+            // 格式：[引用了 SenderName 的消息: "内容"]
+            const quoteBlock = `\n[引用了 ${msg.quote.senderName} 的消息: "${quotedContent}"]\n`;
+            finalContentText = quoteBlock + finalContentText;
+        }
+        // 🔥🔥🔥 新增结束 🔥🔥🔥
         // === 情况 A: 文件消息 ===
         if (msg.type === 'file' && msg.content && msg.content.fileId) {
            try {
@@ -6018,6 +6034,16 @@ async function getAiReply() {
     // 4. 处理当前输入框中可能存在的新消息 (这部分逻辑不变)
     const userMessage = chatInput.value.trim();
     if (userMessage) {
+        // 🔥🔥🔥 这里也要处理当前这步的引用 🔥🔥🔥
+        let currentMsgContent = userMessage;
+        if (currentQuoteData) {
+             let quotedContent = currentQuoteData.text;
+             if (quotedContent.includes('<img') || quotedContent.includes('db-image')) {
+                quotedContent = '[图片]';
+            }
+            currentMsgContent = `[引用了 ${currentQuoteData.senderName} 的消息: "${quotedContent}"]\n${userMessage}`;
+        }
+        // 🔥🔥🔥 处理结束 🔥🔥🔥
         simulateSendingMessage(userMessage);
         messages.push({role: 'user', content: userMessage});
         chatInput.value = '';
@@ -8692,7 +8718,17 @@ async function getSweetheartAiReply() {
     // ★★★ 必须使用 for...of 循环来支持 await ★★★
     for (const msg of recentMessages) {
         const role = msg.sender === 'user' ? 'user' : 'assistant';
-
+        // 🔥🔥🔥 新增：处理引用信息 (密友版) 🔥🔥🔥
+        let quotePrefix = '';
+        if (msg.quote) {
+            let quotedContent = msg.quote.text;
+            if (quotedContent.includes('<img') || quotedContent.includes('db-image')) {
+                quotedContent = '[图片]';
+            }
+            // 构造提示词，告诉AI这是引用的内容
+            quotePrefix = `\n[引用了 ${msg.quote.senderName} 的消息: "${quotedContent}"]\n`;
+        }
+        // 🔥🔥🔥 新增结束 🔥🔥🔥
         // === A. 处理文件消息 (读取IndexedDB文本) ===
         if (msg.type === 'file' && msg.content && msg.content.fileId) {
             // 先把之前的文本缓冲发出去
@@ -8780,7 +8816,8 @@ async function getSweetheartAiReply() {
             let text = msg.text.replace(/<render>[\s\S]*?<\/render>/g, '');
             // 过滤掉 HTML <img> 标签，防止把很长的 HTML 发给 AI
             if (text.includes('<img')) text = '[图片]';
-
+            // 🔥 将引用前缀加到文本前 🔥
+            text = quotePrefix + text;
             if (role === 'user') {
                 userTextBuffer.push(text);
             } else {
@@ -8811,20 +8848,35 @@ async function getSweetheartAiReply() {
         // 记得更新本地存储（因为修改了 isProcessed）
         localStorage.setItem('phoneSweetheartChatHistory', JSON.stringify(chatHistory));
     }
-    //
-    // --- 步骤 3: 处理当前输入框的新消息 ---
+    // --- 步骤 3: 处理当前输入框的新消息 (也要加引用) ---
     const currentUserInput = chatInput.value.trim();
-    if (currentUserInput) {
+    if (currentUserInput || currentSweetheartQuoteData) { // 修改条件
         // 先在UI上渲染出来
-        const messageObj = {sender: 'user', text: currentUserInput};
-        const newIndex = saveSweetheartMessage(contactId, messageObj);
-        const messageRow = _createMessageDOM(contactId, messageObj, newIndex);
+        const messagePayload = { sender: 'user', text: currentUserInput};
+        if (currentSweetheartQuoteData) messagePayload.quote = currentSweetheartQuoteData; // 保存引用到本地
+        const newIndex = saveSweetheartMessage(contactId, messagePayload);
+        const messageRow = _createMessageDOM(contactId, messagePayload, newIndex);
         messagesEl.appendChild(messageRow);
-        chatInput.value = ''; // 清空输入框
-        document.querySelector('.sweetheart-chat-input-area').classList.remove('has-text'); // 移除 has-text 类
+
+        chatInput.value = '';
+        document.querySelector('.sweetheart-chat-input-area').classList.remove('has-text');
+
+        // 🔥🔥🔥 构造发给AI的文本 🔥🔥🔥
+        let aiInputText = currentUserInput;
+        if (currentSweetheartQuoteData) {
+             let quotedContent = currentSweetheartQuoteData.text;
+             if (quotedContent.includes('<img') || quotedContent.includes('db-image')) {
+                quotedContent = '[图片]';
+            }
+            aiInputText = `[引用了 ${currentSweetheartQuoteData.senderName} 的消息: "${quotedContent}"]\n${currentUserInput}`;
+        }
 
         // 再添加到API请求的末尾
-        messages.push({role: 'user', content: currentUserInput});
+        // 如果刚才userTextBuffer没发完，或者刚刚发完，这里直接push一个新的user消息
+        messages.push({role: 'user', content: aiInputText});
+
+        // 清理引用状态
+        cancelSweetheartQuote();
     }
 
     // --- 步骤 4: 检查并调用API ---
