@@ -6917,30 +6917,34 @@ body.code-scrolling-enabled .code-block-wrapper {
 
 /* style.css (修正后的代码) */
 
-/* 新的、更灵活的规则 */
+/* 1. 渲染气泡容器：移除固定高度，改为 auto */
 .render-bubble {
     padding: 0;
-    overflow: hidden; /* 继续隐藏溢出，防止调整大小时内容露出 */
+    overflow: hidden;
     background: #fff;
-    width: 300px; /* 保持默认宽度 */
+    width: 300px; /* 宽度保持 */
 
-    /* 移除固定的 height 属性！这是最关键的一步。 */
-    /* height: 250px; */
+    /* 🔥 关键修改：移除 height: 250px 或其他固定高度 */
+    height: auto !important;
+    min-height: 100px; /* 设置最小高度防止塌陷 */
+    max-height: none !important; /* 移除最大高度限制 */
 
-    resize: both; /* 保持允许用户手动调整大小的功能，这很棒！ */
-    min-width: 200px;
-    min-height: 150px; /* 保留最小高度，避免内容太少时塌陷 */
-    max-height: 60vh; /* 新增最大高度，防止内容过长撑满整个屏幕 (60%的视口高度) */
-    display: flex; /* 新增：让内部的 iframe 能更好地填充 */
+    display: flex;
+    flex-direction: column;
+    transition: height 0.2s ease; /*这也让高度变化更丝滑*/
+
+    /* 移除 resize: both，因为自适应高度时手动调整会冲突，或者保留横向调整 */
+    /* resize: horizontal; */
 }
 
 
-/* 2. iframe样式，用于显示渲染结果 */
+/* 2. iframe 样式：确保它是块级元素 */
 .render-iframe {
     width: 100%;
-    height: 100%;
-    border: none; /* 移除iframe默认边框 */
-    display: block; /* 确保是块级元素 */
+    /* height: 100%;  <-- 删除这个，由 JS 动态控制内联样式 */
+    border: none;
+    display: block;
+    overflow: hidden; /* 隐藏 iframe 内部滚动条 */
 }
 
 /* 3. 在密友聊天界面，给渲染气泡一个可爱的边框 */
@@ -10276,46 +10280,6 @@ body.code-scrolling-enabled .code-block-wrapper {
     overflow: hidden;   /* 确保箭头不会超出轨道 */
 }
 
-/*!* 3. 重新定义 disclosure-arrow 的样式，让它成为一个进度点 *!*/
-/*.voice-message-bubble .disclosure-arrow {*/
-/*    position: absolute; !* 绝对定位，脱离文档流 *!*/
-/*    top: 50%;           !* 垂直居中 *!*/
-/*    left: 2%;           !* 初始位置在最左边 *!*/
-/*    width: 10px;        !* 指示点的大小 *!*/
-/*    height: 10px;*/
-/*    background-color: white; !* 默认颜色 *!*/
-/*    border-radius: 50%;*/
-/*    transform: translate(-50%, -50%); !* 精确居中 *!*/
-/*    z-index: 10;*/
-/*    pointer-events: none;*/
-/*    box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);*/
-/*    !* 关键：默认不播放动画 *!*/
-/*    animation: none;*/
-/*}*/
-
-/*!* AI接收到的消息，箭头颜色更深 *!*/
-/*.message-row.received .disclosure-arrow {*/
-/*    background-color: #555;*/
-/*}*/
-
-/*!* 在密友聊天中，我方发送的消息，箭头使用主题粉色 *!*/
-/*.sweetheart-chat-page .message-row.sent .disclosure-arrow {*/
-/*    background-color: #FFFAFA;*/
-/*}*/
-/*!* 在密友聊天中，对方发送的消息，箭头使用主题棕色 *!*/
-/*.sweetheart-chat-page .message-row.received .disclosure-arrow {*/
-/*    background-color: #8D6E63;*/
-/*}*/
-
-
-/*!* 4. 当语音条处于播放状态时，应用动画 *!*/
-/*.voice-message-bubble.is-playing .disclosure-arrow {*/
-/*    !* JS会动态设置 animation-duration *!*/
-/*    animation-name: disclosureArrowSlide;*/
-/*    animation-play-state: running;*/
-/*    animation-timing-function: linear; !* 必须是线性，保证匀速 *!*/
-/*    animation-fill-mode: forwards; !* 动画结束后停在最后一帧 *!*/
-/*}*/
 
 /* 同时，让进度条填充也动起来 */
 .voice-progress-fill {
@@ -10404,4 +10368,26 @@ body.code-scrolling-enabled .code-block-wrapper {
 
 .voice-play-icon:not(.loading) {
     pointer-events: auto !important;
+}
+
+/* ========== 密友聊天输入框按钮切换逻辑 (修复版) ========== */
+
+/* 1. 默认状态 (输入框无字) */
+/* 隐藏发送按钮 (爱心) */
+#sweetheartSendMsgBtn {
+    display: none !important;
+}
+/* 显示接收按钮 (星星/信封) */
+#sweetheartGetReplyBtn {
+    display: flex !important;
+}
+
+/* 2. 输入状态 (输入框有字，父容器有 .has-text 类) */
+/* 显示发送按钮 */
+.sweetheart-chat-input-area.has-text #sweetheartSendMsgBtn {
+    display: flex !important;
+}
+/* 隐藏接收按钮 */
+.sweetheart-chat-input-area.has-text #sweetheartGetReplyBtn {
+    display: none !important;
 }

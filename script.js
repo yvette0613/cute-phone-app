@@ -923,31 +923,25 @@ function updateSweetheartReplyModeUI(mode) {
     }
 }
 
-
+/**
+ * [修正版] 更新密友聊天输入区按钮状态
+ * 现在只负责根据输入框内容切换 class，不再手动干预 style.display
+ */
 function updateSweetheartChatInputAreaButtons() {
     const chatInputArea = document.querySelector('.sweetheart-chat-input-area');
-    const sendMsgBtn = document.getElementById('sweetheartSendMsgBtn');
-    const getReplyBtn = document.getElementById('sweetheartGetReplyBtn');
+    const inputEl = document.getElementById('sweetheartChatInput');
 
-    if (!chatInputArea || !sendMsgBtn || !getReplyBtn) return;
+    if (!chatInputArea || !inputEl) return;
 
-    if (globalConfig.sweetheartReplyMode === 'single') {
-        // 单信息模式：隐藏回复按钮，发送按钮可见
-        getReplyBtn.style.display = 'none';
-        sendMsgBtn.style.display = 'flex'; // 确保发送按钮可见，但它的点击行为待会修改
+    // 纯粹根据是否有字来决定是否添加类名
+    // 具体的显示/隐藏逻辑全部交给 CSS 处理
+    if (inputEl.value.trim().length > 0) {
+        chatInputArea.classList.add('has-text');
     } else {
-        // 多信息模式：回复按钮可见，发送按钮可见
-        getReplyBtn.style.display = 'flex'; // 确保回复按钮可见
-        sendMsgBtn.style.display = 'flex'; // 发送按钮也可见
-    }
-    // 确保发送按钮和回复按钮的初始显示状态取决于输入框是否有文本，覆盖上面的规则
-    // 只有当输入框文本为空时，回复按钮才显示，如果非空，发送按钮显示
-    if (document.getElementById('sweetheartChatInput').value.trim().length > 0) {
-        chatInputArea.classList.add('has-text'); // 显示发送按钮
-    } else {
-        chatInputArea.classList.remove('has-text'); // 显示回复按钮
+        chatInputArea.classList.remove('has-text');
     }
 }
+
 
 // 调用：在 initializeApp() 和 `openSweetheartChat()` 的末尾调用 ``
 
@@ -1807,15 +1801,68 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
     // 使用更健壮的正则表达式来匹配 <render> 标签，处理多行和各种非<字符
 
     const renderMatch = text.match(/<render>([\s\S]*?)<\/render>/);
-
     if (renderMatch && renderMatch[1]) {
         bubble.classList.add('render-bubble');
         const iframe = document.createElement('iframe');
         iframe.className = 'render-iframe';
-        iframe.sandbox = 'allow-scripts allow-forms allow-pointer-lock allow-popups allow-same-origin allow-top-navigation-by-user-activation';
-        const secureSrcDoc = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>body{margin:0;padding:10px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;box-sizing:border-box;}*{box-sizing:border-box;}</style></head><body>${renderMatch[1]}</body></html>`;
+        // 允许脚本执行
+        iframe.sandbox = 'allow-scripts allow-forms allow-pointer-lock allow-popups allow-same-origin';
+
+        // 🔥 关键修改：注入自动计算高度的 ResizeObserver 脚本
+        // 这里的 CSS 保证 body 没有 margin，防止计算误差
+        const autoResizeScript = `
+            <script>
+                function reportHeight() {
+                    // 获取内容的确切高度
+                    const height = document.body.scrollHeight;
+                    // 发送消息给父窗口
+                    window.parent.postMessage({
+                        type: 'iframe-resize',
+                        height: height
+                    }, '*');
+                }
+                // 监听内容变化
+                const observer = new ResizeObserver(reportHeight);
+                observer.observe(document.body);
+                
+                // 图片加载完成后再次汇报，防止图片未加载导致高度错误
+                window.addEventListener('load', reportHeight);
+                // 每次点击也检查一次（处理交互式展开内容）
+                window.addEventListener('click', () => setTimeout(reportHeight, 100));
+            </script>
+        `;
+        const secureSrcDoc = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <style>
+                    body { 
+                        margin: 0; 
+                        padding: 10px; /* 给内部留一点呼吸空间 */
+                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
+                        box-sizing: border-box;
+                        overflow: hidden; /* 隐藏滚动条 */
+                        width: 100%;
+                        height: auto;
+                    }
+                    * { box-sizing: border-box; }
+                    /* 针对图片的优化 */
+                    img { max-width: 100%; height: auto; }
+                </style>
+            </head>
+            <body>
+                ${renderMatch[1]}
+                ${autoResizeScript}
+            </body>
+            </html>
+        `;
+
         iframe.srcdoc = secureSrcDoc;
         bubble.appendChild(iframe);
+
+        // 事件捕获层保持不变
         const eventCaptureLayer = document.createElement('div');
         eventCaptureLayer.className = 'iframe-event-capture-layer';
         bubble.appendChild(eventCaptureLayer);
@@ -9522,17 +9569,12 @@ function cancelSweetheartQuote() {
 
 /**
  * [最终修复版] 初始化密友聊天输入框
- * 作用：只负责处理文本框的回车发送。
- * 注意：文件上传逻辑已移至 setupSweetheartAttachmentMenu 中统一处理，此处已移除以防止冲突。
  */
 function setupSweetheartChatInput() {
     const chatInput = document.getElementById('sweetheartChatInput');
     const chatInputArea = document.querySelector('.sweetheart-chat-input-area');
 
-    if (!chatInput || !chatInputArea) {
-        console.error('❌ 密友聊天输入框元素未找到');
-        return;
-    }
+    if (!chatInput || !chatInputArea) return;
 
     // 1. 克隆节点以移除旧的所有事件监听器 (防止重复绑定)
     const freshChatInput = chatInput.cloneNode(true);
@@ -9540,11 +9582,7 @@ function setupSweetheartChatInput() {
 
     // 2. 绑定 "输入时显示发送按钮" 的逻辑
     freshChatInput.addEventListener('input', function () {
-        if (this.value.trim().length > 0) {
-            chatInputArea.classList.add('has-text');
-        } else {
-            chatInputArea.classList.remove('has-text');
-        }
+        updateSweetheartChatInputAreaButtons();
     });
 
     // 3. 绑定 "回车发送" 逻辑
@@ -9555,11 +9593,12 @@ function setupSweetheartChatInput() {
         }
     });
 
-    // 4. 确保输入框可用
+    // 4. 初始化一次状态
+    updateSweetheartChatInputAreaButtons();
+
+    // 确保输入框可用
     freshChatInput.disabled = false;
     freshChatInput.removeAttribute('readonly');
-
-    console.log('✅ 密友文本输入框已初始化 (已移除旧的文件自动发送逻辑)');
 }
 
 
@@ -13922,10 +13961,15 @@ function closeTestReady() {
 }
 
 // ========== 开始测试 ==========
+// ========== 开始测试 (修复版) ==========
 function startTest() {
     closeTestReady();
 
-    // 渲染测试页面
+    // 1. 🔥 核心修复：先显示页面！
+    // 必须先给页面添加 .show 类，否则 updateTimer 函数会检测到页面未显示而自动杀死计时器
+    document.getElementById('testPage').classList.add('show');
+
+    // 2. 渲染测试页面内容
     const testContent = document.getElementById('testContent');
     testContent.innerHTML = '';
 
@@ -13974,17 +14018,13 @@ function startTest() {
         testContent.appendChild(questionDiv);
     });
 
-    // 开始计时
+    // 3. 开始计时 (现在页面已经显示了，计时器可以安全启动)
     testData.startTime = Date.now();
     if (timerInterval) {
         clearInterval(timerInterval);
     }
     timerInterval = setInterval(updateTimer, 1000); // 每秒更新一次
     updateTimer(); // 立即更新一次
-
-
-    // 显示测试页面
-    document.getElementById('testPage').classList.add('show');
 }
 
 // ========== 选择选项 ==========
@@ -14970,6 +15010,32 @@ function applyImportedData(data) {
 
 
 function initializeApp() {
+    // ▼▼▼ 新增：监听 iframe 高度调整消息 ▼▼▼
+    window.addEventListener('message', function(event) {
+        // 安全检查：确保消息类型正确
+        if (event.data && event.data.type === 'iframe-resize') {
+            const newHeight = event.data.height;
+
+            // 在所有渲染的 iframe 中找到发送消息的那一个
+            const iframes = document.querySelectorAll('.render-iframe');
+            for (let iframe of iframes) {
+                // iframe.contentWindow 就是消息源 event.source
+                if (iframe.contentWindow === event.source) {
+                    // 加上一点缓冲像素(20px)，防止出现滚动条
+                    const finalHeight = (newHeight + 20) + 'px';
+
+                    // 设置 iframe 高度
+                    iframe.style.height = finalHeight;
+
+                    // 同时也设置父容器 bubble 的高度（如果 CSS 设置了 flex，这一步可能自动完成，但显式设置更保险）
+                    if (iframe.parentElement) {
+                        iframe.parentElement.style.height = finalHeight;
+                    }
+                    break; // 找到后退出循环
+                }
+            }
+        }
+    });
     // ▼▼▼ 在这里粘贴全局错误处理代码 ▼▼▼
     window.addEventListener('error', (event) => {
         console.error('捕获到未处理的全局错误:', event.error);
