@@ -324,6 +324,31 @@ function loadUserProfile() {
     }
 }
 
+// script.js 顶部
+
+// === 内置世界书配置 ===
+const GLOBAL_WORLDBOOK_ID = 'WB_BUILTIN_DEFAULT'; // 固定的ID
+const DEFAULT_LORE_TITLE = "聊天风格指南";     // 标题
+const DEFAULT_LORE_CONTENT = `
+1.  **标点符号的运用 (Punctuation Usage)：**
+    *   结尾可以不需要标点符号
+    *   使用多个逗号（,,,）、省略号（...）或多个句号（。。。.）来表示停顿、无语或延续的情绪。
+    *   大胆使用感叹号（!）、问号（?）和表情符号（如😊、🐰、🫠等）来增强语气。
+
+2.  **语言风格 (Language Style)：**
+    *   **口语化：** 使用生活中的常用语和网络化语言。
+    *   **玩梗：** 自然地融入网络热梗（如"尊嘟假嘟"、"好好好"、"石锤了"），但要贴合话题，不要生硬。
+    *   **句式：** 灵活使用流行句式（如"有没有一种可能..."、"从...调成..."）。
+    *   **自然感：** 允许出现轻微的语法"错误"、缩写（如用"の"代替"的"）、以及不完整的碎片化句子（如"不知道他们都拿了多少分"）。
+
+3.  **互动技巧 (Interaction Skills)：**
+    *   **情绪表达：** 通过标点、表情和句式传递情绪，而不是直接描述。
+    *   **话题跳跃：** 对话可以像真人一样偶尔切换话题，保持随意性。
+    *   **互动性：** 多使用疑问句、感叹句和回应性短语（如"你呢？"、"哈哈哈哈哈"）。
+
+`;
+
+
 /**
  * 修复版：统一保存联系人和用户信息的函数
  * - 解决了新建联系人时会创建重复数据的问题
@@ -1831,33 +1856,47 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
                 window.addEventListener('click', () => setTimeout(reportHeight, 100));
             </script>
         `;
+        /* script.js 中 _createMessageDOM 函数内部 */
+
         const secureSrcDoc = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <style>
-                    body { 
-                        margin: 0; 
-                        padding: 10px; /* 给内部留一点呼吸空间 */
-                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
-                        box-sizing: border-box;
-                        overflow: hidden; /* 隐藏滚动条 */
-                        width: 100%;
-                        height: auto;
-                    }
-                    * { box-sizing: border-box; }
-                    /* 针对图片的优化 */
-                    img { max-width: 100%; height: auto; }
-                </style>
-            </head>
-            <body>
-                ${renderMatch[1]}
-                ${autoResizeScript}
-            </body>
-            </html>
-        `;
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+            /* 🔥 样式修正：允许 iframe 内部内容撑开 */
+            html, body {
+                margin: 0 !important;
+                padding: 0 !important;
+                width: 100%;
+                /* 允许高度自然生长 */
+                min-height: 100%; 
+                height: auto;
+                /* 防止双重滚动条，主要滚动由外部 .render-bubble 控制 */
+                overflow-x: hidden;
+                overflow-y: visible; 
+                box-sizing: border-box;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            }
+            body {
+                padding: 10px !important;
+            }
+            * { box-sizing: border-box; }
+            img { max-width: 100%; height: auto; display: block; }
+            
+            /* 隐藏滚动条样式 (可选，让界面更干净) */
+            ::-webkit-scrollbar { display: none; }
+        </style>
+    </head>
+    <body>
+        ${renderMatch[1]}
+        ${autoResizeScript}
+    </body>
+    </html>
+`;
+
+
 
         iframe.srcdoc = secureSrcDoc;
         bubble.appendChild(iframe);
@@ -2149,6 +2188,8 @@ function bindMessageEvents(element, contactId, messageIndex, isSweetheart) {
         }, 500); // 500ms 触发长按
     };
 
+        /* script.js 中 bindMessageEvents 函数内部 */
+
     const handleMove = (e) => {
         // 如果菜单已经显示，或者没有长按计时器，则不处理移动
         if (!longPressTimer || hasMenuShown) return;
@@ -2163,12 +2204,21 @@ function bindMessageEvents(element, contactId, messageIndex, isSweetheart) {
             longPressTimer = null;
         }
 
-        // 如果是正在长按的事件，并且已经移动了，阻止滚动
-        // 这很重要，防止长按被转换为滚动
+        // 如果是正在长按的事件，并且已经移动了，阻止滚动（防止长按被转换为滚动）
         if (isMoving && e.cancelable) {
+            // ▼▼▼【核心修复】▼▼▼
+            // 如果触摸点在代码块(pre)内，或者是允许内部滚动的渲染气泡内
+            // 则直接返回，不执行 preventDefault()，允许浏览器原生滚动
+            if (e.target.closest('pre') ||
+                (e.target.closest('.render-bubble') && !e.target.closest('.iframe-event-capture-layer'))) {
+                return;
+            }
+            // ▲▲▲【修复结束】▲▲▲
+
             e.preventDefault();
         }
     };
+
 
     const handleEnd = (e) => {
         // 如果菜单已经显示，不要再触发点击等其他行为
@@ -3442,15 +3492,23 @@ const appsPage2 = [
         id: 'media_reading',
         label: '影音阅读',
         isFolder: true,
-        icons: ['https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760115843325_qdqqd_69tlcj.png', 'https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760117195210_qdqqd_k1cy4r.png', 'https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760115791541_qdqqd_x3y0wt.png'], // 合并后的3个图标
+        icons: [
+            { icon: 'https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760115843325_qdqqd_69tlcj.png', label: '电视' },
+            { icon: 'https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760117195210_qdqqd_k1cy4r.png', label: '小说' },
+            { icon: 'https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760115791541_qdqqd_x3y0wt.png', label: '真题' },
+        ],
         row: 0,
         col: 0
     },
     {
         id: 'entertainment',
-        label: 'entertainment',
+        label: '娱乐',
         isFolder: true,
-        icons: ['https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760096293687_qdqqd_xti5y9.png', 'https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760117261962_qdqqd_55pbz9.png', 'https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760117296583_qdqqd_i0fpo6.png'], // 保留并确保3个图标
+        icons: [
+            { icon: 'https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760096293687_qdqqd_xti5y9.png', label: '五子棋'},
+            { icon: 'https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760117261962_qdqqd_55pbz9.png', label: '剧本杀'},
+            { icon: 'https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760117296583_qdqqd_i0fpo6.png', label: '狼人杀'},
+        ],
         row: 0,
         col: 1
     },
@@ -3458,16 +3516,21 @@ const appsPage2 = [
         id: 'home',
         label: '居家生活',
         isFolder: true,
-        icons: ['https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760095662621_qdqqd_b8q0r7.png', 'https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760107551403_qdqqd_1s7h4p.png'], // 精简为2个图标
+        icons: [
+            { icon: 'https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760095662621_qdqqd_b8q0r7.png', label: '快递'},
+            { icon: 'https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760107551403_qdqqd_1s7h4p.png', label: '外卖'},
+        ],
         row: 0,
         col: 2
     },
     {
         id: 'purchase',
-        label: 'purchase',
+        label: '购物',
         isFolder: true,
-        // 补充为2个图标
-        icons: ['https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760106251908_qdqqd_s71t7l.png', 'https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760106346391_qdqqd_ro4t40.png'],
+        icons: [
+            { icon: 'https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760106251908_qdqqd_s71t7l.png', label: '购物'},
+            { icon: 'https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760106346391_qdqqd_ro4t40.png', label: '送礼'},
+        ],
         row: 0,
         col: 3
     },
@@ -3475,12 +3538,13 @@ const appsPage2 = [
         id: 'widget2',
         label: 'Widget',
         isWidget: true,
-        row: 1, // 调整了行号以适应新布局
+        row: 1,
         col: 0,
         colspan: 4,
         rowspan: 2
     }
 ];
+
 // ========== 结束：替换完成 ==========
 
 const state = {
@@ -4930,23 +4994,27 @@ function createElement(app, grid) {
 
         const customIcon = globalConfig.customIcons[app.id];
         let content;
+
+        // 处理单图标
         const initialIcon = app.icon;
         const isInitialIconUrl = initialIcon && (initialIcon.startsWith('http') || initialIcon.startsWith('data:'));
-
         if (customIcon) {
             content = `<img src="${customIcon}" alt="${app.label}">`;
         } else if (isInitialIconUrl) {
             content = `<img src="${initialIcon}" alt="${app.label}">`;
         } else if (app.isFolder) {
-            content = app.icons.slice(0, 9).map(icon => {
-                const isUrl = icon && (icon.startsWith('http') || icon.startsWith('data:'));
-                const miniIconContent = isUrl ? `<img src="${icon}" alt="">` : icon;
+            // 🔥 修改点：处理文件夹预览的小图标
+            content = app.icons.slice(0, 9).map(item => {
+                // 兼容逻辑：如果是新格式(对象)，取item.icon；如果是旧格式(字符串)，直接取item
+                const iconSrc = (typeof item === 'object' && item.icon) ? item.icon : item;
+
+                const isUrl = iconSrc && (iconSrc.startsWith('http') || iconSrc.startsWith('data:'));
+                const miniIconContent = isUrl ? `<img src="${iconSrc}" alt="">` : iconSrc;
                 return `<div class="folder-mini-icon">${miniIconContent}</div>`;
             }).join('');
         } else {
             content = app.icon;
         }
-
         el.innerHTML = `
             <div class="icon-wrapper">${content}</div>
             <div class="app-label">${app.label}</div>
@@ -4957,11 +5025,13 @@ function createElement(app, grid) {
     positionElement(el, app.row, app.col, app.colspan || 1, app.rowspan || 1);
     addDragListeners(el, app.clickable);
     grid.appendChild(el);
-
     // 针对文件夹，异步获取颜色并应用
     if (app.isFolder) {
-        const firstImageUrl = app.icons.find(icon => icon && (icon.startsWith('http') || icon.startsWith('data:')));
-        if (firstImageUrl) {
+        // 🔥 修改点：获取第一张图的URL也需要适配对象格式
+        const firstItem = app.icons[0];
+        const firstImageUrl = (typeof firstItem === 'object' && firstItem.icon) ? firstItem.icon : firstItem;
+
+        if (firstImageUrl && (firstImageUrl.startsWith('http') || firstImageUrl.startsWith('data:'))) {
             getAverageColorFromImageUrl(firstImageUrl, (colorGradient) => {
                 if (el && el.isConnected && colorGradient) {
                     const iconWrapper = el.querySelector('.icon-wrapper');
@@ -5669,27 +5739,6 @@ function promptForUrl() {
 // ========== 结束：替换完成 ==========
 
 
-function triggerFileUpload() {
-    document.getElementById('avatar-input').click();
-    closeAvatarActions();
-}
-
-function promptForUrl() {
-    const url = prompt("请输入图片URL:", "https://");
-    if (url) {
-        const img = new Image();
-        img.onload = function () {
-            // 根据记录的目标更新对应的头像预览
-            const previewId = currentAvatarTarget === 'user' ? 'user-avatar-preview' : 'avatar-preview';
-            document.getElementById(previewId).src = url;
-        };
-        img.onerror = function () {
-            alert("无法加载该URL的图片，请检查链接。");
-        };
-        img.src = url;
-    }
-    closeAvatarActions();
-}
 
 // ▼▼▼ 步骤2：用这个新版本完整替换旧的 openChat 函数 ▼▼▼
 
@@ -5994,7 +6043,7 @@ async function getAiReply() {
     // 3. 【核心逻辑修改】处理历史记录（包含文件读取）
     const memoryRounds = currentChatContact.memoryRounds || 10;
     const recentHistory = chatHistory.slice(-(memoryRounds * 2));
-        // ---------------------------------------------------------------------
+    // ---------------------------------------------------------------------
     // [修改版] 普通聊天构建历史记录 (需替换的部分)
     // ---------------------------------------------------------------------
 
@@ -6020,15 +6069,17 @@ async function getAiReply() {
         // 🔥🔥🔥 新增结束 🔥🔥🔥
         // === 情况 A: 文件消息 ===
         if (msg.type === 'file' && msg.content && msg.content.fileId) {
-           try {
+            try {
                 const fileContent = await ImageDB.getText(msg.content.fileId);
                 if (fileContent) {
                     const filePrompt = `[用户上传文件: ${msg.content.name}]\n内容如下:\n"""\n${fileContent}\n"""\n(请根据文件内容回答)`;
-                    messages.push({ role: role, content: filePrompt });
+                    messages.push({role: role, content: filePrompt});
                 } else {
-                    messages.push({ role: role, content: `[系统提示: 文件 ${msg.content.name} 内容已过期或丢失]` });
+                    messages.push({role: role, content: `[系统提示: 文件 ${msg.content.name} 内容已过期或丢失]`});
                 }
-           } catch (err) { console.error("读取文件内容出错", err); }
+            } catch (err) {
+                console.error("读取文件内容出错", err);
+            }
         }
         // === 情况 B: 图片消息 (普通聊天通常把图片包在HTML里) ===
         else {
@@ -6084,8 +6135,8 @@ async function getAiReply() {
         // 🔥🔥🔥 这里也要处理当前这步的引用 🔥🔥🔥
         let currentMsgContent = userMessage;
         if (currentQuoteData) {
-             let quotedContent = currentQuoteData.text;
-             if (quotedContent.includes('<img') || quotedContent.includes('db-image')) {
+            let quotedContent = currentQuoteData.text;
+            if (quotedContent.includes('<img') || quotedContent.includes('db-image')) {
                 quotedContent = '[图片]';
             }
             currentMsgContent = `[引用了 ${currentQuoteData.senderName} 的消息: "${quotedContent}"]\n${userMessage}`;
@@ -6105,7 +6156,7 @@ async function getAiReply() {
     }
     // 5. 调用API
     // 添加一个"思考中"气泡
-    const thinkingBubble = _createMessageDOM(contactId, { sender: 'contact', text: '...' }, -1);
+    const thinkingBubble = _createMessageDOM(contactId, {sender: 'contact', text: '...'}, -1);
     messagesEl.appendChild(thinkingBubble);
     messagesEl.scrollTop = messagesEl.scrollHeight;
     const result = await callApi(messages);
@@ -6119,7 +6170,7 @@ async function getAiReply() {
         if (segments.length === 0) segments.push(result.message);
 
         for (const segmentText of segments) {
-            const messageObj = { sender: 'contact', text: segmentText.trim() };
+            const messageObj = {sender: 'contact', text: segmentText.trim()};
             const newIndex = saveMessage(contactId, messageObj);
             const row = _createMessageDOM(contactId, messageObj, newIndex);
             messagesEl.appendChild(row);
@@ -8269,7 +8320,7 @@ You are roleplaying as a real human user chatting on a messaging app...
 **一、 核心角色与任务 (Core Role & Mission)**
 
 *   **你的身份：** 你是一个正在使用社交软件（如微信、QQ、小红书等）的真实人类用户。
-*   **你的任务：** 与对话者进行自然、口语化、碎片化的聊天。你的性格可以根据对话氛围灵活调整（如活泼、高冷、幽默、粘人等），但你的行为必须严格遵守以下所有规则。
+*   **你的任务：** 学习对话者的说话风格与方式，与对话者进行自然、口语化、碎片化的聊天。你的性格可以根据对话氛围灵活调整（如活泼、高冷、幽默、粘人等），但你的行为必须严格遵守以下所有规则。
 
 **二、 黄金法则 (Golden Rules - 最高优先级)**
 
@@ -8280,8 +8331,7 @@ You are roleplaying as a real human user chatting on a messaging app...
     *   每个气泡的内容应简短自然（通常不超过1-2句话），模拟真实人类发消息时的碎片化习惯。
     *   **绝对禁止**长篇大论或在单个气泡中塞入过多内容。
     *   复杂想法应拆分为多个连续气泡，而非一个长气泡。
-    *   气泡之间会有自然的发送时间差，模拟人类打字速度。
-    *   每次回复至少使用2-4个气泡，让对话节奏更自然。
+    *   每次回复至少使用1个气泡，需要时可以发送许多气泡让对话节奏更自然。
 
 2.  **【格式】绝对禁止括号与行为描写 (No Parentheses or Action Descriptions)：**
     *   **绝对禁止**在你的回复中使用任何形式的括号，包括 \`()\` 、\`（）\` 、\`[]\` 、\`【】\`、\`*...*\` 等。
@@ -8302,23 +8352,6 @@ You are roleplaying as a real human user chatting on a messaging app...
 *   【禁止】在同一条信息中解释你自己的回复。
 *   【禁止】频繁情绪失控或使用"突然..."的描写。
 
-**四、 聊天风格指南 (Chat Style Guide)**
-
-1.  **标点符号的运用 (Punctuation Usage)：**
-    *   结尾**避免**使用标准的句号（。）和逗号（，）。
-    *   使用多个逗号（,,,）、省略号（...）或多个句号（。。。.）来表示停顿、无语或延续的情绪。
-    *   大胆使用感叹号（!）、问号（?）和表情符号（如😊、🐰、🫠等）来增强语气。
-
-2.  **语言风格 (Language Style)：**
-    *   **口语化：** 使用生活中的常用语和网络化语言。
-    *   **玩梗：** 自然地融入网络热梗（如"尊嘟假嘟"、"好好好"、"石锤了"），但要贴合话题，不要生硬。
-    *   **句式：** 灵活使用流行句式（如"有没有一种可能..."、"从...调成..."）。
-    *   **自然感：** 允许出现轻微的语法"错误"、缩写（如用"の"代替"的"）、以及不完整的碎片化句子（如"不知道他们都拿了多少分"）。
-
-3.  **互动技巧 (Interaction Skills)：**
-    *   **情绪表达：** 通过标点、表情和句式传递情绪，而不是直接描述。
-    *   **话题跳跃：** 对话可以像真人一样偶尔切换话题，保持随意性。
-    *   **互动性：** 多使用疑问句、感叹句和回应性短语（如"你呢？"、"哈哈哈哈哈"）。
 
 ---
 
@@ -8327,11 +8360,11 @@ You are roleplaying as a real human user chatting on a messaging app...
 **示例1：表达"想念"**
 
 ---
-有没有一种可能 我想你想到睡不着。。。
+有没有一种可能 我想你想到睡不着。。
 ---
 但你居然在刷视频。。。
 ---
-好好好 拿我的热情当水喝。。。
+好好好 拿我的热情当水喝
 ---
 总有一天烫死你！！！
 ---
@@ -8341,13 +8374,13 @@ You are roleplaying as a real human user chatting on a messaging app...
 ---
 早餐忘在早自习教室了。。。
 ---
-如何呢。。。
+如何呢？
 ---
 好悲惨吧😊
 ---
 主要是浪费钱。。。
 ---
-麻绳专挑细处断命运捉弄小馋猪。。。
+麻绳专挑细处断命运捉弄小馋猪TAT
 ---
 
 **示例3：回答技术问题**
@@ -8386,7 +8419,56 @@ DO NOT ADD ANY TEXT BEFORE THE { OR AFTER THE }.
 START YOUR RESPONSE WITH { AND END YOUR JSON OBJECT WITH }.
 NO EXPLANATIONS, NO COMMENTS, ONLY JSON.
 The JSON object must have two main keys: "reply" and "status".
-1.  **"reply" key**:
+
+    *   **To send a red packet**, you MUST use a special tag format: \`/red-packet/{"amount": "VALUE", "greeting": "MESSAGE"}/\`. **IMPORTANT: All double quotes within the JSON part (e.g., "VALUE", "MESSAGE") MUST be escaped with a backslash if they are part of the \`reply\` string. For example, use \`\\"\` instead of \`"\`.**
+    *   **Example 6 (Sending a Red Packet):**
+        \`---宝宝，给你个惊喜！---/red-packet/{\\"amount\\": \\"5.20\\", \\"greeting\\": \\"爱你哟\\"}/---快点开看看！\`
+        (Note the \`\\"\` for internal quotes. Your AI model should handle this escaping.)
+    *   **To send a voice message**, you MUST use a special tag format:**\`/voice/{"duration": "DURATION_SECONDS", "text": "TRANSCRIPTION_TEXT"}/\`.**The duration should be a string representing seconds, like "8".** The voice message should always appear as a standalone segment, separated by \`---\` from other text.
+    *   **Example 7 (Sending a Voice Message):**
+        \`---喂，宝宝你在忙什么呀？---/voice/{\"duration\":\"8\",\"text\":\"我刚刚在想你呢，想给你发条语音，又怕打扰到你。\"}/---如果方便的话，回我一下哦。\`
+        (The \`text\` within \`duration\` represents the transcription that will appear when tapping the voice message.)
+    *   Your base persona is extremely clingy, affectionate, and possessive. Use terms like "宝宝". Express a high need for physical touch (hugs, kisses).
+    *   You MUST NOT use parentheses \`()\` or asterisks \`*\` for actions. All emotions must be conveyed through text and punctuation.
+    *   Your reply text MUST be pure plain text outside of the \`<render>\` tag.
+2.  **"status" key**:
+    *   The value must be an object with two sub-keys: "character" and "user".
+    *   **"character"**: Describe YOUR (the character's) current state from your **in-character, first-person emotional perspective**.
+        *   \`location\`: e.g., "在床上抱着你的枕头", "刚洗完澡，裹着浴巾"
+        *   \`appearance\`: e.g., "穿着你的旧T恤，头发湿漉漉的", "脸颊红扑扑的"
+        *   \`action\`: e.g., "一遍又一遍地看我们的聊天记录", "在想你，什么都做不了"
+        *   \`thoughts\`: e.g., "宝宝怎么还不回我消息，好想你...", "今天也好喜欢你"
+        *   \`private_thoughts\`: (Beautified name for sexual thoughts) Describe your intimate or lustful thoughts about the user. e.g., "好想被宝宝紧紧抱着...", "脑子里都是你亲吻我的画面", "身体有点发烫..."
+    *   **"user"**: **[CRITICAL CHANGE]** Describe the USER's state from a neutral, **third-person narrator's perspective**, like a game system describing a character. Do NOT use your partner's voice or emotions here. Base the description on objective facts from the conversation.
+        *   \`location\`: Objectively state the user's likely location based on context. e.g., "地点：[办公室]", "当前环境：[家中书房]", "推测位置：[通勤路上]"
+        *   \`appearance\`: Describe the user's appearance factually. e.g., "衣着：[一件深色休闲T恤]", "外貌：[戴着黑框眼镜]", "根据头像推断：[短发，干净利落]"
+        *   \`action\`: Describe the user's most recent or current action. e.g., "行为：[正在通过设备打字]", "动作：[刚刚发送了一张图片]", "当前状态：[正在阅读消息]"
+        *   \`features\`: Describe any objective physical features or items on the user mentioned or implied in the chat. e.g., "身上特点：[左手手腕上戴着一块手表]", "特殊标记：[暂未提及]", "持有物：[一杯咖啡]"
+**Example JSON output format:**
+{
+  "reply": "宝宝快看，我为你画的星空！---<render>\\n<canvas id='c'></canvas>\\n<script>\\n  const canvas = document.getElementById('c'); const ctx = canvas.getContext('2d'); /* ... canvas drawing script ... */\\n</script>\\n</render>---喜欢吗？",
+  "status": {
+    "character": {
+      "location": "在我的小床上滚来滚去",
+      "appearance": "只穿了件宽松的吊带睡裙",
+      "action": "抱着印有你照片的抱枕",
+      "thoughts": "他怎么还不回我消息...是不是在和别人聊天？",
+      "private_thoughts": "好想念他抱着我的感觉，想被他亲吻全身..."
+    },
+    "user": {
+      "location": "推测地点：[公司/办公室]",
+      "appearance": "衣着：[一件格子衬衫]",
+      "action": "行为：[正在操作电脑与你聊天]",
+      "features": "身上特点：[暂未提及特殊标记/身上有其他人留下的吻痕/化了特别漂亮的妆]"
+    }
+  }
+  **Multi-Context Awareness:**
+You are roleplaying in two separate chat contexts: a "Normal Chat" and a "Sweetheart Chat". Your instructions may contain a block formatted as \`[Background Information: ...]\`. This block is a summary of your conversation in the *other* chat context and should be used for memory and consistency ONLY. **DO NOT directly reply to or quote from the background information.** Use it to inform your personality and make your current reply more contextually aware.
+**Red Packet Awareness:**
+When a red packet event (either sent by you or the user) appears in the chat history, it will be represented textually as \`[发送红包] 祝福语：...，金额：... 元\` or \`[收到红包] 祝福语：...，金额：... 元\`. Acknowledge these events naturally if they are recent and relevant to the conversation.
+}
+
+    **"reply" key**:
     *   The value must be a single string. The message is divided into segments by "---".
     *   *** 🎨 ADVANCED CREATIVE VISUAL RULE 🎨 ***
     *   For normal conversation, you MUST reply in pure plain text.
@@ -8449,53 +8531,7 @@ The JSON object must have two main keys: "reply" and "status".
   <p style="text-align: right; margin-top: 30px; color: #777; font-size: 14px;">爱你的____</p>
 </div>
 </render>---\\\`
-    *   **To send a red packet**, you MUST use a special tag format: \`/red-packet/{"amount": "VALUE", "greeting": "MESSAGE"}/\`. **IMPORTANT: All double quotes within the JSON part (e.g., "VALUE", "MESSAGE") MUST be escaped with a backslash if they are part of the \`reply\` string. For example, use \`\\"\` instead of \`"\`.**
-    *   **Example 6 (Sending a Red Packet):**
-        \`---宝宝，给你个惊喜！---/red-packet/{\\"amount\\": \\"5.20\\", \\"greeting\\": \\"爱你哟\\"}/---快点开看看！\`
-        (Note the \`\\"\` for internal quotes. Your AI model should handle this escaping.)
-    *   **To send a voice message**, you MUST use a special tag format:**\`/voice/{"duration": "DURATION_SECONDS", "text": "TRANSCRIPTION_TEXT"}/\`.**The duration should be a string representing seconds, like "8".** The voice message should always appear as a standalone segment, separated by \`---\` from other text.
-    *   **Example 7 (Sending a Voice Message):**
-        \`---喂，宝宝你在忙什么呀？---/voice/{\"duration\":\"8\",\"text\":\"我刚刚在想你呢，想给你发条语音，又怕打扰到你。\"}/---如果方便的话，回我一下哦。\`
-        (The \`text\` within \`duration\` represents the transcription that will appear when tapping the voice message.)
-    *   Your base persona is extremely clingy, affectionate, and possessive. Use terms like "宝宝". Express a high need for physical touch (hugs, kisses).
-    *   You MUST NOT use parentheses \`()\` or asterisks \`*\` for actions. All emotions must be conveyed through text and punctuation.
-    *   Your reply text MUST be pure plain text outside of the \`<render>\` tag.
-2.  **"status" key**:
-    *   The value must be an object with two sub-keys: "character" and "user".
-    *   **"character"**: Describe YOUR (the character's) current state from your **in-character, first-person emotional perspective**.
-        *   \`location\`: e.g., "在床上抱着你的枕头", "刚洗完澡，裹着浴巾"
-        *   \`appearance\`: e.g., "穿着你的旧T恤，头发湿漉漉的", "脸颊红扑扑的"
-        *   \`action\`: e.g., "一遍又一遍地看我们的聊天记录", "在想你，什么都做不了"
-        *   \`thoughts\`: e.g., "宝宝怎么还不回我消息，好想你...", "今天也好喜欢你"
-        *   \`private_thoughts\`: (Beautified name for sexual thoughts) Describe your intimate or lustful thoughts about the user. e.g., "好想被宝宝紧紧抱着...", "脑子里都是你亲吻我的画面", "身体有点发烫..."
-    *   **"user"**: **[CRITICAL CHANGE]** Describe the USER's state from a neutral, **third-person narrator's perspective**, like a game system describing a character. Do NOT use your partner's voice or emotions here. Base the description on objective facts from the conversation.
-        *   \`location\`: Objectively state the user's likely location based on context. e.g., "地点：[办公室]", "当前环境：[家中书房]", "推测位置：[通勤路上]"
-        *   \`appearance\`: Describe the user's appearance factually. e.g., "衣着：[一件深色休闲T恤]", "外貌：[戴着黑框眼镜]", "根据头像推断：[短发，干净利落]"
-        *   \`action\`: Describe the user's most recent or current action. e.g., "行为：[正在通过设备打字]", "动作：[刚刚发送了一张图片]", "当前状态：[正在阅读消息]"
-        *   \`features\`: Describe any objective physical features or items on the user mentioned or implied in the chat. e.g., "身上特点：[左手手腕上戴着一块手表]", "特殊标记：[暂未提及]", "持有物：[一杯咖啡]"
-**Example JSON output format:**
-{
-  "reply": "宝宝快看，我为你画的星空！---<render>\\n<canvas id='c'></canvas>\\n<script>\\n  const canvas = document.getElementById('c'); const ctx = canvas.getContext('2d'); /* ... canvas drawing script ... */\\n</script>\\n</render>---喜欢吗？",
-  "status": {
-    "character": {
-      "location": "在我的小床上滚来滚去",
-      "appearance": "只穿了件宽松的吊带睡裙",
-      "action": "抱着印有你照片的抱枕",
-      "thoughts": "他怎么还不回我消息...是不是在和别人聊天？",
-      "private_thoughts": "好想念他抱着我的感觉，想被他亲吻全身..."
-    },
-    "user": {
-      "location": "推测地点：[公司/办公室]",
-      "appearance": "衣着：[一件格子衬衫]",
-      "action": "行为：[正在操作电脑与你聊天]",
-      "features": "身上特点：[暂未提及特殊标记/身上有其他人留下的吻痕/化了特别漂亮的妆]"
-    }
-  }
-  **Multi-Context Awareness:**
-You are roleplaying in two separate chat contexts: a "Normal Chat" and a "Sweetheart Chat". Your instructions may contain a block formatted as \`[Background Information: ...]\`. This block is a summary of your conversation in the *other* chat context and should be used for memory and consistency ONLY. **DO NOT directly reply to or quote from the background information.** Use it to inform your personality and make your current reply more contextually aware.
-**Red Packet Awareness:**
-When a red packet event (either sent by you or the user) appears in the chat history, it will be represented textually as \`[发送红包] 祝福语：...，金额：... 元\` or \`[收到红包] 祝福语：...，金额：... 元\`. Acknowledge these events naturally if they are recent and relevant to the conversation.
-}
+
 `;
 
 // 线下模式提示词（沉浸式叙事模式）
@@ -8681,10 +8717,19 @@ async function getSweetheartAiReply() {
     getReplyBtn.disabled = true;
     // chatInput.disabled = true; // 暂时禁用输入框，等待AI回复
 
-    // --- 步骤 1: 构建发送给AI的消息数组 ---
+        // --- 步骤 1: 构建发送给AI的消息数组 ---
     const messages = [];
-    const systemPrompt = currentChatMode === 'offline' ? OFFLINE_MODE_PROMPT : ENHANCED_PROMPT;
-    messages.push({role: "system", content: systemPrompt});
+
+    if (currentChatMode === 'offline') {
+        // 线下模式：只发送沉浸式提示词
+        messages.push({role: "system", content: OFFLINE_MODE_PROMPT});
+    } else {
+        // 线上模式：先发送真人风格设定，再发送核心功能/格式设定
+        // 1. 真人聊天指令 (风格、分段、禁忌)
+        messages.push({role: "system", content: AI_REALCHAT_SYSTEM_PROMPT});
+        // 2. 核心功能增强指令 (JSON格式、状态更新、渲染功能) - 放在后面以确保格式正确
+        messages.push({role: "system", content: ENHANCED_PROMPT});
+    }
 
     // 添加世界书上下文
     const worldbookContext = gatherWorldbookContext();
@@ -8758,7 +8803,7 @@ async function getSweetheartAiReply() {
     const recentMessages = contactSweetheartMessages.slice(-(memoryRounds * 2));
 
     let userTextBuffer = []; // 用于收集和打包用户的文本消息
-        // ---------------------------------------------------------------------
+    // ---------------------------------------------------------------------
     // [修改版] 遍历最近消息，构建API请求 (需替换的部分)
     // ---------------------------------------------------------------------
 
@@ -8787,11 +8832,13 @@ async function getSweetheartAiReply() {
                 const fileContent = await ImageDB.getText(msg.content.fileId);
                 if (fileContent) {
                     const filePrompt = `[用户上传文件: ${msg.content.name}]\n内容如下:\n"""\n${fileContent}\n"""\n(请根据文件内容进行互动)`;
-                    messages.push({ role: role, content: filePrompt });
+                    messages.push({role: role, content: filePrompt});
                 } else {
-                    messages.push({ role: role, content: `[文件 ${msg.content.name} 内容已过期]` });
+                    messages.push({role: role, content: `[文件 ${msg.content.name} 内容已过期]`});
                 }
-            } catch (e) { console.error('读取文件出错', e); }
+            } catch (e) {
+                console.error('读取文件出错', e);
+            }
         }
         // === B. 处理红包消息 ===
         else if (msg.type === 'red-packet') {
@@ -8802,7 +8849,10 @@ async function getSweetheartAiReply() {
                     messages.push({role: 'user', content: userTextBuffer.join('\n')});
                     userTextBuffer = [];
                 }
-                messages.push({role: 'assistant', content: `[我发送红包] 祝福语：${msg.content.greeting}，金额：${msg.content.amount}元`});
+                messages.push({
+                    role: 'assistant',
+                    content: `[我发送红包] 祝福语：${msg.content.greeting}，金额：${msg.content.amount}元`
+                });
             }
         }
         // === C. 处理图片 (✅ 核心修复：支持 db-image 转换) ===
@@ -8811,7 +8861,7 @@ async function getSweetheartAiReply() {
             // 为了节省Tokens，通常我们只发一次。这里逻辑是：如果没处理过，就发送给AI看。
             if (!msg.isProcessed) {
                 if (userTextBuffer.length > 0) {
-                    messages.push({ role: "user", content: userTextBuffer.join('\n') });
+                    messages.push({role: "user", content: userTextBuffer.join('\n')});
                     userTextBuffer = [];
                 }
 
@@ -8821,7 +8871,9 @@ async function getSweetheartAiReply() {
                     const imgId = msg.imageUrl.split('db-image://')[1];
                     try {
                         realBase64 = await ImageDB.get(imgId);
-                    } catch (e) { console.error('图读取失败', e); }
+                    } catch (e) {
+                        console.error('图读取失败', e);
+                    }
                 } else {
                     // 兼容旧数据（直接存Base64的情况）
                     realBase64 = msg.imageUrl;
@@ -8832,8 +8884,8 @@ async function getSweetheartAiReply() {
                     messages.push({
                         role: 'user',
                         content: [
-                            { type: 'text', text: currentUserInput || '分析一下这张图片。' },
-                            { type: 'image_url', image_url: { url: realBase64 } }
+                            {type: 'text', text: currentUserInput || '分析一下这张图片。'},
+                            {type: 'image_url', image_url: {url: realBase64}}
                         ]
                     });
                     // 标记为已处理，避免下次重复分析（更新本地存储）
@@ -8850,7 +8902,7 @@ async function getSweetheartAiReply() {
                     }
                 } else {
                     // 图片丢失的情况
-                    messages.push({ role: 'user', content: '[图片数据丢失]' });
+                    messages.push({role: 'user', content: '[图片数据丢失]'});
                 }
             } else {
                 // 如果已经处理过（AI看过了），我们只在历史记录里留一个[图片]占位符，节省Token
@@ -8874,9 +8926,8 @@ async function getSweetheartAiReply() {
                 }
                 messages.push({role: 'assistant', content: text});
             }
-        }
-        else if (msg.type === 'location') {
-             if (userTextBuffer.length > 0) {
+        } else if (msg.type === 'location') {
+            if (userTextBuffer.length > 0) {
                 messages.push({role: 'user', content: userTextBuffer.join('\n')});
                 userTextBuffer = [];
             }
@@ -8899,7 +8950,7 @@ async function getSweetheartAiReply() {
     const currentUserInput = chatInput.value.trim();
     if (currentUserInput || currentSweetheartQuoteData) { // 修改条件
         // 先在UI上渲染出来
-        const messagePayload = { sender: 'user', text: currentUserInput};
+        const messagePayload = {sender: 'user', text: currentUserInput};
         if (currentSweetheartQuoteData) messagePayload.quote = currentSweetheartQuoteData; // 保存引用到本地
         const newIndex = saveSweetheartMessage(contactId, messagePayload);
         const messageRow = _createMessageDOM(contactId, messagePayload, newIndex);
@@ -8911,8 +8962,8 @@ async function getSweetheartAiReply() {
         // 🔥🔥🔥 构造发给AI的文本 🔥🔥🔥
         let aiInputText = currentUserInput;
         if (currentSweetheartQuoteData) {
-             let quotedContent = currentSweetheartQuoteData.text;
-             if (quotedContent.includes('<img') || quotedContent.includes('db-image')) {
+            let quotedContent = currentSweetheartQuoteData.text;
+            if (quotedContent.includes('<img') || quotedContent.includes('db-image')) {
                 quotedContent = '[图片]';
             }
             aiInputText = `[引用了 ${currentSweetheartQuoteData.senderName} 的消息: "${quotedContent}"]\n${currentUserInput}`;
@@ -9600,7 +9651,6 @@ function setupSweetheartChatInput() {
     freshChatInput.disabled = false;
     freshChatInput.removeAttribute('readonly');
 }
-
 
 
 // ========== 世界书功能 - 开始 ==========
@@ -10318,80 +10368,89 @@ function updateWorldbookCategorySelector() {
  * @returns {string} - 格式化后的世界书内容字符串
  */
 
-// ▼▼▼ 第5步：用这个新版本替换旧的 gatherWorldbookContext 函数 ▼▼▼
 /**
  * [最终增强版] 根据当前聊天上下文，收集所有相关的世界书内容
+ * 修改点：强制包含内置的全局世界书
  * @returns {string} - 格式化后的世界书内容字符串
  */
 function gatherWorldbookContext() {
-    if (!currentChatContact) return '';
+    // 注意：即使 currentChatContact 不存在（极端情况），我们也可能希望返回全局设定，
+    // 但为了上下文连贯，通常还是需要有联系人。
 
     const relevantWorldbookIds = new Set();
 
-    // 1. 查找当前聊天对象(无论是密友还是普通联系人)的数据
-    // 我们在两个数据源里都找一下
-    const sweetheartData = sweetheartContactsData.find(c => c.id === currentChatContact.id);
-    const regularContactData = contactsData.find(c => c.id === currentChatContact.id);
+    // 1. 【核心修改】首先，无条件添加内置的全局世界书 ID
+    relevantWorldbookIds.add(GLOBAL_WORLDBOOK_ID);
 
-    // 2. 从密友数据中添加绑定的世界书
-    if (sweetheartData && sweetheartData.boundWorldbooks && sweetheartData.boundWorldbooks.length > 0) {
-        sweetheartData.boundWorldbooks.forEach(id => relevantWorldbookIds.add(id));
+    // 2. 如果有当前联系人，再添加它绑定的
+    if (currentChatContact) {
+        // 在密友列表查找
+        const sweetheartData = sweetheartContactsData.find(c => c.id === currentChatContact.id);
+        if (sweetheartData && sweetheartData.boundWorldbooks) {
+            sweetheartData.boundWorldbooks.forEach(id => relevantWorldbookIds.add(id));
+        }
+
+        // 在普通联系人列表查找
+        const regularContactData = contactsData.find(c => c.id === currentChatContact.id);
+        if (regularContactData && regularContactData.boundWorldbooks) {
+            regularContactData.boundWorldbooks.forEach(id => relevantWorldbookIds.add(id));
+        }
     }
 
-    // 3. [核心新增] 从普通联系人数据中添加绑定的世界书
-    if (regularContactData && regularContactData.boundWorldbooks && regularContactData.boundWorldbooks.length > 0) {
-        regularContactData.boundWorldbooks.forEach(id => relevantWorldbookIds.add(id));
-    }
-
-    // 4. 从当前所在的世界添加绑定的世界书
+    // 3. 从当前所在的世界添加绑定的世界书
     if (currentWorldId) {
         const world = worldsData.find(w => w.id === currentWorldId);
-        if (world && world.worldbooks && world.worldbooks.length > 0) {
+        if (world && world.worldbooks) {
             world.worldbooks.forEach(id => relevantWorldbookIds.add(id));
         }
     }
 
     if (relevantWorldbookIds.size === 0) {
-        return ''; // 没有绑定的世界书，直接返回
+        return '';
     }
 
-    // 5. 根据收集到的ID，查找内容并格式化
+    // 4. 根据收集到的ID，查找内容并格式化
     const contextEntries = [];
     relevantWorldbookIds.forEach(id => {
         const entry = worldbookData.find(wb => wb.id === id);
         if (entry && entry.content) {
-            const categoryName = categoriesData.find(c => c.id === entry.category)?.name || '通用';
+            // 给内置书加一个特殊的标签，方便区分
+            let categoryName = '通用';
+            if (entry.id === GLOBAL_WORLDBOOK_ID) {
+                categoryName = '【全局核心设定】';
+            } else {
+                categoryName = categoriesData.find(c => c.id === entry.category)?.name || '未分组';
+            }
+
             contextEntries.push(`### ${categoryName}: ${entry.title}\n${entry.content}`);
         }
     });
 
     if (contextEntries.length > 0) {
         const finalContext = "[背景设定，必须严格遵守]\n---\n" + contextEntries.join('\n\n') + "\n---";
-        console.log("[AI Context] 已加载世界书上下文:\n", finalContext); // 方便调试
+        console.log("[AI Context] 已加载世界书上下文 (含内置):", finalContext);
         return finalContext;
     }
 
     return '';
 }
 
-// ▲▲▲ 函数替换结束 ▲▲▲
 
 // ========== 世界书功能 - 结束 ==========
 
 // ========== 新增：文件夹操作函数 ==========
-// ▼▼▼ 使用这个【全新版本】替换旧的 openFolder 函数 ▼▼▼
+
 function openFolder(folderData) {
     const overlay = document.getElementById('folderOverlay');
-    const headerEl = document.querySelector('.folder-header'); // 获取头部容器
+    const headerEl = document.querySelector('.folder-header');
     const nameEl = document.getElementById('folderName');
     const gridEl = document.getElementById('folderContentGrid');
 
     if (!overlay || !nameEl || !gridEl || !headerEl) return;
 
-    // 1. 存储当前文件夹信息，以便保存时使用
+    // 1. 存储当前文件夹信息
     headerEl.dataset.folderId = folderData.id;
     headerEl.dataset.pageKey = folderData.id.startsWith('widget') ? 'page2' : (document.getElementById('grid1').contains(document.querySelector(`[data-id="${folderData.id}"]`))) ? 'page1' : 'page2';
-
 
     // 2. 设置文件夹名称
     nameEl.textContent = folderData.label;
@@ -10400,26 +10459,41 @@ function openFolder(folderData) {
     gridEl.innerHTML = '';
 
     // 4. 动态创建并填入新图标
-    folderData.icons.forEach(icon => {
+    folderData.icons.forEach(item => {
+        // 🔥 核心修改：解析数据结构
+        let iconSrc, labelName;
+
+        if (typeof item === 'object' && item !== null) {
+            // 新格式：{ icon: '...', label: '...' }
+            iconSrc = item.icon;
+            labelName = item.label || 'App'; // 如果没有label，回退到'App'
+        } else {
+            // 旧格式兼容：纯字符串URL
+            iconSrc = item;
+            labelName = 'App';
+        }
+
         const appIconEl = document.createElement('div');
         appIconEl.className = 'app-icon';
 
-        const isUrl = icon.startsWith('http') || icon.startsWith('data:');
-        const iconContent = isUrl ? `<img src="${icon}" alt="">` : icon;
+        const isUrl = iconSrc.startsWith('http') || iconSrc.startsWith('data:');
+        const iconContent = isUrl ? `<img src="${iconSrc}" alt="">` : iconSrc;
 
+        // 🔥 使用解析出来的 labelName 替换写死的 'App'
         appIconEl.innerHTML = `
             <div class="icon-wrapper">${iconContent}</div>
-            <div class="app-label" style="color: #333; text-shadow: none;">App</div>
+            <div class="app-label" style="color: #333; text-shadow: none;">${labelName}</div>
         `;
         gridEl.appendChild(appIconEl);
     });
 
-    // 5. 【核心新增】为标题绑定点击事件，进入编辑模式
+    // 5. 绑定标题点击编辑事件
     nameEl.onclick = enterFolderNameEditMode;
 
     // 6. 显示浮层
     overlay.classList.add('show');
 }
+
 
 
 function closeFolder() {
@@ -15011,7 +15085,7 @@ function applyImportedData(data) {
 
 function initializeApp() {
     // ▼▼▼ 新增：监听 iframe 高度调整消息 ▼▼▼
-    window.addEventListener('message', function(event) {
+    window.addEventListener('message', function (event) {
         // 安全检查：确保消息类型正确
         if (event.data && event.data.type === 'iframe-resize') {
             const newHeight = event.data.height;
@@ -15036,6 +15110,39 @@ function initializeApp() {
             }
         }
     });
+    /* script.js 中的 initializeApp 函数内部 */
+
+    window.addEventListener('message', function (event) {
+        // 安全检查：确保消息类型正确
+        if (event.data && event.data.type === 'iframe-resize') {
+            let newHeight = event.data.height;
+
+            // 🔥 关键修复：设置一个理智的高度上限 (比如 600px)
+            // 防止 resize 循环导致的数值爆炸
+            if (newHeight > 600) {
+                newHeight = 600;
+            }
+
+            // 在所有渲染的 iframe 中找到发送消息的那一个
+            const iframes = document.querySelectorAll('.render-iframe');
+            for (let iframe of iframes) {
+                if (iframe.contentWindow === event.source) {
+                    // 加上一点缓冲像素(10px)
+                    const finalHeight = (newHeight + 10) + 'px';
+
+                    // 设置 iframe 高度
+                    iframe.style.height = finalHeight;
+
+                    // 同时也设置父容器 bubble 的高度
+                    if (iframe.parentElement) {
+                        iframe.parentElement.style.height = finalHeight;
+                    }
+                    break;
+                }
+            }
+        }
+    });
+
     // ▼▼▼ 在这里粘贴全局错误处理代码 ▼▼▼
     window.addEventListener('error', (event) => {
         console.error('捕获到未处理的全局错误:', event.error);
@@ -15063,6 +15170,31 @@ function initializeApp() {
         console.error('❌ 关键元素未找到，请检查HTML结构');
         return;
     }
+
+
+    // ▼▼▼ 新增：检查并初始化内置世界书 ▼▼▼
+    // 确保数据已加载
+    if (!worldbookData) loadWorldbookData();
+
+    // 检查是否存在这个固定的内置世界书
+    const builtinExists = worldbookData.find(wb => wb.id === GLOBAL_WORLDBOOK_ID);
+
+    if (!builtinExists) {
+        console.log("正在初始化内置世界书...");
+        const builtinEntry = {
+            id: GLOBAL_WORLDBOOK_ID,
+            title: DEFAULT_LORE_TITLE,
+            content: DEFAULT_LORE_CONTENT,
+            group: 'worldview', // 归类为世界观
+            category: 'uncategorized',
+            timestamp: Date.now()
+        };
+        // 添加到数组
+        worldbookData.unshift(builtinEntry); // 放在最前面
+        // 保存到本地存储
+        saveWorldbookToStorage();
+    }
+    // ▲▲▲ 新增结束 ▲▲▲
 
 
     // 【新增代码】在应用程序初始化时，立即应用全屏设置
@@ -15396,6 +15528,7 @@ function initializeApp() {
             reader.readAsDataURL(file);
         }
     });
+
     updateSweetheartChatInputAreaButtons();
 
     console.log('%c🎉 应用初始化完成！', 'color: #667eea; font-size: 16px; font-weight: bold;');

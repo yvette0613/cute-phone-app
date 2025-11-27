@@ -2606,6 +2606,12 @@ body.code-scrolling-enabled .code-block-wrapper pre {
     white-space: pre;
     word-break: normal;
     overflow-x: auto;
+    /* ▼▼▼ 新增以下关键样式 ▼▼▼ */
+    /* 允许 IOS 设备惯性滚动，滑动更流畅 */
+    -webkit-overflow-scrolling: touch;
+    /* 明确告诉浏览器横向滑动是允许的，不要被父级 JS 捕获 */
+    touch-action: pan-x;
+    /* ▲▲▲ 新增结束 ▲▲▲ */
     /* 滚动模式下可能需要更多顶部空间 */
     padding-top: 50px;
 }
@@ -6922,19 +6928,17 @@ body.code-scrolling-enabled .code-block-wrapper {
     padding: 0;
     overflow: hidden;
     background: #fff;
-    width: 300px; /* 宽度保持 */
+    width: 300px;
+    height: auto !important; /* 保持自适应 */
+    min-height: 100px;
 
-    /* 🔥 关键修改：移除 height: 250px 或其他固定高度 */
-    height: auto !important;
-    min-height: 100px; /* 设置最小高度防止塌陷 */
-    max-height: none !important; /* 移除最大高度限制 */
+    /* 🔥 关键修复：设置最大高度，防止无限增长 */
+    max-height: 500px;
+    overflow-y: auto; /* 内容过长时显示滚动条 */
 
     display: flex;
     flex-direction: column;
-    transition: height 0.2s ease; /*这也让高度变化更丝滑*/
-
-    /* 移除 resize: both，因为自适应高度时手动调整会冲突，或者保留横向调整 */
-    /* resize: horizontal; */
+    transition: height 0.2s ease;
 }
 
 
@@ -7820,29 +7824,40 @@ body.code-scrolling-enabled .code-block-wrapper {
 
 /* ========== HTML渲染气泡样式 - 开始 ========== */
 
-/* 1. 渲染气泡的容器样式 */
-/* 新的、更灵活的规则 */
+/* 1. 渲染气泡容器：允许内部滚动 */
 .render-bubble {
     padding: 0;
-    overflow: hidden; /* 继续隐藏溢出，防止调整大小时内容露出 */
     background: #fff;
-    width: 300px; /* 保持默认宽度 */
-    /* 移除固定的 height 属性！这是最关键的一步。 */
-    /* height: 250px; */
-    resize: both; /* 保持允许用户手动调整大小的功能，这很棒！ */
-    min-width: 200px;
-    min-height: 150px; /* 保留最小高度，避免内容太少时塌陷 */
-    max-height: 60vh; /* 新增最大高度，防止内容过长撑满整个屏幕 */
-    display: flex; /* 让内部的 iframe 能更好地填充 */
+    width: 300px; /* 默认宽度 */
+
+    /* 🔥 核心修改 1: 允许垂直滚动，隐藏水平滚动 */
+    overflow-y: auto !important;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch; /* iOS 惯性滚动支持 */
+
+    /* 保持自适应高度逻辑 */
+    height: auto !important;
+    min-height: 100px;
+
+    /* 🔥 核心修改 2: 严格限制最大高度，超过这个高度就出现滚动条 */
+    max-height: 70vh; /* 你可以根据需要调整这个值，比如 60vh */
+
+    display: flex;
+    flex-direction: column;
+    transition: height 0.2s ease;
+
+    /* 确保气泡本身能接收滚动事件 */
+    pointer-events: auto;
 }
 
 
-/* 2. iframe样式，用于显示渲染结果 */
+/* 2. iframe 样式 */
 .render-iframe {
     width: 100%;
-    height: 100%;
-    border: none; /* 移除iframe默认边框 */
-    display: block; /* 确保是块级元素 */
+    /* 高度由内容撑开，或者填满父容器 */
+    min-height: 100px;
+    border: none;
+    display: block;
 }
 
 /* 3. 在密友聊天界面，给渲染气泡一个可爱的边框 */
@@ -7853,18 +7868,28 @@ body.code-scrolling-enabled .code-block-wrapper {
 
 /* ========== HTML渲染气泡样式 - 结束 ========== */
 
-/* ========== iframe 消息气泡的事件捕获遮罩 ========== */
-.iframe-event-overlay {
+/* ========== iframe 消息气泡的事件捕获遮罩 (修改版) ========== */
+.iframe-event-capture-layer {
     position: absolute;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    z-index: 10; /* 确保在 iframe 上方 */
-    cursor: pointer;
+    z-index: 10;
 
-    /* 🔥 关键：默认不拦截事件，允许用户与 iframe 交互 */
-    pointer-events: none;
+    /* 🔥 核心修改 3: 必须设为 none！
+       这样手指/鼠标才能穿透这层遮罩，直接触摸到下面的 iframe 进行滑动或点击按钮。
+       之前的 auto 会像玻璃一样挡住操作。
+    */
+    pointer-events: none !important;
+
+    background: transparent;
+}
+/* (可选) 如果你希望长按气泡边缘还能触发菜单，保留这个，但中间内容区域必须能交互 */
+.chat-bubble.render-bubble {
+    position: relative;
+    /* 确保气泡本身可以被点击 */
+    pointer-events: auto;
 }
 
 /* 🎯 只在需要时激活事件捕获（例如长按时） */
@@ -7962,6 +7987,21 @@ body.code-scrolling-enabled .code-block-wrapper {
 .sweetheart-chat-page .message-checkbox.checked {
     background: #FFB6C1;
     border-color: #FFB6C1;
+}
+
+/* 2. 修复多选失败：在多选模式下，禁止内容区捕获点击事件 */
+/* 当消息行处于 multi-select-mode 时，它的内容子元素不再响应鼠标，
+   这样点击就会冒泡到 .message-row，从而触发 toggleMessageSelection */
+.message-row.multi-select-mode .message-content {
+    pointer-events: none !important;
+}
+
+/* 但要保留复选框的点击能力 (虽然上面pointer-events:none通常只影响后代，
+   但为了保险起见，如果复选框在message-content内的话要排除，
+   不过你的复选框是在 row 里的，所以上面的代码应该足够。
+   为了双重保险，我们可以显式指定) */
+.message-row.multi-select-mode .message-checkbox-container {
+    pointer-events: auto !important;
 }
 
 /* ========== 面具管理功能样式 - 开始 ========== */
