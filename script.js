@@ -97,12 +97,10 @@ const ImageDB = {
     // ▼▼▼ 新增：保存文本内容 ▼▼▼
     async saveText(content) {
         await this.init();
-        // 生成唯一的文本ID
         const id = 'txt_' + Date.now() + Math.random().toString(36).substr(2, 6);
         return new Promise((resolve, reject) => {
             const transaction = this.db.transaction([this.storeName], 'readwrite');
             const store = transaction.objectStore(this.storeName);
-            // 直接存储文本字符串，不压缩
             const request = store.add({id: id, data: content});
             request.onsuccess = () => resolve(id);
             request.onerror = (e) => reject(e);
@@ -111,8 +109,14 @@ const ImageDB = {
 
     // ▼▼▼ 新增：读取文本内容 ▼▼▼
     async getText(id) {
-        // 其实逻辑和 get 一样，但为了语义清晰单独列出
-        return this.get(id);
+        await this.init();
+        return new Promise((resolve) => {
+            const transaction = this.db.transaction([this.storeName], 'readonly');
+            const store = transaction.objectStore(this.storeName);
+            const request = store.get(id);
+            request.onsuccess = () => resolve(request.result ? request.result.data : null);
+            request.onerror = () => resolve(null);
+        });
     }
 };
 
@@ -1897,7 +1901,6 @@ function _createMessageDOM(contactId, messageObj, messageIndex) {
 `;
 
 
-
         iframe.srcdoc = secureSrcDoc;
         bubble.appendChild(iframe);
 
@@ -2188,7 +2191,7 @@ function bindMessageEvents(element, contactId, messageIndex, isSweetheart) {
         }, 500); // 500ms 触发长按
     };
 
-        /* script.js 中 bindMessageEvents 函数内部 */
+    /* script.js 中 bindMessageEvents 函数内部 */
 
     const handleMove = (e) => {
         // 如果菜单已经显示，或者没有长按计时器，则不处理移动
@@ -3445,7 +3448,8 @@ const appsPage1 = [
         icon: 'https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760107619286_qdqqd_tzxf3r.png',
         label: '账单',
         row: 0,
-        col: 2
+        col: 2,
+        clickable: true // 🔥 必须添加这一行，否则点击不触发
     },
     {
         id: 'store',
@@ -3493,9 +3497,18 @@ const appsPage2 = [
         label: '影音阅读',
         isFolder: true,
         icons: [
-            { icon: 'https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760115843325_qdqqd_69tlcj.png', label: '电视' },
-            { icon: 'https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760117195210_qdqqd_k1cy4r.png', label: '小说' },
-            { icon: 'https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760115791541_qdqqd_x3y0wt.png', label: '真题' },
+            {
+                icon: 'https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760115843325_qdqqd_69tlcj.png',
+                label: '电视'
+            },
+            {
+                icon: 'https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760117195210_qdqqd_k1cy4r.png',
+                label: '小说'
+            },
+            {
+                icon: 'https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760115791541_qdqqd_x3y0wt.png',
+                label: '真题'
+            },
         ],
         row: 0,
         col: 0
@@ -3505,9 +3518,18 @@ const appsPage2 = [
         label: '娱乐',
         isFolder: true,
         icons: [
-            { icon: 'https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760096293687_qdqqd_xti5y9.png', label: '五子棋'},
-            { icon: 'https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760117261962_qdqqd_55pbz9.png', label: '剧本杀'},
-            { icon: 'https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760117296583_qdqqd_i0fpo6.png', label: '狼人杀'},
+            {
+                icon: 'https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760096293687_qdqqd_xti5y9.png',
+                label: '五子棋'
+            },
+            {
+                icon: 'https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760117261962_qdqqd_55pbz9.png',
+                label: '剧本杀'
+            },
+            {
+                icon: 'https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760117296583_qdqqd_i0fpo6.png',
+                label: '狼人杀'
+            },
         ],
         row: 0,
         col: 1
@@ -3517,8 +3539,14 @@ const appsPage2 = [
         label: '居家生活',
         isFolder: true,
         icons: [
-            { icon: 'https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760095662621_qdqqd_b8q0r7.png', label: '快递'},
-            { icon: 'https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760107551403_qdqqd_1s7h4p.png', label: '外卖'},
+            {
+                icon: 'https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760095662621_qdqqd_b8q0r7.png',
+                label: '快递'
+            },
+            {
+                icon: 'https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760107551403_qdqqd_1s7h4p.png',
+                label: '外卖'
+            },
         ],
         row: 0,
         col: 2
@@ -3528,8 +3556,14 @@ const appsPage2 = [
         label: '购物',
         isFolder: true,
         icons: [
-            { icon: 'https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760106251908_qdqqd_s71t7l.png', label: '购物'},
-            { icon: 'https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760106346391_qdqqd_ro4t40.png', label: '送礼'},
+            {
+                icon: 'https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760106251908_qdqqd_s71t7l.png',
+                label: '购物'
+            },
+            {
+                icon: 'https://s3plus.meituan.net/opapisdk/op_ticket_885190757_1760106346391_qdqqd_ro4t40.png',
+                label: '送礼'
+            },
         ],
         row: 0,
         col: 3
@@ -5071,6 +5105,8 @@ function addDragListeners(el, clickable) {
                 openSettings(); // 打开设置
             } else if (el.dataset.id === 'worldbook') {
                 openWorldbook(); // 打开世界书
+            } else if (el.dataset.id === 'calc') {
+                openLedger();
             }
             // Add other specific clickable app actions here if any
         }
@@ -5429,34 +5465,26 @@ function swipeEndHandler(e) {
     state.isSwipingPage = false;
 }
 
-// script.js
-
 /**
  * [丝滑翻页优化版] 统一的“滑动开始”处理器
- * - 修复了在状态弹窗等浮层上无法滚动的问题
+ * 修复：已将 .chapter-list-panel 加入排除列表，防止滑动目录时误触翻页
  */
 function swipeStartHandler(e) {
     // 检查触摸事件是否发生在不应触发翻页的元素上
-    // ✅ 核心修复：在这里添加了 .sweetheart-chat-page
-    if (e.target.closest('.page-dots, .dock, #iconDockPanel, #floatingBall, .cat-widget, .contacts-page, .chat-page, .sweetheart-chat-page, .settings-page, .config-page, .beautify-page, .modal-overlay, #statusPopup, .test-page, .worldbook-page, .mask-library-page, .contact-library-page, .memory-center-page, .map-editor-page')) {
+    // ✅ 修复：添加了 .chapter-list-panel (目录) 和 .reader-header-bar (顶部栏)
+    if (e.target.closest('.page-dots, .dock, #iconDockPanel, #floatingBall, .cat-widget, .contacts-page, .chat-page, .sweetheart-chat-page, .settings-page, .config-page, .beautify-page, .modal-overlay, #statusPopup, .test-page, .worldbook-page, .mask-library-page, .contact-library-page, .memory-center-page, .map-editor-page, .folder-overlay, .novel-shelf-page, .novel-reader-page, .chapter-list-panel, .reader-header-bar')) {
         return; // 如果是，则直接退出，不处理翻页逻辑
     }
-
     // 检查是否刚结束拖拽操作，防止误触
     if (Date.now() - state.lastDragEndTime < 300) return;
-
     // 检查是否正在从收藏夹拖出图标或处于桌面编辑模式
     if (state.isDraggingFromDock || state.isEditMode || state.isDragging) return;
-
     // --- 后续的翻页逻辑保持不变 ---
-
     const touch = getTouch(e);
     state.swipeStart = {x: touch.clientX, time: Date.now()};
     state.isSwipingPage = true;
     state.initialTransform = -(state.currentPage - 1) * 50;
-
     pagesWrapper.classList.add('no-transition');
-
     if (e.type === 'touchstart') {
         document.addEventListener('touchmove', swipeMoveHandler, {passive: false});
         document.addEventListener('touchend', swipeEndHandler);
@@ -5465,7 +5493,6 @@ function swipeStartHandler(e) {
         document.addEventListener('mouseup', swipeEndHandler);
     }
 }
-
 
 // 这个函数负责在滑动过程中，通过 rAF 更新页面位置，保证流畅
 function swipeMoveHandler(e) {
@@ -5532,76 +5559,117 @@ function initializeLayout() {
     if (savedWallpaper) {
         applyWallpaper(savedWallpaper);
     }
-    // 【核心修复 - 第1步】:
-    // 在所有操作之前，首先加载收藏夹图标数据
-    const savedDockedIcons = localStorage.getItem('phoneDockedIcons');
-    let dockedIconIds = new Set(); // 使用 Set 数据结构，查询效率更高
-    if (savedDockedIcons) {
+    // 加载收藏夹ID集合
+    const savedDockedIconsRaw = localStorage.getItem('phoneDockedIcons');
+    let dockedIconIds = new Set();
+    if (savedDockedIconsRaw) {
         try {
-            // 解析收藏夹数据，并提取所有图标的 ID
-            const dockedIconsData = JSON.parse(savedDockedIcons);
+            const dockedIconsData = JSON.parse(savedDockedIconsRaw);
             dockedIconsData.forEach(icon => dockedIconIds.add(icon.id));
         } catch (e) {
-            console.error("解析收藏夹图标ID失败", e);
+            console.error(e);
         }
     }
-    // 加载桌面布局
+    // [辅助函数1] 查找单个App的默认Label
+    const findDefaultLabel = (id) => {
+        const allDefaults = [...appsPage1, ...appsPage2];
+        const found = allDefaults.find(a => a.id === id);
+        return found ? found.label : 'App';
+    };
+    // [辅助函数2] 根据ID查找代码中的文件夹配置
+    const findDefaultFolderData = (folderId) => {
+        const allDefaults = [...appsPage1, ...appsPage2];
+        return allDefaults.find(a => a.id === folderId && a.isFolder);
+    };
+    // 3. 加载并恢复布局
     const savedLayouts = localStorage.getItem('phoneAppLayouts');
     if (savedLayouts) {
         try {
             const loadedLayouts = JSON.parse(savedLayouts);
+            ['page1', 'page2'].forEach(pageKey => {
+                if (loadedLayouts[pageKey]) {
+                    loadedLayouts[pageKey].forEach(app => {
+                        const defaultAppConfig = [...appsPage1, ...appsPage2].find(def => def.id === app.id);
+                        if (defaultAppConfig) {
+                            app.clickable = defaultAppConfig.clickable; // 强制同步 clickable 属性
+                        }
+                        // A. 恢复外层普通App名称
+                        if (!app.label && !app.isFolder && !app.isWidget) {
+                            app.label = findDefaultLabel(app.id);
+                        }
+                        // B. [重点修正] 恢复文件夹内部图标名称 (基于位置/索引)
+                        if (app.isFolder && Array.isArray(app.icons)) {
+                            // 1. 在代码中找到这个文件夹的原型 (例如 id="media_reading")
+                            const defaultFolderConfig = findDefaultFolderData(app.id);
 
-            // 【核心修复 - 第2步】:
-            // 将收藏夹图标ID集合传递给 mergeAppLayouts 函数
+                            if (defaultFolderConfig && Array.isArray(defaultFolderConfig.icons)) {
+                                // 2. 遍历 localStorage 里保存的图标
+                                app.icons.forEach((savedIconItem, index) => {
+                                    // 3. 如果保存的数据里没有 label (导出时被删了)
+                                    //    或者为了强制同步，你可以去掉 !savedIconItem.label 这个判断
+                                    if (typeof savedIconItem === 'object' && !savedIconItem.label) {
+
+                                        // 4. [核心] 直接根据索引(index)去默认配置里取
+                                        const defaultIconItem = defaultFolderConfig.icons[index];
+                                        if (defaultIconItem) {
+                                            // 代码里的配置可能是字符串URL，也可能是对象
+                                            const newLabel = (typeof defaultIconItem === 'object' && defaultIconItem.label)
+                                                ? defaultIconItem.label
+                                                : 'App'; // 默认值
+
+                                            // 5. 赋值回去
+                                            savedIconItem.label = newLabel;
+                                        }
+                                    }
+                                });
+                            }
+                        }
+                    });
+                }
+            });
+            // 合并逻辑保持不变
             state.appLayouts.page1 = mergeAppLayouts(appsPage1, loadedLayouts.page1 || [], dockedIconIds);
             state.appLayouts.page2 = mergeAppLayouts(appsPage2, loadedLayouts.page2 || [], dockedIconIds);
-            console.log('成功从 LocalStorage 加载布局并合并新功能');
+            console.log('成功从 LocalStorage 加载布局 (基于位置同步文件夹名称)');
         } catch (e) {
-            console.error('解析 LocalStorage 布局失败，使用默认布局', e);
+            console.error('解析布局失败', e);
         }
     }
-    // Dock栏图标加载（这部分逻辑不变，但为了完整性放在这里）
+    // 加载Dock栏图标 (调用专门的函数)
+    loadDockedIcons();
+
+    // 渲染Dock栏 (这里需要确保界面刷新)
+    renderDockedIcons(); // 注意：这里通常由 loadDockedIcons 处理数据，toggleIconDockPanel 处理渲染，但在初始化时我们也可以手动渲染一下Dock栏的预览（如果有的话）或者保持原逻辑
+    // Dock栏主要显示的4个大图标加载
     const savedDockIcons = localStorage.getItem('phoneDockIcons');
     let dockIconsToRender = globalConfig.dockIcons;
     if (savedDockIcons) {
         try {
             dockIconsToRender = JSON.parse(savedDockIcons);
-            console.log('成功从 LocalStorage 加载Dock图标');
         } catch (e) {
-            console.error('解析 Dock 图标失败', e);
         }
     }
-    // ▼▼▼ 使用这个【修正并优化后】的代码块进行替换 ▼▼▼
-
     const dockContainer = document.querySelector('.dock');
-    dockContainer.innerHTML = ''; // 清空旧图标
-
+    dockContainer.innerHTML = '';
     dockIconsToRender.forEach((icon, index) => {
         const dockIcon = document.createElement('div');
         dockIcon.className = 'dock-icon';
         dockIcon.dataset.index = index;
-
-        // --- 渲染图标内容 (这部分逻辑不变) ---
         if (icon && (icon.startsWith('http') || icon.startsWith('data:'))) {
             dockIcon.innerHTML = `<img src="${icon}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 14px;" alt="">`;
         } else if (icon) {
             dockIcon.textContent = icon;
         }
-
-        // --- 【核心修正】使用 switch 语句，更清晰且不易出错 ---
         switch (index) {
-            case 0: // 第一个图标
+            case 0:
                 dockIcon.onclick = openContacts;
                 break;
-            case 2: // 第三个图标
+            case 2:
                 dockIcon.onclick = openWorldSelect;
                 break;
-            // 默认情况下 (第二个和第四个图标) 不绑定任何特殊点击事件
             default:
                 break;
         }
-
-        // 将创建好的图标添加到 Dock 容器中
         dockContainer.appendChild(dockIcon);
     });
 
@@ -5737,7 +5805,6 @@ function promptForUrl() {
 }
 
 // ========== 结束：替换完成 ==========
-
 
 
 // ▼▼▼ 步骤2：用这个新版本完整替换旧的 openChat 函数 ▼▼▼
@@ -7576,19 +7643,35 @@ function saveDockedIcons() {
 }
 
 /**
- * 加载栏目图标
+ * 加载栏目图标 (增加 label 恢复逻辑)
  */
 function loadDockedIcons() {
     try {
         const saved = localStorage.getItem('phoneDockedIcons');
         if (saved) {
             dockedIcons = JSON.parse(saved);
+
+            // [核心修改] 辅助查找默认名称
+            const findDefaultLabel = (id) => {
+                const allDefaults = [...appsPage1, ...appsPage2];
+                const found = allDefaults.find(a => a.id === id);
+                return found ? found.label : 'App';
+            };
+
+            // 遍历恢复 label
+            dockedIcons.forEach(icon => {
+                if (!icon.label) {
+                    icon.label = findDefaultLabel(icon.id);
+                }
+            });
+
             console.log('成功加载栏目图标，共', dockedIcons.length, '个');
         }
     } catch (e) {
         console.error('加载栏目图标失败:', e);
     }
 }
+
 
 /**
  * 将图标添加到栏目
@@ -8717,7 +8800,7 @@ async function getSweetheartAiReply() {
     getReplyBtn.disabled = true;
     // chatInput.disabled = true; // 暂时禁用输入框，等待AI回复
 
-        // --- 步骤 1: 构建发送给AI的消息数组 ---
+    // --- 步骤 1: 构建发送给AI的消息数组 ---
     const messages = [];
 
     if (currentChatMode === 'offline') {
@@ -10440,6 +10523,8 @@ function gatherWorldbookContext() {
 
 // ========== 新增：文件夹操作函数 ==========
 
+// 在 script.js 中找到 openFolder 函数并替换为：
+
 function openFolder(folderData) {
     const overlay = document.getElementById('folderOverlay');
     const headerEl = document.querySelector('.folder-header');
@@ -10459,7 +10544,8 @@ function openFolder(folderData) {
     gridEl.innerHTML = '';
 
     // 4. 动态创建并填入新图标
-    folderData.icons.forEach(item => {
+    // 🔥 修改点：增加了 index 参数
+    folderData.icons.forEach((item, index) => {
         // 🔥 核心修改：解析数据结构
         let iconSrc, labelName;
 
@@ -10484,6 +10570,17 @@ function openFolder(folderData) {
             <div class="icon-wrapper">${iconContent}</div>
             <div class="app-label" style="color: #333; text-shadow: none;">${labelName}</div>
         `;
+
+        // ▼▼▼ 修改：不再用名字判断，改用文件夹ID和位置索引判断 ▼▼▼
+        // 假设小说APP在 'media_reading' 文件夹的第2个位置 (索引1)
+        if (folderData.id === 'media_reading' && index === 1) {
+            appIconEl.onclick = (e) => {
+                e.stopPropagation(); // 阻止冒泡
+                openNovelShelf();    // 打开书架
+            };
+        }
+        // ▲▲▲ 修改结束 ▲▲▲
+
         gridEl.appendChild(appIconEl);
     });
 
@@ -10493,7 +10590,6 @@ function openFolder(folderData) {
     // 6. 显示浮层
     overlay.classList.add('show');
 }
-
 
 
 function closeFolder() {
@@ -11992,47 +12088,53 @@ let contactLibraryMode = 'edit';
  * @param {'edit' | 'select'} mode - 指定打开的模式。
  */
 function openContactLibrary(mode = 'edit') {
-    // 设置当前模式
     contactLibraryMode = mode;
-
-    // 获取DOM元素
     const page = document.getElementById('contactLibraryPage');
     const title = document.getElementById('contactLibraryTitle');
 
-    // 根据模式更新页面标题
-    if (mode === 'select' || mode === 'selectForSweetheart') { // <-- 修改这里
+    // 修改标题逻辑
+    if (mode === 'select' || mode === 'selectForSweetheart') {
         title.textContent = '选择联系人';
+    } else if (mode === 'discuss') {
+        title.textContent = '与谁讨论剧情？'; // ✨ 新增标题
     } else {
         title.textContent = '联系人库';
     }
 
-    // 显示页面
     page.classList.add('show');
-
-    // 渲染联系人列表
     renderContactLibrary();
 }
 
-// script.js
 
 /**
  * [已修复] 关闭联系人库页面
  */
 function closeContactLibrary() {
-    // 🔥 核心修复：在关闭页面时，如果处在多选模式，则退出
     if (isMultiSelectMode) {
         exitMultiSelectMode();
     }
 
-    // 隐藏页面
     document.getElementById('contactLibraryPage').classList.remove('show');
-    // 清空搜索框
     document.getElementById('contactLibrarySearch').value = '';
+
+    // ▼▼▼ 核心修改：如果是剧情讨论模式，直接return，这样就停留在底下的小说界面了 ▼▼▼
+    if (contactLibraryMode === 'discuss') {
+        return;
+    }
+    // ▲▲▲ 修改结束 ▲▲▲
+
+    if (currentWorldId) {
+        setTimeout(() => {
+            openWorldSelect();
+        }, 300);
+    }
 }
 
 
+
+
 /**
- * 渲染联系人库的列表内容。
+ * 渲染联系人库的列表内容 (已修复：支持剧情讨论模式)
  */
 function renderContactLibrary() {
     const container = document.getElementById('contactLibraryList');
@@ -12054,7 +12156,7 @@ function renderContactLibrary() {
         }
     });
 
-    // 🆕 3. 添加仅存在于库中的联系人
+    // 3. 添加仅存在于库中的联系人
     libraryOnlyContactsData.forEach(contact => {
         if (!allContactsMap.has(contact.id)) {
             allContactsMap.set(contact.id, {...contact, type: 'library-only'});
@@ -12079,7 +12181,6 @@ function renderContactLibrary() {
             ? `<img src="${escapeHTML(contact.avatar)}" alt="">`
             : `<span>${escapeHTML(contact.avatar)}</span>`;
 
-        // 🆕 修改：不再显示类型标签
         item.innerHTML = `
             <div class="contact-library-avatar">${avatarContent}</div>
             <div class="contact-library-info">
@@ -12088,6 +12189,7 @@ function renderContactLibrary() {
             <div class="settings-arrow">›</div>
         `;
 
+        // 🔥🔥🔥 核心修复点在这里 🔥🔥🔥
         if (isMultiSelectMode) {
             item.classList.add('multi-select-mode');
             if (selectedContactIds.has(contact.id)) {
@@ -12095,7 +12197,11 @@ function renderContactLibrary() {
             }
             item.onclick = () => toggleContactSelection(contact.id);
         } else {
-            if (contactLibraryMode === 'select' || contactLibraryMode === 'selectForSweetheart') {
+            // 原来的代码漏掉了 'discuss' 模式，导致默认进入了 else (编辑模式)
+            if (contactLibraryMode === 'select' ||
+                contactLibraryMode === 'selectForSweetheart' ||
+                contactLibraryMode === 'discuss') { // ✅ 加上这一行！
+
                 item.onclick = () => selectContactFromLibrary(contact);
             } else {
                 item.onclick = () => editContactFromLibrary(contact.id, contact.type);
@@ -12109,21 +12215,30 @@ function renderContactLibrary() {
 // ▼▼▼ 请复制并替换这个完整的函数 ▼▼▼
 
 /**
- * [最终修复版] 从联系人库选择联系人
- * - 修复了联系人已存在于全局列表但未在当前世界时，无法添加的问题
+ * [最终增强版] 从联系人库选择联系人
+ * 支持：普通选择、密友选择、剧情讨论
  */
 function selectContactFromLibrary(sourceContact) {
     const contactId = sourceContact.id;
 
-    // 确定操作的目标列表和相关函数
+    // === 新增：处理剧情讨论模式 ===
+    if (contactLibraryMode === 'discuss') {
+        initiateDiscussChat(sourceContact);
+        return;
+    }
+    // === 结束新增 ===
+
+    // ...以下保持原本的逻辑...
     let targetList, targetName, saveFunc, renderFunc, listPageOpener;
+
+    // (此处保持你原本的 selectForSweetheart / select 判断代码不变)
     if (contactLibraryMode === 'selectForSweetheart') {
         targetList = sweetheartContactsData;
         targetName = '密友列表';
         saveFunc = saveSweetheartContacts;
         renderFunc = renderSweetheartList;
         listPageOpener = openSweetheartList;
-    } else { // 'select' mode
+    } else {
         targetList = contactsData;
         targetName = '通讯录';
         saveFunc = () => localStorage.setItem('phoneContactsData', JSON.stringify(contactsData));
@@ -12131,16 +12246,13 @@ function selectContactFromLibrary(sourceContact) {
         listPageOpener = openContacts;
     }
 
-    // --- ▼▼▼ 核心逻辑修正 ▼▼▼ ---
-
     let wasAddedToGlobalList = false;
     let wasAddedToWorld = false;
 
     // 步骤1: 检查并添加到全局列表
+    // 使用 targetList 的引用
     const alreadyInGlobalList = targetList.some(c => c.id === contactId);
     if (!alreadyInGlobalList) {
-        // 如果联系人对象不存在于目标数组中，则添加
-        // 注意：这里我们应该添加源对象的拷贝，以防未来出现引用问题
         targetList.push({...sourceContact});
         saveFunc();
         wasAddedToGlobalList = true;
@@ -12159,9 +12271,6 @@ function selectContactFromLibrary(sourceContact) {
         }
     }
 
-    // --- ▲▲▲ 修正结束 ▲▲▲ ---
-
-    // 步骤3: 根据操作结果提供反馈并更新UI
     if (wasAddedToGlobalList || wasAddedToWorld) {
         showSuccessModal('添加成功', `已将 "${sourceContact.name}" 添加到${targetName}。`);
     } else {
@@ -12170,14 +12279,11 @@ function selectContactFromLibrary(sourceContact) {
 
     closeContactLibrary();
 
-    // 步骤4: 平滑过渡返回列表页面
     setTimeout(() => {
         listPageOpener();
-        // 打开页面后，其内部的渲染函数会自动执行，无需在此再次调用 renderFunc
     }, 350);
 }
 
-// ▲▲▲ 替换结束 ▲▲▲
 
 
 // ========== 联系人库多选模式功能 ==========
@@ -14968,47 +15074,49 @@ function applySweetheartChatAvatarsSetting(isEnabled) {
 
 // ====== 新增：数据导入导出功能 ======
 
+// 在 script.js 中找到 exportAppData 函数并替换为：
+
 /**
  * 导出所有应用数据到 JSON 文件。
- * 遍历 localStorage，收集所有键值对。
+ * (已修改：导出全部完整数据，不再清理label)
  */
 function exportAppData() {
     const appData = {};
     for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
         try {
-            // 尝试解析JSON字符串，如果成功则存储为对象，否则存储原始字符串
-            const value = localStorage.getItem(key);
-            appData[key] = JSON.parse(value);
+            // 1. 获取原始数据的深拷贝
+            let value = JSON.parse(localStorage.getItem(key));
+
+            // ▼▼▼ 修改：不再执行任何删除 label 的操作，直接保存原始数据 ▼▼▼
+            appData[key] = value;
+
         } catch (e) {
-            // 如果不是有效的JSON，则存储原始字符串
+            // 如果不是JSON格式，直接读取字符串
             appData[key] = localStorage.getItem(key);
         }
     }
 
-    const jsonString = JSON.stringify(appData, null, 2); // 格式化JSON字符串，方便阅读
+    const jsonString = JSON.stringify(appData, null, 2);
     const blob = new Blob([jsonString], {type: 'application/json'});
 
-    // 创建下载链接
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
 
-    // 生成文件名，包含日期和时间
     const now = new Date();
-    const dateStr = now.toISOString().slice(0, 10).replace(/-/g, ''); // YYYYMMDD
-    const timeStr = now.toTimeString().slice(0, 8).replace(/:/g, ''); // HHMMSS
-    a.download = `yetta_app_data_${dateStr}_${timeStr}.json`;
+    const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+    const timeStr = now.toTimeString().slice(0, 8).replace(/:/g, '');
+    a.download = `yetta_full_backup_${dateStr}_${timeStr}.json`; // 文件名改为 full_backup
 
-    // 模拟点击下载
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
-    showSuccessModal('导出成功', '所有数据已成功导出为JSON文件！');
-    console.log('所有应用数据已导出。');
+    showSuccessModal('导出成功', '全部原始数据已导出备份！');
 }
+
 
 /**
  * 触发隐藏的文件输入框，让用户选择导入文件。
@@ -15080,6 +15188,2095 @@ function applyImportedData(data) {
         }
     }
     console.log('数据已覆盖到 localStorage。');
+}
+
+/* =========================================
+   📚 小说阅读器核心功能模块 (章节划分版)
+   ========================================= */
+let novelsLibrary = [];
+let currentReadingBookId = null;
+let currentChapters = []; // 存储当前书籍解析后的章节数组
+let currentChapterIndex = 0; // 当前章节索引
+
+// 1. 打开书架页面
+function openNovelShelf() {
+    document.getElementById('iconDockPanel').classList.remove('show'); // 关闭其他可能存在的浮层
+    document.getElementById('folderOverlay').classList.remove('show');
+    document.getElementById('novelShelfPage').classList.add('show');
+    loadNovelLibrary();
+    renderNovelShelf();
+}
+
+// 2. 关闭书架页面
+function closeNovelShelf() {
+    document.getElementById('novelShelfPage').classList.remove('show');
+}
+
+// 3. 触发上传按钮
+function triggerNovelUpload() {
+    document.getElementById('novelFileInput').click();
+}
+
+// 4. 处理文件上传 (保持不变，存入IndexedDB)
+// [步骤2] 处理文件上传 (已集成自动分析)
+async function handleNovelFileSelect(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith('.txt')) {
+        showSuccessModal('格式错误', '目前仅支持 .txt 格式的小说');
+        event.target.value = '';
+        return;
+    }
+
+    // 给用户一个稍微具体的提示
+    showSuccessModal('正在导入', '正在上架书籍并进行AI结构分析...', 3000);
+
+    const reader = new FileReader();
+    reader.onload = async function (e) {
+        const textContent = e.target.result;
+
+        try {
+            const contentId = await ImageDB.saveText(textContent);
+
+            const newBook = {
+                id: 'BOOK_' + Date.now(),
+                title: file.name.replace('.txt', ''),
+                contentId: contentId,
+                currentChapterIndex: 0,
+                currentScrollPos: 0,
+                addedAt: Date.now(),
+                themeColorIndex: Math.floor(Math.random() * 5),
+                // ✨ 关键标记：初始未分析
+                isAnalyzed: false,
+                aiAnalysis: null
+            };
+
+            novelsLibrary.unshift(newBook);
+            saveNovelLibrary();
+            renderNovelShelf();
+
+            // 🔥 立即触发后台智能分析 🔥
+            analyzeNovelStructure(newBook.id);
+
+        } catch (err) {
+            console.error('书籍导入错误:', err);
+            alert('存储失败，请检查空间或重试。');
+        }
+    };
+    reader.readAsText(file, 'utf-8');
+    event.target.value = '';
+}
+
+// 5. 渲染书架 (保持不变)
+function renderNovelShelf() {
+    const container = document.getElementById('novelShelfContent');
+    container.innerHTML = '';
+
+    if (novelsLibrary.length === 0) {
+        container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #999; margin-top: 60px;">书架空空如也<br>点击右上角 + 导入 TXT 小说</div>';
+        return;
+    }
+
+    const gradients = [
+        'linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)',
+        'linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%)',
+        'linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%)',
+        'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+        'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)'
+    ];
+
+    novelsLibrary.forEach(book => {
+        const item = document.createElement('div');
+        item.className = 'book-item';
+        const bgStyle = gradients[book.themeColorIndex % gradients.length];
+
+        item.innerHTML = `
+            <div class="book-cover" style="background: ${bgStyle}" onclick="openBookReader('${book.id}')">
+                <div class="book-title-preview">${escapeHTML(book.title)}</div>
+            </div>
+            <div class="book-name-label">${escapeHTML(book.title)}</div>
+            <div class="book-delete-hint" onclick="deleteBook('${book.id}', event)">删除</div>
+        `;
+        container.appendChild(item);
+    });
+}
+
+// 6. 删除书籍
+function deleteBook(bookId, event) {
+    if (event) event.stopPropagation();
+    if (!confirm('确定要将这本书移出书架吗？')) return;
+    novelsLibrary = novelsLibrary.filter(b => b.id !== bookId);
+    saveNovelLibrary();
+    renderNovelShelf();
+}
+
+/**
+ * 核心功能：解析TXT为章节数组 (防卡死增强版)
+ * 1. 尝试正则匹配
+ * 2. 如果匹配失败，自动按字数切分
+ */
+function parseTxtToChapters(fullText) {
+    if (!fullText) return [];
+
+    // 匹配规则：兼容 "第x章"、"Chapter"、"卷"、"节" 等常见格式
+    // 增加了一点容错性
+    const chapterRegex = /(?:^|\n)\s*(第[0-9零一二三四五六七八九十百千万]+[章回节卷集]|Chapter\s*\d+|^\d+\.|Part\s*\d+).*/g;
+
+    const chapters = [];
+    let match;
+
+    // --- 策略 A: 正则匹配 (标准格式) ---
+    while ((match = chapterRegex.exec(fullText)) !== null) {
+        // 如果找到了新章节，就把上一章的内容截取出来
+        if (chapters.length > 0) {
+            const prevChapter = chapters[chapters.length - 1];
+            prevChapter.content = fullText.substring(prevChapter.startIndex, match.index).trim();
+        } else {
+            // 处理序章（第一章之前的内容）
+            if (match.index > 0) {
+                const introContent = fullText.substring(0, match.index).trim();
+                // 只有序章内容足够长才保留，防止只是几行乱码
+                if (introContent.length > 10) {
+                    chapters.push({
+                        title: "序章 / 前言",
+                        content: introContent,
+                        startIndex: 0
+                    });
+                }
+            }
+        }
+
+        // 记录新章节的开始信息
+        chapters.push({
+            title: match[0].trim(),
+            content: "", // 内容先留空，等找到下一章再填充
+            startIndex: match.index + match[0].length
+        });
+    }
+
+    // 填充最后一章的内容
+    if (chapters.length > 0) {
+        const lastChapter = chapters[chapters.length - 1];
+        lastChapter.content = fullText.substring(lastChapter.startIndex).trim();
+    }
+
+    // --- 策略 B: 智能兜底 (防解析失败) ---
+    // 条件：如果没找到任何章节，或者全书只有一个章节且字数巨大(>2万字)
+    if (chapters.length === 0 || (chapters.length === 1 && fullText.length > 20000)) {
+        console.warn("⚠️ 未识别到标准章节标题，启用【自动分页模式】");
+
+        // 清空之前的尝试，完全采用自动分页
+        chapters.length = 0;
+
+        const CHUNK_SIZE = 8000; // 每 8000 字自动分一章
+        const totalChunks = Math.ceil(fullText.length / CHUNK_SIZE);
+
+        for (let i = 0; i < totalChunks; i++) {
+            const start = i * CHUNK_SIZE;
+            const end = Math.min((i + 1) * CHUNK_SIZE, fullText.length);
+            const chunkContent = fullText.substring(start, end);
+
+            chapters.push({
+                title: `第 ${i + 1} 部分 (自动分页)`,
+                content: chunkContent,
+                startIndex: start
+            });
+        }
+    }
+
+    return chapters;
+}
+
+/**
+ * 7. 打开阅读器 (UI防卡死 + 错误处理)
+ */
+async function openBookReader(bookId) {
+    const book = novelsLibrary.find(b => b.id === bookId);
+    if (!book) return;
+
+    currentReadingBookId = bookId;
+    const readerPage = document.getElementById('novelReaderPage');
+    const contentBox = document.getElementById('readerContent');
+    const headerTitle = document.getElementById('headerTitle');
+
+    // 1. 立即更新UI状态：显示加载动画
+    headerTitle.textContent = book.title;
+
+    // 使用我们在CSS里新加的加载样式
+    contentBox.innerHTML = `
+        <div class="reader-loading-container">
+            <div class="reader-spinner"></div>
+            <div class="reader-loading-text">
+                正在解析《${escapeHTML(book.title)}》...<br>
+                <span style="font-size:12px;opacity:0.8;">(大文件可能需要几秒钟)</span>
+            </div>
+        </div>
+    `;
+
+    // 隐藏干扰元素
+    document.getElementById('readerHeaderBar').classList.add('hidden');
+    document.getElementById('readerFloatMenu').classList.add('hidden');
+    readerPage.classList.add('show');
+    updateReaderTime();
+
+    // 2. 【关键修复】使用 setTimeout 延迟 50ms 执行解析
+    // 这让浏览器有时间先把上面的 "正在解析" 动画渲染出来，避免点击后界面直接冻结
+    setTimeout(async () => {
+        try {
+            // 从数据库获取全文
+            const text = await ImageDB.getText(book.contentId);
+
+            if (!text) {
+                throw new Error("书籍内容为空或读取失败");
+            }
+
+            // 执行解析（可能耗时）
+            // 此时用户已经看到了加载动画，等待感会好很多
+            currentChapters = parseTxtToChapters(text);
+
+            // 恢复上次阅读进度
+            currentChapterIndex = book.currentChapterIndex || 0;
+
+            // 越界保护
+            if (currentChapterIndex >= currentChapters.length) currentChapterIndex = 0;
+
+            console.log(`书籍解析完成: ${currentChapters.length} 章`);
+
+            if (currentChapters.length > 0) {
+                // 渲染内容
+                renderCurrentChapter(book.currentScrollPos || 0);
+            } else {
+                contentBox.innerHTML = '<p style="text-align:center; padding-top:40vh; color:#999;">书籍本身似乎是空的。</p>';
+            }
+
+        } catch (e) {
+            console.error("阅读器错误", e);
+            // 显示友好的错误信息
+            contentBox.innerHTML = `
+                <div style="padding-top: 40vh; text-align: center;">
+                    <div style="font-size:40px; margin-bottom:10px;">⚠️</div>
+                    <p style="color:#d32f2f;">书籍打开失败</p>
+                    <p style="font-size:12px; color:#999;">原因: ${e.message}</p>
+                    <button onclick="closeNovelReader()" style="margin-top:20px; padding:8px 20px; border:1px solid #ccc; background:white; border-radius:8px;">退出</button>
+                </div>
+            `;
+            showErrorModal('打开失败', '无法读取书籍内容，请尝试重新导入。');
+        }
+    }, 100); // 延迟100ms，给UI渲染留出时间
+}
+
+/* ======================================================
+   修复 1: 改进渲染函数，防止双引号截断 data-text 属性
+   ====================================================== */
+function renderCurrentChapter(initialScroll = 0) {
+    const contentBox = document.getElementById('readerContent');
+    const container = document.getElementById('readerContainer');
+    const headerTitle = document.getElementById('headerTitle');
+    if(!currentChapters || !currentChapters[currentChapterIndex]) return;
+    const chapter = currentChapters[currentChapterIndex];
+    const book = novelsLibrary.find(b => b.id === currentReadingBookId);
+    let displayTitle = chapter.title;
+    if ((displayTitle === '正文' || displayTitle.includes('(自动分页)')) && book && book.title) {
+        displayTitle = book.title;
+    }
+    headerTitle.textContent = displayTitle;
+    contentBox.classList.add('fade-out-content');
+    setTimeout(() => {
+        let paragraphs = chapter.content.split(/\n+/);
+        let titleInContent = chapter.title === '正文' ? (book ? book.title : chapter.title) : chapter.title;
+        let htmlBuffer = `<div class="chapter-title-in-text" style="font-size:24px; font-weight:bold; margin-bottom:20px; text-align:center;">${titleInContent}</div>`;
+        paragraphs.forEach(p => {
+            p = p.trim();
+            if (p) {
+                // 🔥 核心修复：手动将双引号替换为 HTML 实体 &quot;
+                // 这样就不会破坏 data-text="..." 的 HTML 结构了
+                const safeText = escapeHTML(p).replace(/"/g, '&quot;');
+
+                // 只有段落够长才显示气泡
+                const btnHtml = p.length > 5
+                    ? `<span class="discuss-btn" onclick="startPlotDiscussion(event, this)">💬</span>`
+                    : '';
+
+                htmlBuffer += `<p data-text="${safeText}">${escapeHTML(p)}${btnHtml}</p>`;
+            }
+        });
+        if(currentChapterIndex < currentChapters.length - 1) {
+            htmlBuffer += `<div style="text-align:center; padding: 20vh 0; color:#999; font-size:12px;">- 本章完 -</div>`;
+        } else {
+            htmlBuffer += `<div style="text-align:center; padding: 20vh 0; color:#999; font-size:12px;">- 全书完 -</div>`;
+        }
+        contentBox.innerHTML = htmlBuffer;
+        // 重新应用 CSS Columns 布局
+        const screenEl = document.querySelector('.screen');
+        const exactScreenWidth = screenEl.getBoundingClientRect().width;
+        contentBox.style.columnWidth = `${exactScreenWidth}px`;
+        contentBox.style.columnGap = '0px';
+        contentBox.style.width = 'auto';
+        contentBox.style.height = '100%';
+        contentBox.classList.remove('fade-out-content');
+        contentBox.classList.add('fade-in-content');
+        requestAnimationFrame(() => {
+            if(initialScroll === 'end') {
+                container.scrollLeft = container.scrollWidth;
+            } else {
+                container.scrollLeft = initialScroll;
+            }
+            updateReaderPageNumber();
+        });
+        saveReadingProgress();
+    }, 50);
+}
+
+function closeNovelReader() {
+    // ▼▼▼ 新增这行 ▼▼▼
+    stopNovelTts();
+    // ▲▲▲ 新增结束 ▲▲▲
+
+    document.getElementById('novelReaderPage').classList.remove('show');
+    document.getElementById('chapterListPanel').classList.remove('show');
+
+    saveReadingProgress();
+    currentReadingBookId = null;
+    currentChapters = [];
+}
+
+
+/**
+ * 保存阅读进度
+ */
+function saveReadingProgress() {
+    if (currentReadingBookId) {
+        const container = document.getElementById('readerContainer');
+        const currentBook = novelsLibrary.find(b => b.id === currentReadingBookId);
+        if (currentBook) {
+            currentBook.currentChapterIndex = currentChapterIndex;
+            currentBook.currentScrollPos = container.scrollLeft;
+            // 为了书架进度条显示，保留总体progress逻辑（可选）
+            // currentBook.progress = ...
+            saveNovelLibrary();
+        }
+    }
+}
+
+/**
+ * 9. 点击翻页逻辑 (含章节切换关键逻辑)
+ */
+function handleReaderClick(e) {
+    const container = document.getElementById('readerContainer');
+    const pageSize = container.getBoundingClientRect().width; // 一页的宽度
+    const currentScroll = container.scrollLeft;
+    const maxScroll = container.scrollWidth - pageSize; // 可滚动的最大距离
+
+    // 容差值 (处理浏览器像素计算误差)
+    const tolerance = 5;
+
+    // 获取点击位置
+    const rect = container.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const clickRatio = clickX / pageSize;
+
+    // 当前在这一章的第几页
+    const currentPageIndex = Math.round(currentScroll / pageSize);
+
+    if (clickRatio < 0.3) {
+        // === 点击左侧：上一页 ===
+        if (currentScroll <= tolerance) {
+            // 已经在第一页了 -> 跳到上一章
+            if (currentChapterIndex > 0) {
+                showSuccessModal('正在加载', '上一章', 500);
+                currentChapterIndex--;
+                renderCurrentChapter('end'); // 跳到上一章的末尾
+            } else {
+                showSuccessModal('提示', '已经是第一章了', 1000);
+            }
+        } else {
+            // 正常翻上一页
+            container.scrollTo({left: (currentPageIndex - 1) * pageSize, behavior: 'smooth'});
+        }
+
+    } else if (clickRatio > 0.7) {
+        // === 点击右侧：下一页 ===
+        if (currentScroll >= maxScroll - tolerance) {
+            // 已经在最后一页了 -> 跳到下一章
+            if (currentChapterIndex < currentChapters.length - 1) {
+                showSuccessModal('正在加载', '下一章', 500);
+                currentChapterIndex++;
+                renderCurrentChapter(0); // 跳到下一章的开头
+            } else {
+                showSuccessModal('提示', '已经是最后一章了', 1000);
+            }
+        } else {
+            // 正常翻下一页
+            container.scrollTo({left: (currentPageIndex + 1) * pageSize, behavior: 'smooth'});
+        }
+
+    } else {
+        // === 点击中间：呼出菜单 ===
+        toggleReaderMenus();
+    }
+
+    // 监听滚动结束保存进度 (防抖)
+    // 注意：这里简单处理，实际应使用 debounce
+    setTimeout(saveReadingProgress, 500);
+}
+
+/**
+ * 切换菜单显示状态
+ */
+function toggleReaderMenus() {
+    document.getElementById('readerHeaderBar').classList.toggle('hidden');
+    document.getElementById('readerFloatMenu').classList.toggle('hidden');
+}
+
+/* script.js - 修改 updateReaderPageNumber 为全书页码版 */
+
+/**
+ * 更新页码进度 (全书总页码估算版)
+ */
+function updateReaderPageNumber() {
+    const container = document.getElementById('readerContainer');
+    const scrollLeft = container.scrollLeft;
+    const pageWidth = container.clientWidth;
+    const scrollWidth = container.scrollWidth;
+
+    if (pageWidth === 0 || !currentChapters || currentChapters.length === 0) return;
+
+    // 1. 计算当前章节内的页码情况
+    const currentPageInChapter = Math.round(scrollLeft / pageWidth) + 1;
+    const totalPagesInChapter = Math.round(scrollWidth / pageWidth);
+
+    // 2. 获取当前章节的内容长度
+    const currentChapterContent = currentChapters[currentChapterIndex].content || "";
+    const currentLen = currentChapterContent.length;
+
+    // 3. 估算每页的字符数 (密度)
+    // 如果章节太短，可能会导致误差，所以设置一个最小保护值 (例如每页至少100字)
+    let charsPerPage = totalPagesInChapter > 0 ? (currentLen / totalPagesInChapter) : 200;
+    if (charsPerPage < 50) charsPerPage = 200; // 兜底默认值
+
+    // 4. 计算之前的章节总字数
+    let prevChaptersLen = 0;
+    for (let i = 0; i < currentChapterIndex; i++) {
+        prevChaptersLen += (currentChapters[i].content || "").length;
+    }
+
+    // 5. 计算全书总字数
+    let totalBookLen = prevChaptersLen + currentLen;
+    // 继续加上后面章节的字数
+    for (let i = currentChapterIndex + 1; i < currentChapters.length; i++) {
+        totalBookLen += (currentChapters[i].content || "").length;
+    }
+
+    // 6. 计算当前读到的总字数位置
+    // (当前章节内页码 - 1) / 章节总页数 = 章节内进度百分比
+    // 进度字数 = 章节内进度百分比 * 章节长度
+    // 实际上更简单：(currentPageInChapter - 1) * charsPerPage + 之前的字数
+    const currentProgressChars = prevChaptersLen + ((currentPageInChapter - 1) * charsPerPage);
+
+    // 7. 换算成全书页码
+    const globalTotalPages = Math.ceil(totalBookLen / charsPerPage);
+    let globalCurrentPage = Math.ceil(currentProgressChars / charsPerPage) + 1;
+
+    // 修正边界值
+    if (globalCurrentPage > globalTotalPages) globalCurrentPage = globalTotalPages;
+    if (globalCurrentPage < 1) globalCurrentPage = 1;
+
+    // 8. 更新显示
+    // 显示格式：总进度页码  (同时保留章节页码作为辅助，或者只显示总页码)
+    // 这里只显示总页码，如 "12 / 580"
+    const progressEl = document.getElementById('readerProgress');
+    progressEl.textContent = `${globalCurrentPage} / ${globalTotalPages}`;
+
+    // 如果你希望同时看到百分比，可以用下面这行代替上面那行：
+    // const percent = Math.min(100, Math.round((globalCurrentPage / globalTotalPages) * 100));
+    // progressEl.textContent = `${globalCurrentPage} / ${globalTotalPages} (${percent}%)`;
+}
+
+
+/* ========== 目录/章节跳转功能 ========== */
+
+/**
+ * 打开目录面板
+ */
+function openChapterList() {
+    // 1. 隐藏原来的浮动菜单
+    document.getElementById('readerHeaderBar').classList.add('hidden');
+    document.getElementById('readerFloatMenu').classList.add('hidden');
+
+    // 2. 渲染目录列表
+    renderChapterListDOM();
+
+    // 3. 显示目录面板
+    const panel = document.getElementById('chapterListPanel');
+
+    // 🔥🔥🔥【关键新增】给整个面板绑定阻断事件，防止误触底层 🔥🔥🔥
+    // 每次打开前先移除旧的，防止重复绑定（保险起见）
+    panel.onclick = (e) => {
+        e.stopPropagation(); // 阻止点击事件传到屏幕或Dock栏
+    };
+    // 同时也阻止触摸移动穿透（防止在列表滑不动时带动下面页面）
+    panel.ontouchmove = (e) => {
+        e.stopPropagation();
+        // 注意：这里不阻止默认行为，否则列表就滚不动了，只阻止冒泡
+    };
+
+    panel.classList.add('show');
+
+    // 4. 自动滚动到当前章节位置
+    setTimeout(() => {
+        const activeItem = document.querySelector('.chapter-item.active');
+        if (activeItem) {
+            activeItem.scrollIntoView({ block: 'center', behavior: 'auto' });
+        }
+    }, 100);
+}
+
+/**
+ * 关闭目录面板
+ */
+function closeChapterList() {
+    document.getElementById('chapterListPanel').classList.remove('show');
+}
+
+/**
+ * 渲染目录列表 DOM
+ * 修复：添加 e.stopPropagation() 防止点击穿透到底部菜单触发世界选择
+ */
+function renderChapterListDOM() {
+    const container = document.getElementById('chapterListContent');
+    container.innerHTML = '';
+    if (!currentChapters || currentChapters.length === 0) {
+        container.innerHTML = '<div style="text-align:center; padding:20px; color:#999;">暂无章节信息</div>';
+        return;
+    }
+    currentChapters.forEach((chapter, index) => {
+        const div = document.createElement('div');
+        div.className = 'chapter-item';
+        // 如果是当前正在读的章节，添加高亮类
+        if (index === currentChapterIndex) {
+            div.classList.add('active');
+        }
+        div.textContent = chapter.title.trim() || `第 ${index + 1} 章`;
+
+        // ▼▼▼▼▼▼▼▼ 核心修改区域 ▼▼▼▼▼▼▼▼
+        div.onclick = (e) => {
+            // 🛑 阻止事件冒泡！这能防止点击穿透到底部的 Dock 栏或触发全局返回
+            if (e) e.stopPropagation();
+            jumpToChapter(index);
+        };
+        // ▲▲▲▲▲▲▲▲ 修改结束 ▲▲▲▲▲▲▲▲
+
+        container.appendChild(div);
+    });
+}
+
+/**
+ * 跳转到指定章节
+ */
+function jumpToChapter(index) {
+    if (index < 0 || index >= currentChapters.length) return;
+
+    currentChapterIndex = index;
+
+    // 渲染该章节
+    renderCurrentChapter(0); // 0 表示跳到该章开头
+
+    // 关闭目录
+    closeChapterList();
+
+    // 给个提示
+    showSuccessModal('跳转成功', `已跳转至：${currentChapters[index].title.substring(0, 10)}...`, 1000);
+}
+
+
+// 启动一个定时器，每分钟更新一次阅读器时间 (保持不变)
+setInterval(updateReaderTime, 60000);
+
+// 数据持久化辅助函数 (保持不变)
+function saveNovelLibrary() {
+    localStorage.setItem('phoneNovelLibrary', JSON.stringify(novelsLibrary));
+}
+
+function loadNovelLibrary() {
+    const saved = localStorage.getItem('phoneNovelLibrary');
+    if (saved) novelsLibrary = JSON.parse(saved);
+}
+
+// 辅助: 更新顶部标题和电量 (保持不变)
+async function updateReaderTime() {
+    const timeEl = document.getElementById('readerTime');
+    const now = new Date();
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    if (timeEl) timeEl.textContent = `${hours}:${minutes}`;
+}
+
+// 初始化
+loadNovelLibrary();
+
+/* =========================================
+   📚 小说听书功能模块 (Minimax API)
+   ========================================= */
+let pendingPlotContext = null; // 用于临时存储想要讨论的剧情段落
+
+let currentNovelAudio = null; // 全局变量：存储当前的小说音频对象
+let isNovelPlaying = false;   // 全局变量：标记是否正在播放
+
+/**
+ * 切换小说听书状态 (播放/停止)
+ */
+async function toggleNovelTts() {
+    const btnText = document.getElementById('novelTtsText');
+    const btnIcon = document.getElementById('novelTtsIcon');
+
+    // 1. 如果正在播放，则停止
+    if (isNovelPlaying) {
+        stopNovelTts();
+        return;
+    }
+
+    // 2. 检查配置
+    const voiceConfig = globalConfig.minimaxVoice;
+    if (!voiceConfig.apiUrl || !voiceConfig.apiKey || !voiceConfig.groupId || !voiceConfig.ttsModel) {
+        showErrorModal('配置缺失', '请先在“设置 > 语音设置”中配置 Minimax API。');
+        return;
+    }
+
+    // 3. 检查是否有内容
+    if (!currentChapters || !currentChapters[currentChapterIndex]) {
+        showErrorModal('无法朗读', '当前没有可阅读的章节内容。');
+        return;
+    }
+
+    // 4. 获取当前章节文本
+    // 为了防止API超时，这里截取前2000个字符进行试读，或者你可以做更复杂的分段逻辑
+    let textToRead = currentChapters[currentChapterIndex].content;
+
+    // 简单清洗一下文本，去除多余空行
+    textToRead = textToRead.replace(/\s+/g, ' ').trim();
+
+    if (!textToRead) {
+        showErrorModal('无法朗读', '当前章节内容为空。');
+        return;
+    }
+
+    // 5. 更新UI为加载状态
+    isNovelPlaying = true; // 先标记为true防止重复点击
+    if (btnText) btnText.textContent = "加载中...";
+
+    // 使用加载中的图标动画 (复用CSS中的spinner)
+    if (btnIcon) btnIcon.innerHTML = `<svg viewBox="0 0 50 50" class="spinner"><circle class="path" cx="25" cy="25" r="20" fill="none" stroke-width="5" stroke="currentColor"></circle></svg>`;
+
+    try {
+        // 6. 调用 API
+        // 使用一个默认的声音ID，比如 'male-qn-qingse' (青涩男声) 适合读小说，或者 'female-qn-yuxin'
+        const voiceId = 'male-qn-qingse';
+
+        const audio = await synthesizeNovelAudio(textToRead, voiceConfig, voiceId);
+
+        // 7. 播放音频
+        currentNovelAudio = audio;
+
+        audio.onended = () => {
+            stopNovelTts(); // 播放结束自动重置
+            // 进阶功能：在这里可以自动 currentChapterIndex++ 然后继续播放下一章
+        };
+
+        audio.onerror = () => {
+            showErrorModal('播放出错', '音频流中断。');
+            stopNovelTts();
+        };
+
+        audio.play();
+
+        // 8. 更新UI为播放中状态 (显示停止按钮)
+        if (btnText) btnText.textContent = "停止";
+        if (btnIcon) btnIcon.innerHTML = `<path d="M6 6h12v12H6z" />`; // 方块停止图标
+
+    } catch (error) {
+        console.error("听书失败:", error);
+        stopNovelTts(); // 重置状态
+        showErrorModal('听书失败', error.message.includes('401') ? 'API Key 无效' : '网络请求失败');
+    }
+}
+
+/**
+ * 停止小说听书
+ */
+function stopNovelTts() {
+    if (currentNovelAudio) {
+        currentNovelAudio.pause();
+        currentNovelAudio = null;
+    }
+    isNovelPlaying = false;
+
+    // 恢复UI按钮状态
+    const btnText = document.getElementById('novelTtsText');
+    const btnIcon = document.getElementById('novelTtsIcon');
+
+    if (btnText) btnText.textContent = "听书";
+    if (btnIcon) btnIcon.innerHTML = `<path d="M12 3v9.28c-.47-.17-.97-.28-1.5-.28C8.01 12 6 14.01 6 16.5S8.01 21 10.5 21c2.31 0 4.2-1.75 4.45-4H15V6h4V3h-7z"/>`;
+}
+
+/**
+ * 核心：调用 Minimax API 合成音频
+ * @returns {Promise<Audio>} 返回一个 HTMLAudioElement
+ */
+async function synthesizeNovelAudio(text, config, voiceId) {
+    // 截取文本以防过长导致API报错 (Minimax T2A v2 限制约 4096 tokens，这里保守取前 1500 字演示)
+    // 实际生产环境需要把章节切分为多个段落队列依次请求
+    const safeText = text.substring(0, 1500) + (text.length > 1500 ? "..." : "");
+
+    const response = await fetch(`${config.apiUrl}?GroupId=${config.groupId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${config.apiKey}`
+        },
+        body: JSON.stringify({
+            model: config.ttsModel,
+            text: safeText,
+            stream: false,
+            output_format: 'hex',
+            voice_setting: {
+                voice_id: voiceId,
+                speed: 1.0,
+                vol: 1.0,
+                pitch: 0
+            }
+        })
+    });
+
+    if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.base_resp?.status_msg || `API Error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    if (data.base_resp && data.base_resp.status_code !== 0) {
+        throw new Error(data.base_resp.status_msg);
+    }
+
+    // 解码 Hex 音频数据
+    const audioHex = data.data.audio;
+    if (!audioHex) throw new Error("API未返回音频数据");
+
+    const audioBytes = hexToUint8Array(audioHex); // 使用现有的 hexToUint8Array 函数
+    const audioBlob = new Blob([audioBytes], {type: 'audio/mpeg'});
+    const audioUrl = URL.createObjectURL(audioBlob);
+
+    return new Audio(audioUrl);
+}
+// 全局变量：存储背景上下文（三页文本）
+let globalReadingContext = "";
+
+/**
+ * [新增] 获取当前阅读位置的前后一共三页的文本
+ * 逻辑：获取 scrollLeft 前一页、当前页、后一页范围内的所有文字
+ */
+function getReaderContext() {
+    const container = document.getElementById('readerContainer');
+    const content = document.getElementById('readerContent');
+
+    if (!container || !content) return "";
+
+    const pageWidth = container.clientWidth;
+    const currentScroll = container.scrollLeft;
+
+    // 定义范围：
+    // 起点 = 当前滚动位 - 1页宽度 (上一页)
+    // 终点 = 当前滚动位 + 2页宽度 (当前页 + 下一页)
+    // 稍微放宽一点容差 (-10 / +10)，防止边缘文字丢失
+    const startRange = currentScroll - pageWidth - 10;
+    const endRange = currentScroll + (pageWidth * 2) + 10;
+
+    const paragraphs = content.querySelectorAll('p');
+    let contextParts = [];
+
+    paragraphs.forEach(p => {
+        // 在 CSS Column 布局中，offsetLeft 代表元素相对于容器起始位置的水平距离
+        const pLeft = p.offsetLeft;
+        const pWidth = p.offsetWidth;
+        const pRight = pLeft + pWidth;
+
+        // 判断段落是否与目标范围有交集
+        // 逻辑：段落右侧大于范围起点 且 段落左侧小于范围终点
+        if (pRight > startRange && pLeft < endRange) {
+            // 优先获取 data-text (原始文本)，如果没有则取 innerText 并清理掉按钮符号
+            const text = p.getAttribute('data-text') || p.innerText.replace("💬", "").trim();
+            if (text) {
+                contextParts.push(text);
+            }
+        }
+    });
+
+    return contextParts.join('\n\n');
+}
+
+/* ======================================================
+   修复: 启动剧情讨论 (保留阅读器背景)
+   ====================================================== */
+function startPlotDiscussion(event, btnElement) {
+    if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+    }
+
+    const pTag = btnElement.parentElement;
+    const text = pTag.getAttribute('data-text');
+
+    if (!text) return;
+
+    pendingPlotContext = text;
+    globalReadingContext = getReaderContext();
+
+    // ▼▼▼ 核心修改：注释掉下面这两行，不要隐藏阅读器 ▼▼▼
+    // document.getElementById('novelReaderPage').classList.remove('show');
+    // document.getElementById('novelShelfPage').classList.remove('show');
+    // ▲▲▲ 修改结束 ▲▲▲
+
+    // 直接打开联系人库，它会以更高的层级覆盖在上面
+    setTimeout(() => {
+        openContactLibrary('discuss');
+    }, 100);
+}
+
+/**
+ * [步骤1] 核心功能：在后台对小说进行宏观层次分析 (同步阅读器分章逻辑版)
+ */
+async function analyzeNovelStructure(bookId) {
+    const book = novelsLibrary.find(b => b.id === bookId);
+    if (!book) return;
+
+    // 1. 读取全文
+    let fullText = "";
+    try {
+        fullText = await ImageDB.getText(book.contentId);
+    } catch(e) {
+        return;
+    }
+
+    // 2. ✨ 关键修改：使用和阅读器完全一致的分章逻辑
+    // 这样能确保分析出来的 "第X章/部分" 和用户看到的是一一对应的
+    const chapters = parseTxtToChapters(fullText);
+    if(chapters.length === 0) return;
+
+    // 3. 抽取摘要 (书名 + 简介 + 目录骨架)
+    const introText = fullText.substring(0, 2000).replace(/\s+/g, ' ');
+    const totalChapters = chapters.length;
+
+    // 生成目录大纲字符串
+    // 如果章节太多（比如超过30章），我们均匀抽取一些作为骨架给AI看
+    const sampleStep = Math.max(1, Math.floor(totalChapters / 30));
+    let chapterOutline = "";
+
+    for(let i=0; i < totalChapters; i += sampleStep) {
+        // 获取每一章的标题 和 开头100个字作为预览
+        const preview = chapters[i].content.substring(0, 50).replace(/\s+/g, ' ');
+        chapterOutline += `${i+1}. [${chapters[i].title}]: ${preview}...\n`;
+    }
+
+    // 4. 构建分析 Prompt
+    // 专门针对自动分段的情况做了提示词优化
+    const analysisPrompt = `
+我上传了一本小说《${book.title}》。
+这本书被切分成了 ${totalChapters} 个部分（可能是章节，也可能是自动按字数切分的段落）。
+
+请根据下面的【开篇内容】和【目录/部分预览】，分析这本书的宏观走向。
+
+【要求】：
+1. 忽略琐碎细节，概括故事的主线剧情。
+2. 即使是自动分段，也请尝试根据预览内容判断大致的剧情阶段。
+3. 严格输出 JSON 格式。
+
+【开篇内容】：${introText}...
+【目录/部分概览】：
+${chapterOutline}
+
+请输出 JSON：
+{
+  "summary": "全书剧情一句话简介",
+  "layers": [
+    {"stage": "剧情阶段1", "range": "例如: 第1-5部分", "content": "概括该阶段主要发生了什么"},
+    {"stage": "剧情阶段2", "range": "例如: 第6-15部分", "content": "概括该阶段主要发生了什么"}
+  ] 
+}`;
+
+    // 5. 调用 AI 分析 (保持原有逻辑)
+    try {
+        const messages = [{ role: 'user', content: analysisPrompt }];
+        const result = await callApi(messages);
+
+        if (result.success) {
+            let analysisData = null;
+            try {
+                // 使用新的健壮解析器
+                analysisData = robustJsonParse(result.message);
+            } catch (e) {
+                analysisData = { rawText: result.message };
+            }
+
+            // 6. 存入书籍数据
+            book.aiAnalysis = analysisData;
+            book.isAnalyzed = true;
+            saveNovelLibrary();
+            console.log(`✅ 《${book.title}》结构分析完成`);
+        }
+    } catch (err) {
+        console.error("AI分析失败", err);
+    }
+}
+
+/* =========================================================
+   📚 剧情讨论核心逻辑优化 - 包含完整上下文注入与气泡分割
+   ========================================================= */
+/**
+ * [优化版] 初始化剧情讨论
+ * 1. 界面切换
+ * 2. 数据准备
+ * 3. 发送首条引用消息
+ */
+async function initiateDiscussChat(contact) {
+    if (!pendingPlotContext) {
+        showSuccessModal('提示', '剧情内容为空', 1500);
+        closeContactLibrary();
+        return;
+    }
+    const plotText = pendingPlotContext;
+    // === 界面切换 ===
+    closeContactLibrary();
+    document.getElementById('novelReaderPage').classList.add('show'); // 确保背景是阅读器
+    // === 数据准备 ===
+    currentDiscussContact = contact;
+    const contactId = contact.id;
+    // 判断联系人类型以决定存储位置
+    const isSweetheart = sweetheartContactsData.some(c => c.id === contactId) || contact.type === 'sweetheart';
+    // 确保联系人已保存
+    if (isSweetheart) {
+        if (!sweetheartContactsData.some(c => c.id === contactId)) {
+            sweetheartContactsData.push(contact);
+            saveSweetheartContacts();
+        }
+    } else {
+        if (!contactsData.some(c => c.id === contactId)) {
+            contactsData.push(contact);
+            localStorage.setItem('phoneContactsData', JSON.stringify(contactsData));
+        }
+    }
+    // === 弹窗初始化 ===
+    const modal = document.getElementById('discussModal');
+    const msgContainer = document.getElementById('discussMessages');
+    const titleEl = modal.querySelector('.discuss-title');
+    msgContainer.innerHTML = ''; // 清空旧消息
+    titleEl.textContent = `与 ${contact.name} 讨论中`;
+    modal.classList.add('show');
+    // === 加载历史记录 (最近30条) ===
+    const storageKey = isSweetheart ? 'phoneSweetheartChatHistory' : 'phoneChatHistory';
+    const allHistory = JSON.parse(localStorage.getItem(storageKey) || '{}');
+    const myHistory = allHistory[contactId] || [];
+    myHistory.slice(-30).forEach(msg => {
+        appendDiscussBubble(msg); // 渲染历史气泡
+    });
+    // === 发送当前的“剧情引用”消息 ===
+    const messagePayload = {
+        sender: 'user',
+        text: '这段剧情很有意思，你怎么看？',
+        quote: {
+            text: plotText,
+            senderName: '小说原文'
+        },
+        timestamp: Date.now()
+    };
+    // 1. 保存
+    const saveFunc = isSweetheart ? saveSweetheartMessage : saveMessage;
+    saveFunc(contactId, messagePayload);
+    // 2. 渲染
+    appendDiscussBubble(messagePayload);
+    // 3. 触发AI (上下文增强版)
+    await triggerDiscussAI(messagePayload, isSweetheart, true);
+}
+// 2. 关闭弹窗函数
+function closeDiscussModal() {
+    // 只是移除 .show 类，这样底下的 content (小说阅读器) 就会露出来
+    document.getElementById('discussModal').classList.remove('show');
+}
+
+
+// 3. 发送按钮点击事件
+// 发送消息按钮逻辑 (纯文本)
+function sendDiscussMessage() {
+    const input = document.getElementById('discussInput');
+    const text = input.value.trim();
+    if (!text) return;
+
+    input.value = '';
+
+    const contactId = currentDiscussContact.id;
+    const isSweetheart = sweetheartContactsData.some(c => c.id === contactId) || currentDiscussContact.type === 'sweetheart';
+
+    const msgObj = { sender: 'user', text: text, timestamp: Date.now() };
+
+    // 保存
+    const saveFunc = isSweetheart ? saveSweetheartMessage : saveMessage;
+    saveFunc(contactId, msgObj);
+
+    // 渲染
+    appendDiscussBubble(msgObj);
+
+    // 触发AI
+    triggerDiscussAI(msgObj, isSweetheart);
+}
+/**
+ * [步骤3] 触发剧情讨论 AI 回复 (当前章节内容深度注入版)
+ * 核心升级：不再只依赖宏观分析，而是直接把当前章节/部分的实际文字喂给 AI
+ */
+async function triggerDiscussAI(userMsgObj, isSweetheart, isInit = false) {
+    const contactId = currentDiscussContact.id;
+    const saveFunc = isSweetheart ? saveSweetheartMessage : saveMessage;
+
+    // UI: 显示“正在输入”
+    const loadingId = 'loading-' + Date.now();
+    const loadingMsgContainer = document.createElement('div');
+    loadingMsgContainer.id = loadingId;
+    loadingMsgContainer.style.textAlign = 'center';
+    loadingMsgContainer.style.padding = '10px';
+    loadingMsgContainer.innerHTML = `<span style="font-size:12px; color:#999;">✨ ${currentDiscussContact.name} 正在阅读当前剧情...</span>`;
+
+    const msgContainer = document.getElementById('discussMessages');
+    if(msgContainer) {
+        msgContainer.appendChild(loadingMsgContainer);
+        msgContainer.scrollTop = msgContainer.scrollHeight;
+    }
+
+    // --- 构建 Prompt Payload ---
+    const messagesPayload = [];
+
+    // 1. 基础系统指令
+    messagesPayload.push({ role: "system", content: AI_REALCHAT_SYSTEM_PROMPT });
+
+    // 2. ✨✨✨ 核心升级：注入当前章节/部分的具体内容 ✨✨✨
+    if (currentReadingBookId && currentChapters && currentChapters[currentChapterIndex]) {
+        const book = novelsLibrary.find(b => b.id === currentReadingBookId);
+        const currentChap = currentChapters[currentChapterIndex];
+
+        let novelContextInfo = "";
+
+        // A. 宏观背景 (如果有 AI 分析结果)
+        if (book && book.aiAnalysis) {
+            if (book.aiAnalysis.rawText) {
+                novelContextInfo += `【全书背景参考】：${book.aiAnalysis.rawText}\n\n`;
+            } else if (book.aiAnalysis.layers) {
+                novelContextInfo += "【全书背景参考】：\n";
+                book.aiAnalysis.layers.forEach(layer => {
+                    novelContextInfo += `- ${layer.stage} (${layer.range}): ${layer.content}\n`;
+                });
+                novelContextInfo += "\n";
+            }
+        }
+
+        // B. 微观实况 (当前这部分的实际文字)
+        // 为了防止 Token 超限，我们截取本章关键内容（前2000字 + 后1000字）
+        // 如果是自动切分的“部分”，内容通常在 8000 字左右，全部发过去可能会有点多，建议截取
+        const contentText = currentChap.content;
+        let contentToSend = "";
+
+        if (contentText.length > 3500) {
+            contentToSend = contentText.substring(0, 2000) +
+                            "\n\n......(中间略)......\n\n" +
+                            contentText.substring(contentText.length - 1000);
+        } else {
+            contentToSend = contentText;
+        }
+
+        const currentReadingPrompt = `
+[小说阅读实况数据]
+📖 书名：《${book ? book.title : '未知'}》
+📍 当前进度：${currentChap.title} (第 ${currentChapterIndex + 1} 部分/章)
+
+Creating Context...
+${novelContextInfo}
+
+📜 **【重点：用户当前正在阅读的文字内容】**：
+"""
+${contentToSend}
+"""
+
+(System Instruction: 用户正在读上面这段具体的文字。请务必结合【这段文字的具体剧情】，以${currentDiscussContact.name}的身份发表看法、吐槽或回应。不要只说空话，要显得你也读了这段内容。)
+`;
+        messagesPayload.push({ role: "system", content: currentReadingPrompt });
+    }
+
+    // 3. 注入世界书/世界设定/人设 (保持不变)
+    // ... 世界书 ...
+    const worldbookContext = gatherWorldbookContext();
+    if (worldbookContext) messagesPayload.push({ role: "system", content: worldbookContext });
+
+    // ... 世界设定 ...
+    if (currentWorldId) {
+        const world = worldsData.find(w => w.id === currentWorldId);
+        if (world) {
+            let worldSettingText = `[当前世界设定]\n世界名称：${world.name}\n${world.description || ''}`;
+            messagesPayload.push({ role: "system", content: worldSettingText });
+        }
+    }
+
+    // ... 角色设定 (合并处理) ...
+    let characterInfo = `[你的角色设定]\n姓名：${currentDiscussContact.name}\n`;
+    if (currentDiscussContact.status) characterInfo += `设定：${currentDiscussContact.status}\n`;
+    if (currentDiscussContact.personality) characterInfo += `性格：${currentDiscussContact.personality}\n`;
+    if (currentDiscussContact.boundMasks) {
+        currentDiscussContact.boundMasks.forEach(maskId => {
+            const mask = masksData.find(m => m.id === maskId);
+            if(mask) characterInfo += `\n[${mask.name}]: ${mask.content}`;
+        });
+    }
+    messagesPayload.push({ role: "system", content: characterInfo });
+
+    // 4. 用户设定
+    if (userProfile.persona) {
+        messagesPayload.push({ role: "system", content: `[用户设定]\n${userProfile.persona}` });
+    }
+
+    // 5. 处理用户发送的消息 (引用+评论)
+    let finalUserText = userMsgObj.text;
+    if (userMsgObj.quote) {
+        // 在讨论模式下，我们强调用户是指着具体的某句话
+        finalUserText = `(指着文中这一句) "${userMsgObj.quote.text}"\n\n我说：${userMsgObj.text}`;
+    }
+
+    if(isInit) {
+        messagesPayload.push({
+            role: "system",
+            content: `(Action: 这是一个新的讨论话题。请直接针对用户引用的那句话以及当前章节发生的剧情进行互动。)`
+        });
+    }
+
+    messagesPayload.push({ role: "user", content: finalUserText });
+
+    // --- 发起请求 ---
+    try {
+        const result = await callApi(messagesPayload);
+        const el = document.getElementById(loadingId);
+        if (el) el.remove();
+
+        if (result.success) {
+            let rawReply = result.message;
+            // 清洗
+            rawReply = rawReply.replace(/^```json|```$/g, '').trim();
+            try {
+                const parsed = JSON.parse(rawReply);
+                if(parsed.reply) rawReply = parsed.reply;
+            } catch(e){}
+
+            // 保存
+            saveFunc(contactId, { sender: 'contact', text: rawReply, timestamp: Date.now() });
+
+            // 渲染
+            const segments = rawReply.split('---').filter(s => s.trim() !== '');
+            if (segments.length > 0) {
+                for (const seg of segments) {
+                    appendDiscussBubble(seg.trim(), 'contact');
+                    await new Promise(r => setTimeout(r, 600));
+                }
+            } else {
+                appendDiscussBubble(rawReply, 'contact');
+            }
+        } else {
+            appendDiscussBubble(`(连接失败: ${result.message})`, 'system');
+        }
+    } catch (err) {
+        console.error(err);
+        const el = document.getElementById(loadingId);
+        if (el) el.remove();
+        alert("网络请求出错");
+    }
+}
+
+
+/**
+ * 4. 核心逻辑：处理发送、保存、AI回复、弹窗渲染 (增强版：带人设和世界书)
+ */
+async function handleDiscussSend(text, isInit) {
+    if (!currentDiscussContact) return;
+
+    const contactId = currentDiscussContact.id;
+    // 判断是密友还是普通联系人，决定用哪个保存函数
+    const isSweetheart = sweetheartContactsData.some(c => c.id === contactId) || currentDiscussContact.type === 'sweetheart';
+    const activeSaveFunc = isSweetheart ? saveSweetheartMessage : saveMessage;
+
+    // === A. 用户消息处理 ===
+
+    // 1. 保存到 LocalStorage (实现同步)
+    const userMsgObj = { sender: 'user', text: text };
+    // 如果是初始消息（剧情引用），我们可以把引用部分存为quote，或者作为普通文本，这里作为普通文本处理更简单
+    activeSaveFunc(contactId, userMsgObj);
+
+    // 2. 渲染到悬浮窗 (创建临时的DOM)
+    appendDiscussBubble(text, 'user');
+
+    // === B. AI 回复处理 ===
+
+    // 显示“对方正在输入”
+    const loadingId = 'discuss-loading-' + Date.now();
+    const loadingDiv = document.createElement('div');
+    loadingDiv.id = loadingId;
+    loadingDiv.style.textAlign = 'center';
+    loadingDiv.style.color = '#999';
+    loadingDiv.style.fontSize = '12px';
+    loadingDiv.style.marginTop = '10px';
+    loadingDiv.textContent = `${currentDiscussContact.name} 正在输入...`;
+    document.getElementById('discussMessages').appendChild(loadingDiv);
+    document.getElementById('discussMessages').scrollTop = document.getElementById('discussMessages').scrollHeight;
+
+    // --- ⬇️⬇️⬇️ 核心修改：构建完整的上下文 Prompt ⬇️⬇️⬇️ ---
+
+    const messagesPayload = [];
+
+    // 1. 发送真人聊天风格指令 (确保像正常聊天)
+    messagesPayload.push({ role: "system", content: AI_REALCHAT_SYSTEM_PROMPT });
+
+    // 2. 发送世界书上下文 (Lore)
+    // 我们需要手动收集该角色绑定的世界书，因为 gatherWorldbookContext 依赖全局变量
+    const relevantWorldbookIds = new Set();
+    // 添加内置全局设定
+    relevantWorldbookIds.add(GLOBAL_WORLDBOOK_ID);
+    // 添加角色绑定的
+    if (currentDiscussContact.boundWorldbooks) {
+        currentDiscussContact.boundWorldbooks.forEach(id => relevantWorldbookIds.add(id));
+    }
+    // 添加当前世界绑定的
+    if (currentWorldId) {
+        const world = worldsData.find(w => w.id === currentWorldId);
+        if (world && world.worldbooks) {
+            world.worldbooks.forEach(id => relevantWorldbookIds.add(id));
+        }
+    }
+    // 组装文本
+    const contextEntries = [];
+    relevantWorldbookIds.forEach(id => {
+        const entry = worldbookData.find(wb => wb.id === id);
+        if (entry && entry.content) {
+            contextEntries.push(`### ${entry.title}\n${entry.content}`);
+        }
+    });
+    if (contextEntries.length > 0) {
+        messagesPayload.push({
+            role: "system",
+            content: "[背景设定/世界观 (Bot必须遵守)]\n---\n" + contextEntries.join('\n\n') + "\n---"
+        });
+    }
+
+    // 3. 发送角色基本人设 (Persona)
+    let characterSetting = `[你的角色设定]\n姓名：${currentDiscussContact.name}\n`;
+    if (currentDiscussContact.status) characterSetting += `基础设定：${currentDiscussContact.status}\n`;
+    if (currentDiscussContact.personality) characterSetting += `性格：${currentDiscussContact.personality}\n`;
+    if (currentDiscussContact.relationship) characterSetting += `与用户的关系：${currentDiscussContact.relationship}\n`;
+    messagesPayload.push({ role: "system", content: characterSetting });
+
+    // 4. 发送绑定的面具 (Masks) - 这是详细人设的关键
+    if (currentDiscussContact.boundMasks && currentDiscussContact.boundMasks.length > 0) {
+        let maskContent = '[你的详细人设/面具]\n';
+        currentDiscussContact.boundMasks.forEach(maskId => {
+            const mask = masksData.find(m => m.id === maskId);
+            if (mask) {
+                maskContent += `### ${mask.name}\n${mask.content}\n\n`;
+            }
+        });
+        messagesPayload.push({ role: "system", content: maskContent });
+    }
+
+    // 5. 发送用户设定 (User Persona)
+    if (userProfile.persona) {
+        messagesPayload.push({ role: "system", content: `[用户(我)的设定]\n姓名：${userProfile.name}\n${userProfile.persona}` });
+    }
+
+    // 6. 如果是初始剧情讨论，添加一个特殊的引导语
+    if (isInit) {
+        const guidePrompt = `(系统提示：用户正在与你分享一段小说剧情。请保持你的人设性格（${currentDiscussContact.name}），用自然的口语发表看法或吐槽，就像朋友聊天一样。不要像AI助手那样做阅读理解分析。)`;
+        messagesPayload.push({ role: "system", content: guidePrompt });
+    }
+
+    // 7. 添加用户的当前消息
+    messagesPayload.push({ role: "user", content: text });
+
+    // --- ⬆️⬆️⬆️ 构建结束 ⬆️⬆️⬆️ ---
+
+    try {
+        const result = await callApi(messagesPayload);
+
+        const loadingEl = document.getElementById(loadingId);
+        if (loadingEl) loadingEl.remove();
+
+        if (result.success) {
+            let replyText = result.message;
+
+            // 尝试解析可能的 JSON (针对密友模式) 或清理 Markdown
+            if (isSweetheart) {
+                try {
+                    // 如果AI返回了JSON格式，尝试提取reply字段
+                    const parsed = JSON.parse(replyText);
+                    if (parsed.reply) replyText = parsed.reply;
+                } catch(e) {
+                    // 忽略JSON错误，视为普通文本
+                }
+            }
+            // 清理可能存在的 ```json 等标记
+            replyText = replyText.replace(/^```json|```$/g, '').trim();
+
+            // 4. 保存 AI 回复
+            const aiMsgObj = { sender: 'contact', text: replyText };
+            activeSaveFunc(contactId, aiMsgObj);
+
+            // 5. 渲染 (处理 --- 分段)
+            const segments = replyText.split('---').filter(s => s.trim());
+            if (segments.length > 0) {
+                for (const seg of segments) {
+                    appendDiscussBubble(seg.trim(), 'contact');
+                    // 简单的打字机延迟效果
+                    await new Promise(r => setTimeout(r, 300));
+                }
+            } else {
+                appendDiscussBubble(replyText, 'contact');
+            }
+
+        } else {
+            // 这里换成不那么突兀的气泡报错
+            appendDiscussBubble(`(发送失败: ${result.message})`, 'system');
+        }
+
+    } catch (err) {
+        console.error(err);
+        const loadingEl = document.getElementById(loadingId);
+        if (loadingEl) loadingEl.remove();
+        alert("网络请求出错");
+    }
+}
+
+// 5. 辅助：在悬浮窗内渲染气泡 (增强版：支持引用样式和历史记录)
+/* script.js - 修改 appendDiscussBubble 函数 */
+
+/**
+ * [优化 Markdown 版] 渲染单条讨论消息
+ */
+function appendDiscussBubble(messageData) {
+    const container = document.getElementById('discussMessages');
+
+    // 数据归一化 (兼容旧格式传参)
+    let msg = messageData;
+    if (typeof messageData === 'string') {
+        msg = { sender: 'contact', text: messageData }; // 默认为对方
+        // 如果有第二个参数
+        if (arguments.length > 1) msg.sender = arguments[1];
+    }
+
+    const row = document.createElement('div');
+    row.className = `message-row ${msg.sender === 'user' ? 'sent' : 'received'}`;
+
+    // 1. 头像逻辑
+    let avatarSrc = '💬';
+    if(msg.sender === 'user') {
+        avatarSrc = userProfile.avatar || '👤';
+    } else {
+        avatarSrc = currentDiscussContact.avatar || '💬';
+    }
+
+    const isUrl = avatarSrc.includes('http') || avatarSrc.includes('data:');
+    const avatarHtml = isUrl
+        ? `<img src="${avatarSrc}" style="width:100%;height:100%;object-fit:cover;">`
+        : `<div class="initials">${avatarSrc}</div>`;
+
+    // 2. 内容气泡
+    let contentHtml = '';
+
+    // 处理引用样式 (引用部分保持纯文本或简单转义)
+    if(msg.quote) {
+        contentHtml += `
+            <div class="quoted-message-wrapper" style="font-size:12px; opacity:0.8; margin-bottom:6px;">
+                <strong style="color:inherit;">${escapeHTML(msg.quote.senderName)}</strong>
+                <div style="margin-top:2px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; opacity: 0.9;">
+                    ${escapeHTML(msg.quote.text)}
+                </div>
+            </div>
+        `;
+    }
+
+    // 🔥🔥🔥 核心修改：使用 Markdown 解析器处理主文本 🔥🔥🔥
+    const rawText = msg.text || '';
+    // 如果文本包含 <img (图片)，则不进行 Markdown 解析，直接显示 HTML (或者根据你的需求处理)
+    // 假设讨论中主要是文字，我们进行解析：
+    const renderedText = parseSimpleMarkdown(rawText);
+
+    // 将解析后的 HTML 放入带有 markdown-content 类的容器中
+    contentHtml += `<div class="markdown-content">${renderedText}</div>`;
+
+    // 组装 HTML
+    row.innerHTML = `
+        <div class="message-chat-avatar" style="width:32px;height:32px;border-radius:50%;overflow:hidden;flex-shrink:0; background:#eee;">
+            ${avatarHtml}
+        </div>
+        <div class="message-content" style="max-width:85%;"> <!-- 稍微调宽一点方便显示代码/列表 -->
+            <div class="chat-bubble" style="padding:10px 14px; font-size:14px; ${msg.sender==='user' ? 'background:#0A84FF;color:white;' : 'background:white;color:#333;border:1px solid #eee;'}">
+                ${contentHtml}
+            </div>
+        </div>
+    `;
+
+    container.appendChild(row);
+
+    // 滚动底部
+    requestAnimationFrame(() => {
+        container.scrollTop = container.scrollHeight;
+    });
+}
+
+
+/**
+ * [轻量级 Markdown 解析器]
+ * 专为聊天气泡设计，处理常用的格式：标题、列表、粗体、引用、代码块
+ * @param {string} text - 原始 Markdown 文本
+ * @returns {string} - 解析后的 HTML 字符串
+ */
+function parseSimpleMarkdown(text) {
+    if (!text) return '';
+
+    // 1. 安全转义 (防XSS) - 先转义基本字符，但在后续正则处理中要小心
+    let html = text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+
+    // 2. 保护代码块 (避免代码块内部的内容被格式化)
+    const codeBlocks = [];
+    html = html.replace(/```([\s\S]*?)```/g, (match, code) => {
+        codeBlocks.push(code); // 保存代码内容
+        return `___CODE_BLOCK_${codeBlocks.length - 1}___`; // 占位符
+    });
+
+    const inlineCodes = [];
+    html = html.replace(/`([^`]+)`/g, (match, code) => {
+        inlineCodes.push(code);
+        return `___INLINE_CODE_${inlineCodes.length - 1}___`;
+    });
+
+    // 3. 处理标题 (# H1 - ### H3) -> 转换为 <strong> 或 h3 (避免气泡内字太大)
+    html = html.replace(/^(#{1,3})\s+(.*)$/gm, (match, hashes, content) => {
+        return `<h3>${content}</h3>`;
+    });
+
+    // 4. 处理粗体 (**text**)
+    html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+    // 5. 处理斜体 (*text*)
+    html = html.replace(/(^|[^\*])\*([^\*]+)\*(?=$|[^\*])/g, '$1<em>$2</em>');
+
+    // 6. 处理引用 (> text)
+    html = html.replace(/^>\s+(.*)$/gm, '<blockquote>$1</blockquote>');
+
+    // 7. 处理无序列表 (- item 或 * item)
+    // 技巧：先将每一行列表项转为 <li>，然后再用正则把没被包裹的相邻 <li> 包裹进 <ul>
+    html = html.replace(/^\s*[\-\*]\s+(.*)$/gm, '<li>$1</li>');
+    // 将连续的 li 包裹在 ul 中 (简单实现：匹配连续的 li 标签)
+    html = html.replace(/(<li>.*?<\/li>(\s*<li>.*?<\/li>)*)/gs, '<ul>$1</ul>');
+
+    // 8. 处理有序列表 (1. item)
+    html = html.replace(/^\s*\d+\.\s+(.*)$/gm, '<li>$1</li>');
+    // 注意：这里简单地将有序列表也转为了 li，如果 <ul> 和 <ol> 重叠可能会有样式小瑕疵，
+    // 但在聊天中通常能接受。为了区分，可以用不同的替换逻辑包裹 <ol>，这里从简：
+    // 如果上一行已经是 <ul>...</ul>，这里的有序 li 会被独立。为简单起见，暂且让 CSS 统一处理 li。
+    // 若要严格区分，需更复杂的解析器。
+
+    // 9. 处理普通换行：将剩余的换行符转化为 <br>
+    // 注意：ul, blockquote, h3 等块级元素后的换行可以去掉，避免间距过大
+    html = html.replace(/<\/ul>\s*\n/g, '</ul>');
+    html = html.replace(/<\/blockquote>\s*\n/g, '</blockquote>');
+    html = html.replace(/<\/h3>\s*\n/g, '</h3>');
+    html = html.replace(/\n/g, '<br>');
+
+    // 10. 恢复代码块
+    html = html.replace(/___INLINE_CODE_(\d+)___/g, (match, index) => {
+        return `<code>${inlineCodes[index]}</code>`;
+    });
+    html = html.replace(/___CODE_BLOCK_(\d+)___/g, (match, index) => {
+        return `<pre><code>${codeBlocks[index]}</code></pre>`;
+    });
+
+    return html;
+}
+
+
+/* =========================================
+   💰 小猫记账本核心逻辑 (AI 增强版 - 带持久化记忆)
+   ========================================= */
+let ledgerData = []; // 存储账单数据 (交易明细)
+let ledgerChatHistory = []; // ✨ 新增：存储聊天对话记录
+let isLedgerListMode = false;
+let isLedgerAiMode = false;
+
+// ✨✨ AI 记账专用提示词 (兼容版) ✨✨
+/* script.js 顶部常量 */
+
+const LEDGER_AI_PROMPT = `
+你是一个专业的记账助手。请分析图片中的账单或交易记录。
+
+【核心指令】
+1. **必须返回纯 JSON 格式**。不要使用 Markdown 表格，不要使用 \`\`\`json 包裹。
+2. **严禁输出 <think> 标签** 或任何思考过程。直接输出结果。
+3. 如果图片包含多笔交易，请全部列出。
+
+【JSON 数据结构】
+请严格遵守此格式：
+{
+  "reply": "一句简短可爱的总结（如：'识别到5笔交易喵！'）",
+  "items": [
+      { "desc": "交易描述(商品名或交易对象)", "amount": -10.00 },
+      { "desc": "工资收入", "amount": 5000.00 }
+  ]
+}
+
+【金额规则】
+- **支出**必须为负数（例如 -25.50）。通常显示为黑色字体或带"-"号。
+- **收入/退款**必须为正数（例如 100.00）。通常显示为黄色/红色字体或带"+"号，或标有"退款"、"红包"。
+`;
+
+
+
+// 1. 初始化与打开/关闭
+function openLedger() {
+    loadLedgerData();
+    document.getElementById('ledgerPage').classList.add('show');
+    renderLedgerStats();
+    updateLedgerDate();
+
+    // ✨ 新增：渲染历史聊天记录
+    renderLedgerChatHistory();
+}
+
+function closeLedger() {
+    document.getElementById('ledgerPage').classList.remove('show');
+}
+
+// 2. 切换视图模式 (对话 vs 列表)
+function toggleLedgerMode() {
+    isLedgerListMode = !isLedgerListMode;
+    const chatArea = document.getElementById('ledgerChatMode');
+    const listArea = document.getElementById('ledgerListMode');
+    const toggleBtn = document.querySelector('.ledger-toggle-mode');
+
+    if (isLedgerListMode) {
+        chatArea.classList.add('hidden');
+        listArea.classList.remove('hidden');
+        toggleBtn.textContent = '切换记账 💬';
+        renderLedgerList();
+    } else {
+        chatArea.classList.remove('hidden');
+        listArea.classList.add('hidden');
+        toggleBtn.textContent = '切换列表 📝';
+        // 切换回聊天时滚动到底部
+        const list = document.getElementById('ledgerChatList');
+        if (list) list.scrollTop = list.scrollHeight;
+    }
+}
+
+// 切换 AI 记账模式
+function toggleLedgerAiMode() {
+    isLedgerAiMode = !isLedgerAiMode;
+
+    // 更新 UI
+    const switchEl = document.querySelector('.ledger-ai-switch');
+    const inputBar = document.querySelector('.ledger-input-bar');
+    const inputField = document.getElementById('ledgerInput');
+
+    if (isLedgerAiMode) {
+        switchEl.classList.add('active');
+        inputBar.classList.add('ai-active');
+        inputField.placeholder = "✨ AI模式：发送“今晚吃火锅300”试试...";
+        showSuccessModal('AI 记账开启', '发送文字或图片，小猫帮你识别！', 1500);
+    } else {
+        switchEl.classList.remove('active');
+        inputBar.classList.remove('ai-active');
+        inputField.placeholder = "例如：喝奶茶 25";
+    }
+}
+
+// 3. 数据持久化 (包含账单和聊天记录)
+function loadLedgerData() {
+    try {
+        // 加载账单明细
+        const savedLedger = localStorage.getItem('phoneLedgerData');
+        if (savedLedger) ledgerData = JSON.parse(savedLedger);
+
+        // ✨ 加载聊天记录
+        const savedHistory = localStorage.getItem('phoneLedgerChatHistory');
+        if (savedHistory) ledgerChatHistory = JSON.parse(savedHistory);
+        else ledgerChatHistory = [];
+
+    } catch (e) {
+        console.error('Ledger load error', e);
+    }
+}
+
+function saveLedgerData() {
+    localStorage.setItem('phoneLedgerData', JSON.stringify(ledgerData));
+    renderLedgerStats();
+}
+
+// ✨ 新增：保存聊天记录
+function saveLedgerChatHistory() {
+    // 限制历史记录数量，防止无限增长（例如保留最近100条）
+    if (ledgerChatHistory.length > 100) {
+        ledgerChatHistory = ledgerChatHistory.slice(-100);
+    }
+    localStorage.setItem('phoneLedgerChatHistory', JSON.stringify(ledgerChatHistory));
+}
+
+// ✨ 新增：渲染历史记录
+function renderLedgerChatHistory() {
+    const list = document.getElementById('ledgerChatList');
+    // 保留系统欢迎语
+    list.innerHTML = '<div class="ledger-system-msg">喵~ 发送“项目 金额”或者上传小票照片，我帮你记账哦！💰</div>';
+
+    ledgerChatHistory.forEach(msg => {
+        // 第4个参数 false 表示不重复保存到历史
+        addLedgerBubble(msg.content, msg.type, msg.id, false);
+    });
+
+    // 滚动到底部
+    setTimeout(() => {
+        list.scrollTop = list.scrollHeight;
+    }, 50);
+}
+
+// 4. 更新顶部统计
+function renderLedgerStats() {
+    let income = 0;
+    let expense = 0;
+    ledgerData.forEach(item => {
+        if (item.amount > 0) income += item.amount;
+        else expense += Math.abs(item.amount);
+    });
+
+    document.getElementById('statIncome').textContent = income.toFixed(2);
+    document.getElementById('statExpense').textContent = expense.toFixed(2);
+    document.getElementById('statBalance').textContent = (income - expense).toFixed(2);
+}
+
+function updateLedgerDate() {
+    const now = new Date();
+    document.getElementById('ledgerCurrentMonth').textContent = `${now.getMonth() + 1}月`;
+}
+
+// 5. 发送记账消息 (已修改：添加保存逻辑)
+async function sendLedgerMessage() {
+    const input = document.getElementById('ledgerInput');
+    const text = input.value.trim();
+    if (!text) return;
+
+    // A. 用户消息上屏 (true 表示保存到历史)
+    addLedgerBubble(text, 'user', null, true);
+    input.value = '';
+
+    // === 判断是否为 AI 模式 ===
+    if (isLedgerAiMode) {
+        // AI 模式逻辑
+        if (!globalConfig.apiConfigs[globalConfig.activeApiConfig]) {
+            addLedgerBubble("喵？你还没配置 API 呢！在设置里配好再来找我玩哦~", 'ai', null, true);
+            return;
+        }
+
+        const loadingId = 'loading-' + Date.now();
+        // Loading消息不需要保存到历史
+        addLedgerBubble("小猫正在疯狂计算中... 🧮", 'ai', loadingId, false);
+
+        try {
+            const messages = [
+                {role: "system", content: LEDGER_AI_PROMPT},
+                {role: "user", content: text}
+            ];
+
+            const result = await callApi(messages);
+            document.getElementById(loadingId)?.remove();
+
+            if (!result.success) {
+                addLedgerBubble(`出错了喵：${result.message}`, 'ai', null, true);
+                return;
+            }
+
+            let aiData;
+            try {
+                const jsonMatch = result.message.match(/\{[\s\S]*\}/);
+                const jsonStr = jsonMatch ? jsonMatch[0] : result.message;
+                aiData = JSON.parse(jsonStr);
+            } catch (e) {
+                console.error("AI JSON解析失败", e);
+                addLedgerBubble("算不过来了... (AI返回格式错误)", 'ai', null, true);
+                return;
+            }
+
+            const record = {
+                id: Date.now(),
+                desc: aiData.desc || "未知项",
+                amount: parseFloat(aiData.amount),
+                date: Date.now(),
+                type: parseFloat(aiData.amount) > 0 ? 'income' : 'expense'
+            };
+
+            ledgerData.unshift(record);
+            saveLedgerData();
+
+            const amountStr = Math.abs(record.amount).toFixed(2);
+            const sign = record.amount > 0 ? '+' : '-';
+            const finalReply = `${aiData.reply}\n\n✅ 已记账：${record.desc} ${sign}${amountStr}`;
+
+            addLedgerBubble(finalReply, 'ai', null, true);
+
+        } catch (err) {
+            document.getElementById(loadingId)?.remove();
+            addLedgerBubble("连接断开了... 😿", 'ai', null, true);
+            console.error(err);
+        }
+
+    } else {
+        // 🛠️ 原生简单逻辑
+        const numMatch = text.match(/(-?\d+(\.\d+)?)/g);
+
+        if (numMatch) {
+            const amountStr = numMatch[numMatch.length - 1];
+            let amount = parseFloat(amountStr);
+            let desc = text.replace(amountStr, '').trim();
+            if (!desc) desc = "一般支出";
+
+            let type = 'expense';
+            if (text.includes('收入') || text.includes('赚') || text.includes('工资')) {
+                type = 'income';
+                amount = Math.abs(amount);
+            } else {
+                type = 'expense';
+                amount = -Math.abs(amount);
+            }
+
+            await new Promise(r => setTimeout(r, 600));
+
+            const record = {id: Date.now(), desc, amount, date: Date.now(), type};
+            ledgerData.unshift(record);
+            saveLedgerData();
+
+            const reply = `记下来啦！📝\n【${desc}】 ${type === 'income' ? '收入' : '支出'} ${Math.abs(amount)}元`;
+            addLedgerBubble(reply, 'ai', null, true);
+
+        } else {
+            await new Promise(r => setTimeout(r, 600));
+            addLedgerBubble("唔...我没看懂金额，请说“奶茶 20”这样的格式哦~", 'ai', null, true);
+        }
+    }
+}
+
+// 6. 发送图片记账 (AI 识别更新 + 持久化修复)
+function triggerLedgerImage() {
+    if (!isLedgerAiMode) {
+        showSuccessModal('功能受限', '只有 AI 记账模式才可以识别图片哦~ 📷', 2000);
+        return;
+    }
+    document.getElementById('ledgerMsgImageInput').click();
+}
+
+/**
+ * 🛠️ 暴力 JSON 解析器
+ * 不管 AI 加了什么 Markdown 符号或废话，只要有 { ... } 就能抠出来
+ */
+function forceParseJson(str) {
+    if (!str) return null;
+
+    // 1. 尝试直接解析
+    try {
+        return JSON.parse(str);
+    } catch (e) {
+        // console.log("直接解析失败，尝试清洗...");
+    }
+
+    // 2. 暴力清洗：寻找第一个 '{' 和最后一个 '}'
+    const firstOpen = str.indexOf('{');
+    const lastClose = str.lastIndexOf('}');
+
+    if (firstOpen !== -1 && lastClose !== -1) {
+        const jsonCandidate = str.substring(firstOpen, lastClose + 1);
+        try {
+            return JSON.parse(jsonCandidate);
+        } catch (e) {
+            console.error("提取后解析依然失败:", jsonCandidate);
+        }
+    }
+
+    return null; // 彻底失败
+}
+
+/**
+ * 🧹 清洗 AI 回复 (去除 <think> 标签和 markdown 标记)
+ */
+function cleanAiResponseText(text) {
+    if (!text) return "";
+    let cleaned = text;
+
+    // 1. 去除 <think>...</think> 代码块 (这是导致你报错的罪魁祸首)
+    cleaned = cleaned.replace(/<think>[\s\S]*?<\/think>/gi, "");
+
+    // 2. 去除 markdown 代码块标记
+    cleaned = cleaned.replace(/```json/gi, "").replace(/```/g, "");
+
+    return cleaned.trim();
+}
+
+/**
+ * 📊 Markdown 表格解析器 (备用方案)
+ * 当 AI 不听话返回表格时，用这个函数提取数据
+ */
+function parseMarkdownTableToItems(text) {
+    const items = [];
+    const lines = text.split('\n');
+
+    for (const line of lines) {
+        // 必须包含竖线，且不能是分割线 (---|---)
+        if (!line.includes('|') || line.includes('---')) continue;
+
+        // 分割列并去空
+        const cols = line.split('|').map(s => s.trim()).filter(s => s);
+
+        // 简单的启发式逻辑：寻找看起来像金额的列
+        // 通常表格里：日期 | 描述 | 金额 | 备注
+        // 我们尝试在列中寻找数字
+        let amount = null;
+        let desc = null;
+
+        for (const col of cols) {
+            // 尝试匹配金额 (支持 -13.50, +18.00, 10.00)
+            // 排除单纯的日期 (2025年...)
+            if (/^[-+]?\d+(\.\d{1,2})?$/.test(col)) {
+                amount = parseFloat(col);
+            } else if (!col.includes('2025') && !col.includes(':') && col.length > 1) {
+                // 如果不是日期也不是时间，且长度大于1，可能是描述
+                // 优先保留最长的文本作为描述
+                if (!desc || col.length > desc.length) {
+                    desc = col;
+                }
+            }
+        }
+
+        if (amount !== null && desc) {
+            items.push({desc: desc, amount: amount});
+        }
+    }
+    return items;
+}
+
+
+async function handleLedgerImage(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // 1. 生成预览
+    const previewUrl = URL.createObjectURL(file);
+    const previewHtml = `<img src="${previewUrl}" style="max-width: 150px; border-radius: 12px; display: block;" alt="账单图片">`;
+    addLedgerBubble(previewHtml, 'user', null, false);
+
+    event.target.value = '';
+
+    // 检查配置
+    if (!globalConfig.apiConfigs[globalConfig.activeApiConfig]) {
+        addLedgerBubble("喵？请先在设置里配置 API 哦~", 'ai', null, true);
+        return;
+    }
+
+    const loadingId = 'img-loading-' + Date.now();
+    addLedgerBubble("正在分析账单... (可能会有点慢)", 'ai', loadingId, false);
+
+    try {
+        // 2. 存图
+        const imgId = await ImageDB.save(file);
+        const dbHtml = `<img src="db-image://${imgId}" style="max-width: 150px; border-radius: 12px; display: block;" alt="账单图片">`;
+        ledgerChatHistory.push({content: dbHtml, type: 'user', id: Date.now()});
+        saveLedgerChatHistory();
+
+        // 3. 读取并发送
+        const base64Data = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target.result);
+            reader.readAsDataURL(file);
+        });
+
+        const messages = [
+            {role: "system", content: LEDGER_AI_PROMPT},
+            {
+                role: "user",
+                content: [
+                    {type: "text", text: "识别这张账单。"},
+                    {type: "image_url", image_url: {url: base64Data}}
+                ]
+            }
+        ];
+
+        const result = await callApi(messages);
+        document.getElementById(loadingId)?.remove();
+
+        if (!result.success) {
+            addLedgerBubble(`连接失败：${result.message}`, 'ai', null, true);
+            return;
+        }
+
+        console.log("🐱 AI原始回复:", result.message);
+
+        // --- 核心修改：双保险解析逻辑 ---
+// 步骤 A: 清洗数据
+        const cleanText = cleanAiResponseText(result.message);
+        console.log("🧹 清洗后文本:", cleanText);
+        let items = [];
+        let replyMsg = "识别完成！";
+// 步骤 B: 尝试解析 JSON (优先)
+        const jsonData = forceParseJson(cleanText);
+        if (jsonData && jsonData.items && jsonData.items.length > 0) {
+            // 方案 1: JSON 解析成功
+            items = jsonData.items;
+            replyMsg = jsonData.reply || "识别成功";
+            console.log("✅ JSON解析模式成功");
+        } else {
+            // 方案 2: JSON 失败，启用表格解析模式 (针对你截图中的情况)
+            console.warn("⚠️ JSON解析失败，尝试表格解析模式...");
+            const tableItems = parseMarkdownTableToItems(cleanText);
+
+            if (tableItems.length > 0) {
+                items = tableItems;
+                replyMsg = "虽然不是标准格式，但我看懂账单啦！(表格模式)";
+                console.log("✅ 表格解析模式成功", items);
+            }
+        }
+// 步骤 C: 结果处理
+        if (items.length === 0) {
+            // 只有当两种方法都失败时，才显示错误
+            addLedgerBubble(`看不懂这个格式喵... (解析失败)\nAI回复片段: ${cleanText.substring(0, 100)}...`, 'ai', null, true);
+            return;
+        }
+// 步骤 D: 记账入库 (保持原有逻辑)
+        let totalIncome = 0;
+        let totalExpense = 0;
+        let detailsStr = "";
+        items.forEach(item => {
+            const amount = parseFloat(item.amount);
+            if (isNaN(amount)) return;
+            const desc = item.desc || "未知项";
+            // 自动修正类型：负数为支出，正数为收入
+            const type = amount > 0 ? 'income' : 'expense';
+            if (amount > 0) totalIncome += amount;
+            else totalExpense += Math.abs(amount);
+            const record = {
+                id: Date.now() + Math.random(),
+                desc: desc,
+                amount: amount,
+                type: type,
+                date: Date.now(),
+                imgId: imgId // 关联图片ID
+            };
+            ledgerData.unshift(record);
+            const sign = amount > 0 ? '+' : '';
+            detailsStr += `\n🔹 ${desc} ${sign}${amount}`;
+        });
+        saveLedgerData(); // 更新界面统计
+        let summary = "\n\n📊 本次识别统计:";
+        if (totalIncome > 0) summary += `\n收入: +${totalIncome.toFixed(2)}`;
+        if (totalExpense > 0) summary += `\n支出: -${totalExpense.toFixed(2)}`;
+        addLedgerBubble(`${replyMsg}${detailsStr}${summary}`, 'ai', null, true);
+
+    } catch (e) {
+        document.getElementById(loadingId)?.remove();
+        console.error(e);
+        addLedgerBubble(`处理出错了：${e.message}`, 'ai', null, true);
+    }
+}
+
+
+/**
+ * 辅助：添加气泡 (已修改：集成保存逻辑和图片加载)
+ * @param {string} content 内容
+ * @param {string} type 'user' 或 'ai'
+ * @param {string} id 可选ID
+ * @param {boolean} shouldSave 是否保存到历史记录 (默认 false，防止重复保存)
+ */
+function addLedgerBubble(content, type, id = null, shouldSave = false) {
+    const list = document.getElementById('ledgerChatList');
+    const div = document.createElement('div');
+
+    div.className = `ledger-msg ${type}`;
+
+    if (typeof content === 'string' && content.includes('<img')) {
+        div.innerHTML = content;
+        div.style.background = 'transparent';
+        div.style.padding = '0';
+        div.style.boxShadow = 'none';
+        div.classList.add('image-bubble');
+
+        // ✨ 如果是 db-image，则加载它
+        const img = div.querySelector('img');
+        if (img && img.src.startsWith('db-image://')) {
+            loadRealImage(img);
+        }
+    } else {
+        div.textContent = content;
+    }
+
+    if (id) div.id = id;
+    list.appendChild(div);
+    list.scrollTop = list.scrollHeight;
+
+    // ✨ 执行保存
+    if (shouldSave) {
+        ledgerChatHistory.push({
+            content: content,
+            type: type,
+            id: id || Date.now(),
+            timestamp: Date.now()
+        });
+        saveLedgerChatHistory();
+    }
+}
+
+// 7. 渲染明细列表 (保持不变)
+function renderLedgerList() {
+    const container = document.getElementById('ledgerListContainer');
+    container.innerHTML = '';
+
+    if (ledgerData.length === 0) {
+        container.innerHTML = '<div style="text-align:center;color:#999;padding:40px;">暂无账单记录</div>';
+        return;
+    }
+
+    ledgerData.forEach(item => {
+        const row = document.createElement('div');
+        row.className = 'ledger-record-item';
+
+        const dateStr = new Date(item.date).toLocaleDateString();
+        const icon = item.amount > 0 ? '💰' : '💸';
+        const amountClass = item.amount > 0 ? 'income' : 'expense';
+        const amountSign = item.amount > 0 ? '+' : '';
+
+        row.innerHTML = `
+            <div class="record-icon">${icon}</div>
+            <div class="record-info">
+                <div class="record-title">${item.desc}</div>
+                <div class="record-date">${dateStr}</div>
+            </div>
+            <div class="record-amount ${amountClass}">${amountSign}${item.amount.toFixed(2)}</div>
+            <div class="record-delete" onclick="deleteLedgerItem(${item.id})">×</div>
+        `;
+        container.appendChild(row);
+    });
+}
+
+function deleteLedgerItem(id) {
+    if (confirm('确定删除这条账单吗？')) {
+        ledgerData = ledgerData.filter(i => i.id !== id);
+        saveLedgerData();
+        renderLedgerList();
+    }
 }
 
 
@@ -15398,6 +17595,21 @@ function initializeApp() {
                 hideSweetheartMessageActionSheet();
             }
         });
+    }
+
+    // ===== 强制修复：初始化时确保书架和阅读器是隐藏的 =====
+    const shelfPage = document.getElementById('novelShelfPage');
+    const readerPage = document.getElementById('novelReaderPage');
+
+    if (shelfPage) {
+        shelfPage.classList.remove('show'); // 移除显示类
+        // 这一步是为了防止浏览器缓存了 transform 状态
+        shelfPage.style.transform = '';
+    }
+
+    if (readerPage) {
+        readerPage.classList.remove('show');
+        readerPage.style.transform = '';
     }
 
     // ===== 初始化悬浮球和布局 =====

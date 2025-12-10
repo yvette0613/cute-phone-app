@@ -2159,6 +2159,7 @@
                     </div>
                 </div>
             </div>
+
         </div>
         <!-- ▲▲▲ 复制到这里结束 ▲▲▲ -->
         <!-- ▼▼▼ 新增：状态历史记录弹窗 ▼▼▼ -->
@@ -2175,6 +2176,152 @@
                         <div class="history-empty-icon">📂</div>
                         <div class="history-empty-text">还没有历史状态哦</div>
                     </div>
+                </div>
+            </div>
+        </div>
+        <!-- ========== 1. 小说书架页面 (新增) ========== -->
+        <div class="novel-shelf-page" id="novelShelfPage">
+            <div class="settings-header">
+                <div class="back-btn" onclick="closeNovelShelf()">←</div>
+                <div class="settings-title">我的书架</div>
+                <!-- 右上角加号，用于上传 -->
+                <div class="add-contact-btn" onclick="triggerNovelUpload()">+</div>
+            </div>
+
+            <div class="novel-shelf-content" id="novelShelfContent">
+                <!-- 小说列表将在这里动态生成 -->
+            </div>
+
+            <!-- 隐藏的文件输入框 -->
+            <input type="file" id="novelFileInput" accept=".txt" style="display: none;"
+                   onchange="handleNovelFileSelect(event)">
+        </div>
+
+        <!-- ========== 2. 小说阅读页面 (高仿 UI 版) ========== -->
+        <div class="novel-reader-page" id="novelReaderPage">
+
+            <!-- 顶部：章节标题 (点击中间时显示/隐藏) -->
+            <div class="reader-header-bar hidden" id="readerHeaderBar">
+                <div class="back-btn-text" onclick="closeNovelReader()">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                        <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
+                    </svg>
+                    <span id="headerTitle">Loading...</span>
+                </div>
+            </div>
+
+            <!-- 核心阅读区 -->
+            <div class="reader-container" id="readerContainer" onclick="handleReaderClick(event)">
+                <div id="readerContent">
+                    <!-- 文字将注入到这里 -->
+                </div>
+            </div>
+
+            <!-- 底部系统栏 (固定显示) -->
+            <div class="reader-system-bar">
+                <span class="reader-progress" id="readerProgress">0 / 0</span>
+                <div class="reader-sys-right">
+                    <span id="readerTime">19:05</span>
+                    <div class="reader-battery">
+                        <div class="reader-battery-level"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 底部浮动菜单 (已修改：加入目录按钮) -->
+            <div class="reader-float-menu hidden" id="readerFloatMenu">
+                <div class="menu-pill-btn left" onclick="openChapterList()">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                        <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>
+                    </svg>
+                    目录
+                </div>
+                <div class="menu-pill-divider"></div>
+
+                <div class="menu-pill-btn right" id="novelTtsBtn" onclick="toggleNovelTts()">
+                    <svg id="novelTtsIcon" viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                        <path d="M12 3v9.28c-.47-.17-.97-.28-1.5-.28C8.01 12 6 14.01 6 16.5S8.01 21 10.5 21c2.31 0 4.2-1.75 4.45-4H15V6h4V3h-7z"/>
+                    </svg>
+                    <span id="novelTtsText">听书</span>
+                </div>
+            </div>
+            <!-- ▼▼▼ 新增：目录弹窗列表 ▼▼▼ -->
+            <div class="chapter-list-panel" id="chapterListPanel">
+                <div class="chapter-list-header">
+                    <div class="chapter-list-title">目录</div>
+                    <div class="chapter-list-close" onclick="closeChapterList()">关闭</div>
+                </div>
+                <div class="chapter-list-container" id="chapterListContent">
+                    <!-- JS 动态生成章节列表 -->
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== 新增：记账本页面 (完整修复版) ========== -->
+        <div class="ledger-page" id="ledgerPage">
+            <div class="test-header">
+                <div class="back-btn" onclick="closeLedger()">←</div>
+                <div class="test-title">小猫账本</div>
+                <!-- 占位符，保持标题居中 -->
+                <div class="add-contact-btn" style="opacity: 0; pointer-events: none;">+</div>
+            </div>
+
+            <!-- 1. 顶部：资产卡片 & AI开关 -->
+            <div class="ledger-summary-card">
+                <div class="ledger-header-row">
+                    <div class="ledger-month-selector">
+                        <span id="ledgerCurrentMonth">--月</span>
+                        <!-- 切换视图按钮 -->
+                        <span class="ledger-toggle-mode" onclick="toggleLedgerMode()">切换列表 📝</span>
+                    </div>
+                    <!-- AI模式切换开关 -->
+                    <div class="ledger-ai-switch" onclick="toggleLedgerAiMode()">
+                        <span class="ai-switch-label">✨ AI 记账</span>
+                        <div class="ai-toggle-btn" id="ledgerAiToggle">
+                            <div class="ai-toggle-circle"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="ledger-stats-row">
+                    <div class="stat-item">
+                        <span class="stat-label">收入</span>
+                        <span class="stat-num income" id="statIncome">0.00</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">支出</span>
+                        <span class="stat-num expense" id="statExpense">0.00</span>
+                    </div>
+                </div>
+                <div class="ledger-balance">
+                    <span>结余</span>
+                    <span id="statBalance">0.00</span>
+                </div>
+            </div>
+
+            <!-- 2. 模式一：对话记账区 (包含消息列表 + 底部输入框) -->
+            <!-- ⚠️ 之前可能缺失了这一部分 -->
+            <div class="ledger-content-area" id="ledgerChatMode">
+
+                <!-- 消息列表 -->
+                <div class="ledger-chat-list" id="ledgerChatList">
+                    <div class="ledger-system-msg">喵~ 发送“项目 金额”或者上传小票照片，我帮你记账哦！💰</div>
+                </div>
+                <!-- 底部输入栏 -->
+                <div class="ledger-input-bar">
+                    <div class="ledger-upload-btn" onclick="triggerLedgerImage()">📷
+                        <input type="file" id="ledgerMsgImageInput" accept="image/*" style="display: none;"
+                               onchange="handleLedgerImage(event)">
+                    </div>
+                    <input type="text" id="ledgerInput" placeholder="例如：喝奶茶 25">
+                    <button class="ledger-send-btn" onclick="sendLedgerMessage()">记一笔</button>
+                </div>
+            </div>
+
+
+            <!-- 模式二：明细列表区 (默认隐藏) -->
+            <div class="ledger-content-area hidden" id="ledgerListMode">
+                <div class="ledger-list-container" id="ledgerListContainer">
+                    <!-- 动态生成 -->
                 </div>
             </div>
         </div>
@@ -2233,7 +2380,29 @@
             <p id="errorModalMessage">出现未知错误。</p>
         </div>
     </div>
+    <!-- ========== 新增：剧情讨论临时弹窗 ========== -->
+    <div class="modal-overlay" id="discussModal">
+        <div class="discuss-card">
+            <div class="discuss-header">
+                <div class="discuss-title">剧情讨论中...</div>
+                <button class="discuss-close-btn" onclick="closeDiscussModal()">收起</button>
+            </div>
+
+            <!-- 聊天区域 -->
+            <div class="discuss-messages" id="discussMessages">
+                <!-- 消息会动态插入这里 -->
+            </div>
+
+            <!-- 输入区域 -->
+            <div class="discuss-input-area">
+                <input type="text" id="discussInput" placeholder="输入想法...">
+                <button class="discuss-send-btn" onclick="sendDiscussMessage()">发送</button>
+            </div>
+        </div>
+    </div>
+
 </div>
+
 
 <!-- 2. 引入外部的JavaScript文件 (defer属性确保HTML解析完再执行) -->
 <script src="script.js" defer></script>

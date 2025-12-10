@@ -585,7 +585,16 @@ body.fullscreen-enabled {
     background-position: center;
     background-repeat: no-repeat;
     transition: background-image 0.5s ease-in-out;
+
+    /* 🔥🔥🔥 在这里添加这两行强制裁剪修复代码 🔥🔥🔥 */
+    /* 1. 这行代码利用遮罩强制按照 border-radius 形状裁剪子元素 */
+    -webkit-mask-image: -webkit-radial-gradient(white, black);
+
+    /* 2. 这行代码开启 GPU 加速，确保裁剪在渲染层生效，防止闪烁 */
+    transform: translate3d(0, 0, 0);
 }
+
+
 
 .pages-wrapper {
     display: flex;
@@ -10431,3 +10440,1069 @@ body.code-scrolling-enabled .code-block-wrapper {
 .sweetheart-chat-input-area.has-text #sweetheartGetReplyBtn {
     display: none !important;
 }
+
+/* ========== 小说书架样式 (修复版) ========== */
+.novel-shelf-page {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #F2F2F7;
+    z-index: 1300; /* 层级很高，所以必须确保被移出屏幕 */
+
+    /* 核心隐藏逻辑：默认向右平移100%，并隐藏可见性 */
+    transform: translateX(100%);
+    visibility: hidden;
+
+    /* 过渡动画 */
+    transition: transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94), visibility 0.35s;
+
+    display: flex;
+    flex-direction: column;
+    border-radius: 0;
+}
+
+/* 当添加了 .show 类时的样式 */
+.novel-shelf-page.show {
+    transform: translateX(0); /* 移回屏幕中间 */
+    visibility: visible;      /* 设为可见 */
+}
+
+/* 1. 书架容器 */
+.novel-shelf-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+
+    display: grid;
+    /* 固定分成3列，每列占据1份可用空间 */
+    grid-template-columns: repeat(3, 1fr);
+    grid-auto-rows: min-content;
+    align-content: start;
+
+    gap: 20px 15px;
+}
+
+/* 2. 单本书的容器 */
+.book-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    position: relative;
+
+    /* 🔥【核心修复】🔥 */
+    /* min-width: 0 允许Grid子项在空间不足时收缩，而不是被长文本撑大 */
+    min-width: 0;
+    width: 100%; /* 占满格子的宽度 */
+}
+
+/* 3. 封面样式 */
+.book-cover {
+    width: 100%;
+    /* 锁定 2:3 比例，高度自动计算 */
+    aspect-ratio: 2 / 3;
+
+    border-radius: 6px;
+    background: linear-gradient(135deg, #FF9A9E 0%, #FECFEF 100%);
+    box-shadow: 2px 4px 10px rgba(0,0,0,0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px;
+    text-align: center;
+    overflow: hidden;
+}
+
+/* 4. 封面上的文字预览修正 */
+.book-title-preview {
+    font-size: 14px;
+    font-weight: bold;
+    color: #fff;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+
+    /* 🔥 防止长英文/数字不换行撑大容器 🔥 */
+    word-break: break-all;
+    white-space: normal;
+
+    line-height: 1.4;
+    max-height: 80%;
+    overflow: hidden;
+}
+
+.book-name-label {
+    font-size: 12px;
+    color: #333;
+    text-align: center;
+    width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.book-delete-hint {
+    font-size: 10px;
+    color: #999;
+    margin-top: -4px;
+}
+
+/* ========== 小说阅读器加载动画 ========== */
+.reader-loading-container {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    color: #8D6E63;
+    z-index: 100;
+}
+
+.reader-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #E0E0E0;
+    border-top: 4px solid #8D6E63;
+    border-radius: 50%;
+    animation: reader-spin 1s linear infinite;
+}
+
+.reader-loading-text {
+    font-size: 14px;
+    font-weight: 500;
+    color: #8D6E63;
+    text-align: center;
+}
+
+@keyframes reader-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+
+/* ========== 修正后的：阅读器样式 (Screen基准版) ========== */
+.novel-reader-page {
+    position: absolute;
+    top: 0;
+    left: 0;
+
+    /* 🔥 核心：强制宽度和高度占满父级 (.screen) */
+    width: 100% !important;
+    height: 100% !important;
+
+    background-color: #E6E2D3; /* 羊皮纸色 */
+    z-index: 1400;
+
+    /* 翻页动画 */
+    transform: translateX(100%);
+    visibility: hidden;
+    transition: transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94), visibility 0.35s;
+
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+    border-radius: 0;
+
+    /* 移除所有内边距，确保容器就是屏幕大小 */
+    padding: 0 !important;
+    box-sizing: border-box;
+}
+
+.novel-reader-page.show {
+    transform: translateX(0);
+    visibility: visible;
+}
+
+/* --- 核心阅读容器 --- */
+.reader-container {
+    display: block; /* 确保是块级 */
+    width: 100%;
+
+    /* 除去顶部和底部的安全区域，你可以根据需要调整这个高度 */
+    height: calc(100% - 60px);
+    margin-top: 100px;
+    margin-bottom: 50px;
+
+    /* 横向滚动设置 */
+    overflow-x: scroll;
+    overflow-y: hidden;
+    scroll-behavior: smooth;
+
+    /* 隐藏滚动条 */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+
+    position: relative;
+
+    /* 🔥 核心：零内边距，零外边距，确保 contentBox 宽度 = 屏幕宽度 */
+    padding: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    box-sizing: border-box;
+
+    /* 🔥 新增：强制滚动吸附 (CSS Scroll Snap) */
+    /* 这是一个双重保险，浏览器会在滚动停止时自动对齐到最近的一页 */
+    scroll-snap-type: x mandatory;
+}
+.reader-container::-webkit-scrollbar { display: none; }
+
+/* 修改 #readerContent 样式 */
+#readerContent {
+    height: 100%;
+    width: 100%;
+
+    /* 关键设置 */
+    column-gap: 0 !important;
+    column-fill: auto;
+
+    padding: 0 !important;
+    box-sizing: border-box;
+}
+/* 修改段落样式，确保没有横向溢出 */
+#readerContent p {
+    /* 你的现有样式... */
+    margin: 0 0 1em 0;
+    text-indent: 2em;
+    font-size: 19px;
+    line-height: 1.8;
+    color: #2c2c2c;
+    text-align: justify;
+
+    /* 视觉留白交给 P 标签 */
+    padding: 0 24px;
+    box-sizing: border-box;
+
+    /* 防止段落被拦腰截断 */
+    break-inside: avoid;
+    page-break-inside: avoid;
+    -webkit-column-break-inside: avoid;
+
+    /* 🔥 新增：让每一页的内容都作为吸附点 */
+    scroll-snap-align: start;
+}
+/* 顶部标题栏容器 */
+.reader-header-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    /* 增加顶部内边距，避开刘海屏/状态栏 */
+    padding: 50px 16px 10px 16px !important;
+    background-color: rgba(230, 226, 211, 0.95); /* 与背景色一致的半透明色 */
+    backdrop-filter: blur(10px);
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    /* justify-content: center; */ /* 如果你想让标题绝对居中，取消这行的注释 */
+    box-shadow: 0 1px 0 rgba(0,0,0,0.05);
+}
+
+/* 优化标题栏，使其能显示章节标题 */
+#headerTitle {
+    font-size: 15px; /*稍微减小一点以容纳长标题*/
+    font-weight: 500;
+    color: #5d5d5d;
+    margin-left: 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 70%;
+    transition: opacity 0.3s;
+}
+
+/* 章节切换时的淡入淡出动画类 */
+.fade-out-content {
+    opacity: 0;
+    transition: opacity 0.2s ease-out;
+}
+.fade-in-content {
+    opacity: 1;
+    transition: opacity 0.2s ease-in;
+}
+
+/* 底部浮动菜单 - 黑色胶囊风格 */
+.reader-float-menu {
+    position: absolute;
+    bottom: 40px; /* 距离底部的高度 */
+    left: 50%;
+    transform: translateX(-50%);
+
+    /* 胶囊容器样式 */
+    background: rgba(30, 30, 30, 0.9); /* 深色背景 */
+    backdrop-filter: blur(10px);
+    padding: 12px 24px;
+    border-radius: 50px; /* 大圆角 */
+
+    display: flex;
+    align-items: center;
+    gap: 20px; /* 两个按钮之间的间距 */
+
+    z-index: 20;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+
+    /* 动画 */
+    transition: opacity 0.3s, transform 0.3s;
+}
+
+/* 隐藏时的状态（配合 JS 的 hidden 类） */
+.reader-float-menu.hidden {
+    display: flex; /* 保持 flex 布局以便测量 */
+    opacity: 0;
+    bottom: 20px;
+    pointer-events: none;
+}
+
+/* 菜单按钮样式 */
+.menu-pill-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+    color: #fff; /* 白色文字 */
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    opacity: 0.9;
+}
+
+.menu-pill-btn:active {
+    opacity: 0.6;
+}
+
+/* 按钮图标 */
+.menu-pill-btn svg {
+    width: 18px;
+    height: 18px;
+    fill: #fff;
+}
+
+/* 中间的分隔线 */
+.menu-pill-divider {
+    width: 1px;
+    height: 16px;
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* ========== 阅读器底部系统栏样式 (新增) ========== */
+
+/* 1. 系统栏容器：固定在底部 */
+.reader-system-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 44px; /* 系统栏高度 */
+
+    /* 布局：两端对齐 */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    /* 间距 */
+    padding: 0 24px;
+    padding-bottom: 14px; /* 适配手机底部安全区 */
+
+    /* 样式 */
+    font-size: 13px;
+    color: #7d7568; /* 深灰褐色，适合羊皮纸背景 */
+    background: transparent; /* 透明背景 */
+    z-index: 99; /* 确保在最上层 */
+    font-family: Menlo, Monaco, 'Courier New', monospace; /* 数字用等宽字体好看 */
+    pointer-events: none; /* 让点击穿透，不影响翻页 */
+}
+
+/* 优化系统栏，让页码显示更清晰 */
+.reader-progress {
+    font-size: 12px;
+    color: #999;
+}
+
+/* 3. 右侧信息容器 (时间和电量) */
+.reader-sys-right {
+    display: flex;
+    align-items: center;
+    gap: 10px; /* 时间和电池的间距 */
+}
+
+/* 4. 电池外框样式 */
+.reader-battery {
+    width: 22px;
+    height: 11px;
+    border: 1px solid #7d7568;
+    border-radius: 2px;
+    padding: 1px;
+    position: relative;
+    opacity: 0.8;
+    display: flex;
+    align-items: center;
+}
+
+/* 5. 电池正极小头 */
+.reader-battery::after {
+    content: '';
+    position: absolute;
+    right: -3px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 2px;
+    height: 4px;
+    background: #7d7568;
+    border-radius: 0 1px 1px 0;
+}
+
+/* 6. 电量填充条 */
+.reader-battery-level {
+    height: 100%;
+    background: #7d7568;
+    width: 100%; /* 默认满电，JS会控制实际宽度 */
+    border-radius: 1px;
+}
+
+/* ========== 阅读器目录列表样式 ========== */
+.chapter-list-panel {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 70%;
+    background: #fff; /* 必须是纯色背景 */
+    border-radius: 20px 20px 0 0;
+
+    z-index: 2000; /* 层级保持很高 */
+
+    /* 🔥🔥🔥 核心新增：就是这行代码解决了穿透问题 🔥🔥🔥 */
+    pointer-events: auto !important;
+    /* 强制捕获所有鼠标/触摸事件 */
+
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 -5px 20px rgba(0,0,0,0.1);
+}
+
+
+
+.chapter-list-panel.show {
+    transform: translateY(0);
+}
+
+.chapter-list-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.chapter-list-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #333;
+}
+
+.chapter-list-close {
+    font-size: 14px;
+    color: #666;
+    padding: 6px 12px;
+    background: #f5f5f5;
+    border-radius: 14px;
+    cursor: pointer;
+}
+
+.chapter-list-container {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px 0;
+}
+
+.chapter-item {
+    padding: 14px 20px;
+    font-size: 15px;
+    color: #333;
+    border-bottom: 1px solid #f9f9f9;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.chapter-item:active {
+    background: #f0f0f0;
+}
+
+.chapter-item.active {
+    color: #0A84FF; /* 当前章节高亮色 */
+    font-weight: 600;
+    background: rgba(10, 132, 255, 0.05);
+}
+/* style.css */
+
+/* 通用的旋转动画，用于听书加载状态 */
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.spinner {
+    animation: spin 1s linear infinite;
+    width: 16px;
+    height: 16px;
+}
+
+/* 稍微优化一下浮动菜单的按钮，防止文字变长导致挤压 */
+.reader-float-menu .menu-pill-btn {
+    min-width: 60px; /* 确保有最小宽度 */
+    justify-content: center;
+}
+
+/* ========== 小说段落与讨论按钮样式 ========== */
+
+/* 段落容器，设置为相对定位以便放置按钮 */
+#readerContent p {
+    position: relative;
+    padding-right: 30px !important; /* 右侧留出空间给图标 */
+    transition: background-color 0.2s;
+    border-radius: 8px;
+}
+
+#readerContent p:hover {
+    background-color: rgba(0, 0, 0, 0.03); /* 鼠标悬停时段落微微变色 */
+}
+
+/* 讨论小标志 */
+.discuss-btn {
+    position: absolute;
+    right: 0;
+    top: 0;
+    font-size: 16px;
+    cursor: pointer;
+    opacity: 0.3; /* 默认比较淡 */
+    transition: all 0.2s ease;
+    user-select: none;
+    padding: 4px;
+}
+
+/* 悬停段落时，图标变明显 */
+#readerContent p:hover .discuss-btn {
+    opacity: 1;
+    transform: scale(1.2);
+}
+
+.discuss-btn:hover {
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+}
+
+/* 确保讨论按钮在最上层且可点击 */
+.discuss-btn {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%); /* 垂直居中 */
+    font-size: 18px; /* 稍微调大一点 */
+    cursor: pointer;
+    opacity: 0.4;
+    transition: all 0.2s ease;
+    user-select: none;
+    padding: 8px 12px; /* 增加点击热区 */
+    z-index: 100; /* 🔥 确保在段落文字之上 */
+    background: transparent;
+    pointer-events: auto; /* 🔥 确保能接收点击事件 */
+}
+
+/* 修复阅读内容区域的层级，防止遮挡按钮 */
+#readerContent p {
+    position: relative;
+    padding-right: 40px !important; /* 留出更多空间给按钮 */
+    box-sizing: border-box;
+    z-index: 1;
+}
+
+/* 悬停效果 */
+#readerContent p:hover {
+    background-color: rgba(0, 0, 0, 0.03);
+}
+
+#readerContent p:hover .discuss-btn {
+    opacity: 1;
+    transform: translateY(-50%) scale(1.2);
+}
+
+/* 🔥 强制提升层级，确保联系人选择器永远在最上层 */
+.contact-library-page {
+    z-index: 2000 !important; /* 原始是1004，提升到2000超过所有APP */
+}
+
+/* 同样提升聊天页面的层级，防止选完人后聊天框被书架挡住 */
+.chat-page,
+.sweetheart-chat-page {
+    z-index: 1500 !important; /* 原始是1005，提升到1500超过书架(1300) */
+}
+
+/* ========== 剧情讨论弹窗样式 ========== */
+#discussModal {
+    z-index: 2500; /* 必须高于联系人库(2000)和小说阅读器(1400) */
+    background: rgba(0, 0, 0, 0.3); /* 稍微深一点的遮罩 */
+    align-items: flex-end; /* 让弹窗从底部出现，类似键盘或面板 */
+    padding: 0;
+}
+
+.discuss-card {
+    width: 100%;
+    height: 70%; /* 占据屏幕 70% 高度 */
+    background: #fff;
+    border-radius: 20px 20px 0 0;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 -5px 20px rgba(0,0,0,0.1);
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+#discussModal.show .discuss-card {
+    transform: translateY(0);
+}
+
+.discuss-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid #f0f0f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #f9f9f9;
+    border-radius: 20px 20px 0 0;
+}
+
+.discuss-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+}
+
+.discuss-close-btn {
+    font-size: 14px;
+    color: #666;
+    background: #e0e0e0;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 12px;
+    cursor: pointer;
+}
+
+.discuss-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 15px;
+    background: #f5f5f5;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* 复用现有的消息气泡样式，但在讨论窗中稍微缩小 */
+.discuss-messages .chat-bubble {
+    font-size: 14px;
+    padding: 10px;
+    max-width: 85%;
+}
+
+.discuss-input-area {
+    padding: 10px 15px;
+    background: white;
+    border-top: 1px solid #eee;
+    display: flex;
+    gap: 10px;
+    /* 适配 iPhone 底部安全区 */
+    padding-bottom: 25px;
+}
+
+#discussInput {
+    flex: 1;
+    padding: 10px 14px;
+    background: #f0f2f5;
+    border: none;
+    border-radius: 20px;
+    font-size: 14px;
+    outline: none;
+}
+
+.discuss-send-btn {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    border: none;
+    padding: 0 20px;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+/* style.css 末尾添加 */
+
+/* ========== 剧情讨论 Markdown 样式优化 ========== */
+
+/* Markdown 内容容器 */
+.markdown-content {
+    line-height: 1.6;
+    font-size: 14px;
+    color: inherit;
+}
+
+/* 1. 标题样式 */
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3 {
+    font-size: 16px;
+    font-weight: 700;
+    margin: 12px 0 6px 0;
+    line-height: 1.4;
+}
+.markdown-content h1:first-child,
+.markdown-content h2:first-child,
+.markdown-content h3:first-child {
+    margin-top: 0;
+}
+
+/* 2. 列表样式 (关键：解决缩进问题) */
+.markdown-content ul,
+.markdown-content ol {
+    margin: 6px 0;
+    padding-left: 20px; /* 留出圆点空间 */
+}
+
+.markdown-content li {
+    margin-bottom: 4px;
+    list-style-position: outside; /* 标记在外部，整齐对齐 */
+}
+
+/* 3. 粗体与斜体 */
+.markdown-content strong {
+    font-weight: 700;
+    color: inherit; /* 继承气泡文字颜色 */
+}
+.markdown-content em {
+    font-style: italic;
+    opacity: 0.9;
+}
+
+/* 4. 引用块 (Blockquote) */
+.markdown-content blockquote {
+    margin: 8px 0;
+    padding: 8px 12px;
+    border-left: 3px solid rgba(0, 0, 0, 0.2); /* 半透明边框 */
+    background: rgba(0, 0, 0, 0.05); /* 半透明背景 */
+    border-radius: 4px;
+    font-size: 0.95em;
+    color: inherit;
+}
+
+/* 发送方的引用块颜色适配 (蓝色背景) */
+.message-row.sent .markdown-content blockquote {
+    border-left-color: rgba(255, 255, 255, 0.5);
+    background: rgba(255, 255, 255, 0.15);
+}
+
+/* 5. 行内代码与代码块 */
+.markdown-content code {
+    font-family: 'Consolas', monospace;
+    background: rgba(0, 0, 0, 0.08);
+    padding: 2px 4px;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+.message-row.sent .markdown-content code {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.markdown-content pre {
+    background: #2d2d2d;
+    color: #e6e6e6;
+    padding: 10px;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 8px 0;
+}
+.markdown-content pre code {
+    background: transparent;
+    padding: 0;
+    color: inherit;
+}
+
+/* 6. 段落处理 */
+.markdown-content p {
+    margin-bottom: 8px;
+}
+.markdown-content p:last-child {
+    margin-bottom: 0;
+}
+
+
+
+/* ========== 记账本页面样式 ========== */
+.ledger-page {
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: #F2F4F7;
+    z-index: 1100;
+    transform: translateX(100%);
+    visibility: hidden;
+    transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94), visibility 0.3s;
+    display: flex;
+    flex-direction: column;
+}
+.ledger-page.show {
+    transform: translateX(0);
+    visibility: visible;
+}
+
+/* 顶部资产卡片 */
+.ledger-summary-card {
+    background: linear-gradient(135deg, #FFF0F5 0%, #E6E6FA 100%);
+    margin: 10px 20px;
+    padding: 20px;
+    border-radius: 20px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+    color: #555;
+    flex-shrink: 0;
+}
+.ledger-month-selector {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 15px;
+    font-weight: bold;
+    font-size: 16px;
+    color: #333;
+}
+.ledger-toggle-mode {
+    font-size: 13px;
+    color: #667eea;
+    cursor: pointer;
+    background: rgba(255,255,255,0.6);
+    padding: 4px 10px;
+    border-radius: 12px;
+}
+.ledger-stats-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 15px;
+}
+.stat-item {
+    display: flex;
+    flex-direction: column;
+}
+.stat-label { font-size: 12px; opacity: 0.7; }
+.stat-num { font-size: 20px; font-weight: bold; font-family: 'DIN Alternate', sans-serif; }
+.stat-num.income { color: #f39c12; }
+.stat-num.expense { color: #e74c3c; }
+.ledger-balance {
+    border-top: 1px dashed rgba(0,0,0,0.1);
+    padding-top: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 14px;
+}
+
+/* 内容区域通用 */
+.ledger-content-area {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    background: #fff;
+    border-radius: 20px 20px 0 0;
+    margin-top: 10px;
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.03);
+}
+.ledger-content-area.hidden { display: none; }
+
+/* 聊天记账模式 */
+.ledger-chat-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+.ledger-system-msg {
+    text-align: center;
+    font-size: 12px;
+    color: #999;
+    background: #f5f5f5;
+    padding: 5px 10px;
+    border-radius: 10px;
+    align-self: center;
+}
+.ledger-msg {
+    max-width: 80%;
+    padding: 10px 14px;
+    border-radius: 16px;
+    font-size: 14px;
+    line-height: 1.4;
+}
+.ledger-msg.user {
+    align-self: flex-end;
+    background: #667eea;
+    color: white;
+    border-bottom-right-radius: 4px;
+}
+.ledger-msg.ai {
+    align-self: flex-start;
+    background: #f0f2f5;
+    color: #333;
+    border-bottom-left-radius: 4px;
+    white-space: pre-wrap; /* 保留换行 */
+    line-height: 1.5;
+}
+
+
+/* 底部输入框 */
+.ledger-input-bar {
+    padding: 10px 15px; /* 增加底部内边距 */
+    background: #fff;
+    border-top: 1px solid #eee;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-bottom: 30px; /* 适配全面屏底部 */
+}
+.ledger-upload-btn {
+    font-size: 24px;
+    cursor: pointer;
+}
+#ledgerInput {
+    flex: 1;
+    padding: 10px;
+    border: 1px solid #eee;
+    border-radius: 20px;
+    background: #f9f9f9;
+    outline: none;
+}
+.ledger-send-btn {
+    background: #667eea;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 16px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+/* 列表模式 */
+.ledger-list-container {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 20px;
+}
+.ledger-record-item {
+    display: flex;
+    align-items: center;
+    padding: 15px 0;
+    border-bottom: 1px solid #f5f5f5;
+}
+.record-icon {
+    width: 40px; height: 40px;
+    background: #f0f2f5;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    margin-right: 12px;
+}
+.record-info { flex: 1; }
+.record-title { font-size: 15px; color: #333; font-weight: 500; }
+.record-date { font-size: 12px; color: #999; margin-top: 2px; }
+.record-amount { font-size: 16px; font-weight: bold; font-family: 'DIN Alternate', sans-serif; }
+.record-amount.expense { color: #333; }
+.record-amount.income { color: #f39c12; }
+.record-delete {
+    color: #ff4757; font-size: 12px; margin-left: 10px;
+    cursor: pointer; padding: 5px; opacity: 0.5;
+}
+
+/* ========== 新增：AI 记账模式样式 ========== */
+
+/* 头部布局调整 */
+.ledger-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+/* AI 开关容器 */
+.ledger-ai-switch {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.5);
+    padding: 4px 8px;
+    border-radius: 20px;
+    transition: all 0.3s ease;
+}
+
+.ai-switch-label {
+    font-size: 12px;
+    font-weight: bold;
+    color: #888;
+}
+
+/* 开关轨道 */
+.ai-toggle-btn {
+    width: 36px;
+    height: 20px;
+    background: #ccc;
+    border-radius: 20px;
+    position: relative;
+    transition: background 0.3s ease;
+}
+
+/* 开关圆球 */
+.ai-toggle-circle {
+    width: 16px;
+    height: 16px;
+    background: white;
+    border-radius: 50%;
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+/* AI 模式激活状态 */
+.ledger-ai-switch.active .ai-switch-label {
+    color: #8A2BE2; /* 紫色文字 */
+    text-shadow: 0 0 5px rgba(138, 43, 226, 0.3);
+}
+
+.ledger-ai-switch.active .ai-toggle-btn {
+    background: linear-gradient(135deg, #b06ab3, #4568dc); /* 魔法渐变色 */
+}
+
+.ledger-ai-switch.active .ai-toggle-circle {
+    transform: translateX(16px);
+}
+
+/* 输入框在 AI 模式下的特效 */
+.ledger-input-bar.ai-active {
+    border-top: 2px solid #b06ab3;
+    box-shadow: 0 -4px 20px rgba(176, 106, 179, 0.15);
+}
+
+.ledger-input-bar.ai-active .ledger-send-btn {
+    background: linear-gradient(135deg, #b06ab3, #4568dc);
+    animation: glow 2s infinite;
+}
+
+@keyframes glow {
+    0% { box-shadow: 0 0 5px rgba(176, 106, 179, 0.5); }
+    50% { box-shadow: 0 0 15px rgba(176, 106, 179, 0.8); }
+    100% { box-shadow: 0 0 5px rgba(176, 106, 179, 0.5); }
+}
+
